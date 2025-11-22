@@ -1,0 +1,24 @@
+# Python & Ambiente
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Modelos e Dados Pesados (NÃO SUBIR PARA O GITHUB)
+*.pth
+*.pt
+*.bin
+*.gguf
+models/
+checkpoints/
+datasets/
+
+# Logs e Artefatos Temporários
+experiments/logs/
+experiments/experiments_log/
+paper_resources/data/
+
+# OS Junk
+.DS_Store
+Thumbs.db
