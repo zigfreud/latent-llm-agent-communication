@@ -3,8 +3,10 @@ transformers>=4.30.0
 accelerate>=0.20.0
 datasets>=2.14.0
 bitsandbytes>=0.41.0
+sentence-transformers>=2.2.2
 matplotlib
 pandas
 numpy
 scipy
 tqdm
+torch-directml
