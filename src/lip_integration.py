@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 from lip_protocol import LIPPacket
 
 DEVICE = "cpu"
-ADAPTER_PATH = os.path.join("experiments", "experiments_log", r"20251122_0925_Gen4_Code_Specialist", "final_adapter_gen4.pth")
+ADAPTER_PATH = os.path.join("experiments", "experiments_log", r"20251123_1819_Gen4_Code_Specialist", "final_adapter_gen5.pth")
 
 print(f"🔧 [LIP Integration] Starting Universal Protocol Demo...")
 
@@ -71,16 +71,36 @@ class LIPReceiver:
         print("\n☁️  Initializing Server (Llama-3)...")
         self.model_id = "NousResearch/Meta-Llama-3-8B-Instruct"
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        
+        print(f"   Trying to load model on {DEVICE}...")
         try:
+            # Tentativa 1: Otimizada (bfloat16)
+            print("   [1/2] Attempting bfloat16 load (Low RAM)...")
             self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_id, device_map=DEVICE, torch_dtype=torch.bfloat16, low_cpu_mem_usage=True
+                self.model_id, 
+                device_map=DEVICE, 
+                torch_dtype=torch.bfloat16, 
+                low_cpu_mem_usage=True
             )
-        except:
-             self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_id, device_map=DEVICE, torch_dtype=torch.float32
-            )
+            print("   ✅ Loaded in bfloat16.")
+        except Exception as e:
+            print(f"   ⚠️ bfloat16 failed: {e}")
+            print("   [2/2] Attempting float32 load (High RAM usage!)...")
+            # Tentativa 2: Fallback explícito
+            try:
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    self.model_id, 
+                    device_map=DEVICE, 
+                    torch_dtype=torch.float32
+                )
+                print("   ✅ Loaded in float32.")
+            except Exception as e2:
+                print(f"   ❌ FATAL: Could not load model. Error: {e2}")
+                sys.exit(1) # Mata o processo se falhar
+
         self.model.eval()
 
+        print("   Calculating Energy Signature...")
         with torch.no_grad():
             self.ref_energy = self.model.get_input_embeddings().weight.norm(p=2, dim=-1).mean().item()
             print(f"⚡ Server Reference Energy: {self.ref_energy:.4f}")
@@ -132,17 +152,36 @@ class LIPReceiver:
 
 
 if __name__ == "__main__":
+    print(f"🔎 Checking Adapter at: {ADAPTER_PATH}")
     if not os.path.exists(ADAPTER_PATH):
-        print(f"❌ Adapter not found at {ADAPTER_PATH}. Please run 'src/train_gen4.py' first!")
+        print(f"❌ Adapter NOT FOUND. Check the path/filename.")
+        print(f"   Current Dir: {os.getcwd()}")
         sys.exit(1)
-
-    sender = LIPSender(ADAPTER_PATH)
-    receiver = LIPReceiver()
+    
+    print("✅ Adapter found. Starting sequence.")
+    
+    try:
+        sender = LIPSender(ADAPTER_PATH)
+    except Exception as e:
+        print(f"❌ Sender Init Failed: {e}")
+        sys.exit(1)
+        
+    try:
+        receiver = LIPReceiver()
+    except Exception as e:
+        print(f"❌ Receiver Init Failed: {e}")
+        sys.exit(1)
 
     prompt = "write an python hello world function"
 
     print("-" * 60)
-    json_payload = sender.create_packet(prompt)
-    print(f"\n🌐 [NETWORK] Transmitting JSON: {json_payload[:100]}... [Encrypted]")
-    receiver.process_packet(json_payload)
+    print(f"📝 Input Prompt: '{prompt}'")
+    
+    try:
+        json_payload = sender.create_packet(prompt)
+        print(f"\n🌐 [NETWORK] Transmitting JSON: {len(json_payload)} bytes...")
+        receiver.process_packet(json_payload)
+    except Exception as e:
+        print(f"❌ Runtime Error during transmission: {e}")
+        
     print("-" * 60)

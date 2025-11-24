@@ -98,6 +98,7 @@ def run_factory():
 
     llama_emb = torch.load(EMBEDDING_FILE).cpu()
     tok_tgt = AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3-8B-Instruct")
+    tok_tgt.pad_token = tok_tgt.eos_token
     ds = load_dataset(DATASET_NAME, split="train")
     total_len = len(ds)
     shard_len = total_len // num_shards
