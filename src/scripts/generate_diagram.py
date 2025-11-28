@@ -20,11 +20,11 @@ def draw_architecture():
     draw_box(0.5, 2.5, 2, 1, "User Prompt\n(Text)", color='#FFF3E0', edge='#EF6C00')
     ax.annotate("", xy=(3.0, 3.0), xytext=(2.7, 3.0), arrowprops=dict(arrowstyle="->", lw=2))
 
-    draw_box(3.2, 2.0, 2.5, 2, "Source Model\n(TinyLlama-1.1B)\n\nEncoder", color='#E3F2FD', edge='#1565C0')
+    draw_box(3.2, 2.0, 2.5, 2, "Source Model\n(DeepSeek-Coder-1.3b)\n\nEncoder", color='#E3F2FD', edge='#1565C0')
     ax.annotate("", xy=(6.2, 3.0), xytext=(5.9, 3.0), arrowprops=dict(arrowstyle="->", lw=2))
     ax.text(6.05, 3.1, "2048d", ha='center', fontsize=9)
 
-    draw_box(6.4, 2.2, 2.0, 1.6, "LIP Adapter\n(Dual-Encoder)\n\nBottleneck 512d", color='#FFF8E1', edge='#FBC02D')
+    draw_box(6.4, 2.2, 2.0, 1.6, "LIP Adapter\n(Dual-Encoder)\n\n512d", color='#FFF8E1', edge='#FBC02D')
     ax.annotate("", xy=(9.0, 3.0), xytext=(8.6, 3.0), arrowprops=dict(arrowstyle="->", lw=2))
     ax.text(8.8, 3.1, "LIP Packet\n(4096d)", ha='center', fontsize=9)
 

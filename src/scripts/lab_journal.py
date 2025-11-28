@@ -8,8 +8,6 @@ class LabJournal:
     def __init__(self, experiment_name, config):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
         self.exp_id = f"{timestamp}_{experiment_name}"
-
-        # Fix: Ensure logs go to experiments/experiments_log
         base_dir = os.path.join("experiments", "experiments_log")
         self.dir = os.path.join(base_dir, self.exp_id)
 

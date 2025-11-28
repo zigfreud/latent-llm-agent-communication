@@ -139,7 +139,7 @@ def run_factory():
     tok_src = AutoTokenizer.from_pretrained(SRC_ID)
     tok_src.pad_token = tok_src.eos_token
     dtype = torch.float16 if use_fp16 else torch.float32
-    model_src = AutoModelForCausalLM.from_pretrained(SRC_ID, torch_dtype=dtype).to(device).eval()
+    model_src = AutoModelForCausalLM.from_pretrained(SRC_ID, torch_dtype=dtype, use_safetensors=True).to(device).eval()
 
     print("📚 Loading Llama-3 embeddings...")
     llama_emb = torch.load(EMBEDDING_FILE).cpu()
