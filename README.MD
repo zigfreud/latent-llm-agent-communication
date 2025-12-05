@@ -1,161 +1,136 @@
 <div align="center">
 
-🧠 LIP: Latent Injection Protocol (Research Lab)
+# 🧬 LIP: The Latent Injection Protocol
 
-🧪 Universal Latent Injection Protocol for Heterogeneous Model Communication
-
-"O mundo inteiro está se perguntando como organizar LLMs de forma eficiente. Mas por que ninguém fala sobre ensiná-las a conversar em uma língua eficiente?"
-
-Este projeto explora a comunicação direta via espaço latente, eliminando a serialização de texto intermediária.
+### Why speak in JSON when you can think in Vectors?
 
 </div>
 
-📋 Resumo do Projeto
+---
 
-Este repositório contém a implementação oficial, dados experimentais e código-fonte do paper "LIP: A Universal Latent Injection Protocol for Heterogeneous Model Communication".
+### 🚀 The Thesis
 
-A arquitetura atual de Sistemas Multi-Agente (MAS) é ineficiente:
-Agente A (Pensa) -> Texto -> Tokenização -> Agente B (Lê)
+> "The whole world is asking how to organize LLMs efficiently. But why is no one talking about teaching them to speak an efficient language?"
 
-Nossa Proposta (V2V):
-Agente A (Pensa) -> Vetor Latente -> Adaptador LIP -> Agente B (Entende)
+Current Multi-Agent Systems (MAS) suffer from the **"Dinner Table Paradox"**: brilliant AI agents sit at the same table but are forced to communicate by passing handwritten notes (text/JSON). This legacy, human-centric interface is slow, insecure, and inefficient.
 
-O LIP permite que LLMs (mesmo de arquiteturas diferentes, como TinyLlama e Llama-3) se comuniquem diretamente via vetores, possibilitando:
+This process introduces critical bottlenecks:
 
-Privacidade: Ovetores são ilegíveis para humanos (obfuscação natural).
+- **Latency**: Endless tokenization and decoding cycles waste massive GPU/TPU time.
+- **Insecurity**: Sensitive data travels as plaintext, vulnerable to interception and leakage.
+- **Inefficiency**: High-bandwidth context from techniques like RAG clogs the network.
 
-Eficiência: Elimina a etapa de decodificação/geração de texto intermediário.
+### ✨ The Solution: Direct Vector-to-Vector Communication
 
-Computação Distribuída: Ideal para arquiteturas Edge-to-Cloud.
+LIP proposes a paradigm shift: **Direct Vector-to-Vector (V2V) Communication**.
 
-🏗️ Arquitetura do Experimento (Gen 4)
+By establishing a _semantic bridge_ between different models (e.g., a `TinyLlama-1.1B` at the Edge and a `Llama-3-8B` in the Cloud), we enable direct functional control and code generation without exchanging a single word of natural language. It's like telepathy for LLMs.
 
-Nesta versão (v2), validamos a comunicação Heterogênea. Utilizamos um TinyLlama-1.1B (Cliente/Sender) comandando um Llama-3-8B (Servidor/Receiver).
+---
 
-O pipeline consiste em três estágios:
+### ⚡ Key Features
 
-Sender (TinyLlama): Processa a instrução e exporta o last_hidden_state (o "pensamento vetorial").
+🔌 **Heterogeneous Bridging**: Connects models with different architectures and latent space dimensions (e.g., 2048d → 512d → 4096d).
 
-Projector (Adaptador LIP): Uma rede neural treinada (Dual-Encoder) que alinha o espaço latente do modelo menor ao do modelo maior.
+🔒 **Obfuscation by Design**: Transmits abstract mathematical intent, not human-readable text, making communication inherently private.
 
-Receiver (Llama-3): Recebe o vetor projetado diretamente em seus inputs_embeds e executa a ação.
+⚖️ **Energy Matching**: Uses physics-based calibration to ensure the injected vector is stable and coherent within the target model's latent space.
 
-graph TD;
-User[User Prompt] -->|Texto| AgentA(Sender: TinyLlama 1.1B);
-AgentA -->|Last Hidden State| Adapter{LIP Adapter / Projector};
-Adapter -->|Vetor Alinhado| AgentB(Receiver: Llama-3 8B);
-AgentB -->|Execução| Output[Código/Resposta];
+📉 **Zero-Overhead Receiver**: The server-side model skips the expensive "Reading" (Prefill) phase entirely, receiving pre-digested "thought vectors" ready for processing.
 
-    style AgentA fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style AgentB fill:#e3f2fd,stroke:#01579b,stroke-width:2px
-    style Adapter fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 5 5
+---
 
-📂 Estrutura do Repositório
+### 🛠️ Get Started in 2 Steps
 
-Este laboratório está organizado para garantir a reprodutibilidade científica:
+#### 1. Clone the Lab
 
-.
-├── paper/ # O Artigo Científico (PDF, LaTeX, Figuras)
-├── src/ # Código Fonte do Protocolo e Demos
-│ ├── lip_protocol.py # A definição do Pacote LIP (JSON + Tensores)
-│ └── lip_integration.py # Demo Cliente-Servidor (TinyLlama -> Llama-3)
-├── experiments/ # Scripts de Reprodução Científica
-│ ├── train.py # Script de Treino do Adaptador (Gen 4)
-│ ├── dataset_generator.py # Fábrica de Vetores (Filtra Alpaca)
-│ └── benchmarks/ # Scripts que geraram os gráficos do paper
-├── models/ # Checkpoints dos Adaptadores Treinados (.pth)
-└── datasets/ # Datasets de vetores pré-processados (.pt)
-
-🚀 Guia de Início Rápido (Quick Start)
-
-1. Pré-requisitos
-
-Python 3.10+
-
-Hardware: 16GB RAM (CPU-Only) ou GPU com 12GB+ VRAM.
-
-# Clone o repositório
-
-git clone [https://github.com/zigfreud/latent-llm-agent-communication.git](https://github.com/zigfreud/latent-llm-agent-communication.git)
+```bash
+git clone https://github.com/zigfreud/latent-llm-agent-communication.git
 cd latent-llm-agent-communication
+pip install -r requirements.txt
+```
 
-# Crie um ambiente virtual
+#### 2. Run the Telepathy Demo
 
-python -m venv .venv
-source .venv/bin/activate # Linux/Mac
+Watch a 1.1B parameter model control an 8B parameter model using only vectors.
 
-# ou .venv\Scripts\activate no Windows
-
-# Instale as dependências
-
-pip install torch transformers accelerate datasets matplotlib pandas numpy
-
-2. Executando a Demo (Telepatia IA)
-
-Esta demo carrega o TinyLlama (Sender) e o Llama-3 (Receiver) e demonstra a transferência de instruções via vetor.
-
-Certifique-se de possuir o arquivo de pesos lip_hetero_adapter_final.pth na pasta models/.
-
+```bash
+# Ensure you have the trained adapter located in the datasets/ directory
 python src/lip_integration.py
+```
 
-🔬 Reproduzindo a Ciência
+---
 
-Siga este pipeline para treinar o adaptador do zero e reproduzir os resultados da Gen 4 descritos no paper.
+### 🔬 Reproducibility
 
-Passo 1: Gerar o Dataset de Vetores
+This repository contains the full scientific pipeline to reproduce our results.
 
-Baixa o dataset Alpaca, filtra instruções de código e extrai/alinha os vetores dos dois modelos (Source e Target).
+- `experiments/data_factory_v3.py`: Mines instruction-following vector pairs from the dataset.
+- `experiments/train.py`: Trains the Dual-Encoder Adapter that bridges the two models.
+- `experiments/benchmarks/`: Contains scripts to generate the convergence and stability graphs.
+- `experiments/extract_embeddings.py`: Contain a function to extract the embedding layer in case you wants to use anoter LLM.
 
-python experiments/dataset_generator.py
+For a deep dive into the mathematical proofs and ablation studies, please see the full paper in the `/paper` directory.
 
-# Saída: Cria datasets/dataset_code_only.pt
+---
 
-Passo 2: Treinar o Adaptador
+<div align="center">
 
-Treina a rede neural (Dual-Encoder) para alinhar os espaços latentes.
+_An Independent Research Project by [Cristiano Silva](https://www.linkedin.com/in/cristiano-silva-a2a084204/?locale=en-US)_
 
-python experiments/train.py
+</div>
 
-# Saída: Salva models/lip_hetero_adapter_final.pth e logs
+---
 
-📊 Resultados Preliminares (Gen 4)
+### 📚 Citation
 
-Comparativo com versões anteriores (PoC):
+If you use LIP in a paper, project, or derivative work, please cite this repository so others can find the original research.
 
-Métrica
+Suggested citation (plain text):
 
-Status
+Silva, Cristiano. "LIP: The Latent Injection Protocol". 2025. GitHub repository. https://github.com/zigfreud/latent-llm-agent-communication
 
-Observação
+BibTeX example:
 
-Viabilidade Técnica
-
-✅ Sucesso
-
-Convergência de Loss < 0.003. O modelo aceita injeção vetorial heterogênea.
-
-Transferência de Sintaxe
-
-✅ Sucesso
-
-O Receiver (Llama-3) gera código Python válido a partir de "pensamentos" do TinyLlama.
-
-Integridade Semântica
-
-✅ Estável
-
-Ao contrário da PoC (que sofria Mode Collapse), a Gen 4 atingiu estabilidade semântica robusta na validação.
-
-📝 Citação / Citation
-
-Se você utilizar o LIP (Latent Injection Protocol) em sua pesquisa ou projeto, por favor cite da seguinte forma:
-
-BibTeX (LaTeX)
-
-@article{silva2025lip,
-title={LIP: A Universal Latent Injection Protocol for Heterogeneous Model Communication},
-author={Silva, Cristiano},
-year={2025},
-publisher={GitHub},
-url={[https://github.com/zigfreud/latent-llm-agent-communication](https://github.com/zigfreud/latent-llm-agent-communication)}
+```bibtex
+@misc{silva2025lip,
+  title        = {LIP: The Latent Injection Protocol},
+  author       = {Silva, Cristiano},
+  year         = {2025},
+  howpublished = {GitHub repository, \url{https://github.com/zigfreud/latent-llm-agent-communication}},
+  note         = {Accessed: 2025-11-27}
 }
+```
+
+---
+
+### 🛣️ Roadmap & Future Work
+
+LIP is an active research project. Below is a succinct, realistic roadmap capturing short, medium, and long-term goals — technical improvements, packaging, and deployment plans.
+
+Key release goals:
+
+- First protocol release: include YAML configuration templates, best-practice example pipelines, and pre-trained adapter weights for widely used open-source models where licensing allows (e.g., TinyLlama, community LLMs).
+- Publish the LIP Python package to PyPI for easy integration and experimentation.
+
+Encryption & privacy roadmap (three phases):
+
+1. Phase 1 — Current (Obfuscation by Design) ✅
+
+   - Vectors are intentionally non-human-readable by design — this reduces accidental leaks and limits casual inspection.
+   - This phase provides an immediate privacy and safety improvement with low operational cost.
+
+2. Phase 2 — Near-term (Vector Transport Encryption) 🔒
+
+   - Engineering a secure transport layer for vector packets — a TLS-like mechanism at the LIP packet level.
+   - Goals: authenticated sessions, integrity checks, forward secrecy for vector transport, and robust key management for heterogeneous systems.
+
+3. Phase 3 — Research / Long-term (Partial Homomorphic LIP) 🧪
+
+   - Investigate partial homomorphic encryption for LIP, enabling some vector-space operations while data remains encrypted.
+   - Realistic research direction: it is imposible to run full Llama-3-sized models under homomorphic encryption. Instead, explore running the semantic router in HE — the router can decide where to forward requests without learning the request content.
+
+Additional notes:
+
+- We will prioritize a pragmatic, staged approach: start with obfuscation and secure transport, then pursue HE for specific components with strong privacy needs.
+- Release artifacts will include YAML config templates and example weights (subject to model license). Packaging on PyPI will make it easy for developers and researchers to adopt LIP.

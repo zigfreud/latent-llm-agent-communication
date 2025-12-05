@@ -1,0 +1,22 @@
+experiment_name: "Gen6"
+device: "auto"
+output_dir: "checkpoints/Gen6"
+
+data:
+  dataset_path: "datasets/raw_shards"
+  batch_size: 32
+  num_workers: 4
+
+model:
+  input_dim: 2048
+  output_dim: 4096
+  hidden_dim: 1024
+
+training:
+  epochs: 100
+  learning_rate: 0.0001
+  save_every: 5
+
+loss:
+  temperature: 0.1
+  lambda_mse: 0.1
