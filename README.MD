@@ -1,136 +1,176 @@
 <div align="center">
 
-# 🧬 LIP: The Latent Injection Protocol
+# 🧬 LIP — Latent Injection Protocol
 
-### Why speak in JSON when you can think in Vectors?
+### Why speak in JSON when models can think in vectors?
 
 </div>
 
 ---
 
-### 🚀 The Thesis
+## Status
 
-> "The whole world is asking how to organize LLMs efficiently. But why is no one talking about teaching them to speak an efficient language?"
+**Active Research Prototype (Gen6 — stabilization phase)**
 
-Current Multi-Agent Systems (MAS) suffer from the **"Dinner Table Paradox"**: brilliant AI agents sit at the same table but are forced to communicate by passing handwritten notes (text/JSON). This legacy, human-centric interface is slow, insecure, and inefficient.
+This repository contains **experimental research code**.  
+Architectures, APIs, and results are subject to change.
 
-This process introduces critical bottlenecks:
-
-- **Latency**: Endless tokenization and decoding cycles waste massive GPU/TPU time.
-- **Insecurity**: Sensitive data travels as plaintext, vulnerable to interception and leakage.
-- **Inefficiency**: High-bandwidth context from techniques like RAG clogs the network.
-
-### ✨ The Solution: Direct Vector-to-Vector Communication
-
-LIP proposes a paradigm shift: **Direct Vector-to-Vector (V2V) Communication**.
-
-By establishing a _semantic bridge_ between different models (e.g., a `TinyLlama-1.1B` at the Edge and a `Llama-3-8B` in the Cloud), we enable direct functional control and code generation without exchanging a single word of natural language. It's like telepathy for LLMs.
+The project is currently transitioning from **Gen4 → Gen6**, with recent
+breakthroughs in **correct hidden-state injection mechanics** and **deterministic
+AB validation**.
 
 ---
 
-### ⚡ Key Features
+## 🚀 The Thesis
 
-🔌 **Heterogeneous Bridging**: Connects models with different architectures and latent space dimensions (e.g., 2048d → 512d → 4096d).
+> *“The field is focused on organizing LLMs via orchestration frameworks.
+But little attention is given to teaching models to communicate in an efficient,
+native language.”*
 
-🔒 **Obfuscation by Design**: Transmits abstract mathematical intent, not human-readable text, making communication inherently private.
+Modern Multi-Agent Systems (MAS) suffer from what we call the **Dinner Table Paradox**:
+highly capable agents share the same environment, yet are forced to communicate
+through **human-centric channels** (text / JSON).
 
-⚖️ **Energy Matching**: Uses physics-based calibration to ensure the injected vector is stable and coherent within the target model's latent space.
+This introduces structural bottlenecks:
 
-📉 **Zero-Overhead Receiver**: The server-side model skips the expensive "Reading" (Prefill) phase entirely, receiving pre-digested "thought vectors" ready for processing.
-
----
-
-### 🛠️ Get Started in 2 Steps
-
-#### 1. Clone the Lab
-
-```bash
-git clone https://github.com/zigfreud/latent-llm-agent-communication.git
-cd latent-llm-agent-communication
-pip install -r requirements.txt
-```
-
-#### 2. Run the Telepathy Demo
-
-Watch a 1.1B parameter model control an 8B parameter model using only vectors.
-
-```bash
-# Ensure you have the trained adapter located in the datasets/ directory
-python src/lip_integration.py
-```
+- **Latency** — repeated tokenization and decoding waste compute.
+- **Bandwidth** — large contexts (e.g., RAG) saturate communication channels.
+- **Leakage risk** — semantic intent is flattened into plaintext.
+- **Semantic loss** — rich latent structure is discarded at every hop.
 
 ---
 
-### 🔬 Reproducibility
+## ✨ Core Idea — Direct Vector-to-Vector Communication
 
-This repository contains the full scientific pipeline to reproduce our results.
+LIP explores **direct latent communication between heterogeneous LLMs**.
 
-- `experiments/data_factory_v3.py`: Mines instruction-following vector pairs from the dataset.
-- `experiments/train.py`: Trains the Dual-Encoder Adapter that bridges the two models.
-- `experiments/benchmarks/`: Contains scripts to generate the convergence and stability graphs.
-- `experiments/extract_embeddings.py`: Contain a function to extract the embedding layer in case you wants to use anoter LLM.
+Instead of exchanging tokens, a source model transmits **semantic vectors**
+that are translated and injected directly into the internal computation of
+a target model.
 
-For a deep dive into the mathematical proofs and ablation studies, please see the full paper in the `/paper` directory.
+Example setup:
+
+- **Edge / Source:** TinyLlama or DeepSeek-Coder (2048d)
+- **Cloud / Target:** Llama-3-8B (4096d)
+- **Bridge:** Asymmetric adapter with a bottleneck (e.g., 2048 → 512 → 4096)
+
+This enables **functional steering** of the target model **without textual exchange**.
+
+---
+
+## ⚡ What Works (Gen6)
+
+- ✅ **Heterogeneous latent translation** (2048d → 4096d)
+- ✅ **Contrastive alignment (InfoNCE-style)** outperforms MSE in high-dimensional spaces
+- ✅ **Correct hidden-state injection** (not input embeddings)
+- ✅ Stable injection via **forward hooks** into the **penultimate transformer layer (-2)**
+- ✅ **Deterministic AB testing** confirms non-placebo steering
+- ✅ Functional control demonstrated in code-generation tasks
+  (e.g., explanation → implementation)
+
+---
+
+## 🔬 Key Technical Decisions (Empirically Validated)
+
+- **Injection target:** Hidden states (never input embeddings)
+- **Layer:** Penultimate transformer layer (-2)
+- **Spatial focus:** Final token position
+- **Temporal scope:** Single injection at initial forward pass
+- **Calibration:** Norm-based energy matching relative to target embeddings
+
+These choices were validated through ablations on layer, position, and gain.
+
+---
+
+## ⚠️ Known Limitations
+
+- ❌ Fine-grained intent transfer remains inconsistent  
+  (vectors often encode *mode/style* better than precise constraints)
+- ❌ Dataset currently aligned to final-layer targets while injection occurs at layer -2
+  (being corrected)
+- ❌ Evaluation is limited to controlled prompts
+- ❌ No standardized benchmarks yet
+- ❌ 8B inference is **cloud-only** for stability reasons
+
+These limitations are explicitly acknowledged and align with open problems
+identified in related work.
+
+---
+
+## 🧪 Reproducibility
+
+This repository contains a **script-based, config-driven pipeline** (no notebooks):
+
+src/
+core/ # models, losses
+pipelines/ # extract, train, infer
+integrations/ # injection hooks
+configs/ # yaml experiment configs
+datasets/ # sharded latent pairs
+checkpoints/ # adapter weights
+scripts/ # CLI entry points
+
+
+Experiments are designed to be **deterministic and inspectable**.
+
+---
+
+## 🛣️ Roadmap (Near-Term)
+
+- Align dataset mining with **layer-specific injection**
+- Add **quantitative retrieval metrics** (top-k, cosine vs baseline)
+- Ablations on:
+  - injection layer
+  - token position
+  - gain / blending strength
+- Small-scale benchmark tasks (code, reasoning, structured output)
+
+---
+
+## 🔐 Privacy & Security (Research Scope)
+
+LIP currently provides **obfuscation by design**:
+vectors are non-human-readable and reduce accidental leakage.
+
+Planned research phases:
+
+1. **Current:** Obfuscation by design ✅  
+2. **Near-term:** Secure vector transport (TLS-like protocol for packets)  
+3. **Long-term:** Partial homomorphic routing (research-only, limited scope)
+
+No cryptographic security claims are made at this stage.
+
+---
+
+## 🤝 Contribution Policy
+
+This project is **not yet open for general contributions**.
+
+Feedback, inspection, and discussion are welcome.
+Targeted collaboration may be enabled once the Gen6 pipeline is fully stabilized.
+
+---
+
+## 📎 Disclaimer
+
+This is **research code**, not a production library.
+
+Expect breaking changes.
 
 ---
 
 <div align="center">
 
-_An Independent Research Project by [Cristiano Silva](https://www.linkedin.com/in/cristiano-silva-a2a084204/?locale=en-US)_
+_An Independent Research Project by  
+[Cristiano Silva](https://www.linkedin.com/in/cristiano-silva-a2a084204/)_
 
 </div>
 
 ---
 
-### 📚 Citation
+## 📚 Citation
 
-If you use LIP in a paper, project, or derivative work, please cite this repository so others can find the original research.
+If you reference this work:
 
-Suggested citation (plain text):
-
-Silva, Cristiano. "LIP: The Latent Injection Protocol". 2025. GitHub repository. https://github.com/zigfreud/latent-llm-agent-communication
-
-BibTeX example:
-
-```bibtex
-@misc{silva2025lip,
-  title        = {LIP: The Latent Injection Protocol},
-  author       = {Silva, Cristiano},
-  year         = {2025},
-  howpublished = {GitHub repository, \url{https://github.com/zigfreud/latent-llm-agent-communication}},
-  note         = {Accessed: 2025-11-27}
-}
-```
-
----
-
-### 🛣️ Roadmap & Future Work
-
-LIP is an active research project. Below is a succinct, realistic roadmap capturing short, medium, and long-term goals — technical improvements, packaging, and deployment plans.
-
-Key release goals:
-
-- First protocol release: include YAML configuration templates, best-practice example pipelines, and pre-trained adapter weights for widely used open-source models where licensing allows (e.g., TinyLlama, community LLMs).
-- Publish the LIP Python package to PyPI for easy integration and experimentation.
-
-Encryption & privacy roadmap (three phases):
-
-1. Phase 1 — Current (Obfuscation by Design) ✅
-
-   - Vectors are intentionally non-human-readable by design — this reduces accidental leaks and limits casual inspection.
-   - This phase provides an immediate privacy and safety improvement with low operational cost.
-
-2. Phase 2 — Near-term (Vector Transport Encryption) 🔒
-
-   - Engineering a secure transport layer for vector packets — a TLS-like mechanism at the LIP packet level.
-   - Goals: authenticated sessions, integrity checks, forward secrecy for vector transport, and robust key management for heterogeneous systems.
-
-3. Phase 3 — Research / Long-term (Partial Homomorphic LIP) 🧪
-
-   - Investigate partial homomorphic encryption for LIP, enabling some vector-space operations while data remains encrypted.
-   - Realistic research direction: it is imposible to run full Llama-3-sized models under homomorphic encryption. Instead, explore running the semantic router in HE — the router can decide where to forward requests without learning the request content.
-
-Additional notes:
-
-- We will prioritize a pragmatic, staged approach: start with obfuscation and secure transport, then pursue HE for specific components with strong privacy needs.
-- Release artifacts will include YAML config templates and example weights (subject to model license). Packaging on PyPI will make it easy for developers and researchers to adopt LIP.
+Silva, Cristiano. "LIP — Latent Injection Protocol". 2025.
+GitHub repository: https://github.com/zigfreud/latent-llm-agent-communication
