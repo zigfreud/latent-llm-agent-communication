@@ -15,14 +15,27 @@ from src.core.utils import get_device, set_seed, setup_logger
 
 class ShardDataset(Dataset):
     def __init__(self, filepath):
-        data = torch.load(filepath)
-        self.data = data if isinstance(data, list) else []
+        try:
+            # Forçamos map_location='cpu' para evitar erros de device entre torch versions
+            data = torch.load(filepath, map_location='cpu', weights_only=False)
+        except Exception as e:
+            print(f"❌ ARQUIVO CORROMPIDO: {filepath} | Erro: {e}")
+            self.data = []
+            return
+
+        if isinstance(data, list):
+            self.data = data
+        else:
+            # AQUI ESTÁ O SEGREDO: Vamos ver o que tem dentro
+            print(f"⚠️ TIPO ERRADO em {os.path.basename(filepath)}: Recebi {type(data)} em vez de 'list'.")
+            self.data = []
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
         item = self.data[idx]
+        # Garante que estamos retornando tensores float32, não importa como foi salvo
         return item['src_vector'].squeeze().float(), item['tgt_vector'].squeeze().float()
 
 
@@ -72,8 +85,7 @@ def train(config_path):
     )
 
     criterion = HybridContrastiveLoss(
-        temperature=cfg['loss']['temperature'],
-        lambda_mse=cfg['loss']['lambda_mse']
+        temperature=cfg['loss']['temperature']
     )
 
     start_epoch = 0
@@ -100,7 +112,8 @@ def train(config_path):
 
             optimizer.zero_grad()
             output = model(src)
-            loss, nce, mse, acc = criterion(output, tgt)
+            loss, acc = criterion(output, tgt)
+            mse = 0.0
             loss.backward()
             optimizer.step()
 

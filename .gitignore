@@ -22,3 +22,4 @@ paper_resources/data/
 # OS Junk
 .DS_Store
 Thumbs.db
+.venv*

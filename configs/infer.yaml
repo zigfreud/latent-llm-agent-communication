@@ -1,0 +1,23 @@
+source_model: deepseek-ai/deepseek-coder-1.3b-base
+target_model: NousResearch/Meta-Llama-3-8B-Instruct
+adapter_ckpt: checkpoints/Gen6.2/best_model.pth
+
+runtime:
+  device_src: cuda
+  device_tgt: auto
+  load_4bit: true
+
+lip:
+  gain: 10.0
+  layer_idx: -2
+  inject_pos_mode: last     # last | last_minus_1
+
+generation:
+  max_new_tokens: 120
+  do_sample: false
+  temperature: 0.0
+  repetition_penalty: 1.2
+
+prompts:
+  - "def fibonacci(n): return the nth number, not a list"
+  - "def fibonacci(n): use recursion with memoization"

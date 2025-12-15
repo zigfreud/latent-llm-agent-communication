@@ -1,10 +1,10 @@
-experiment_name: "Gen6"
-device: "auto"
-output_dir: "checkpoints/Gen6"
+experiment_name: "Gen6.2"
+device: "dml"
+output_dir: "checkpoints/Gen6.2"
 
 data:
-  dataset_path: "datasets/raw_shards"
-  batch_size: 32
+  dataset_path: "datasets/Gen6.1/"
+  batch_size: 16
   num_workers: 4
 
 model:
