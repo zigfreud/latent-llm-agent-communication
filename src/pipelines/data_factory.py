@@ -58,7 +58,7 @@ def get_model(model_id, device):
     model.eval()
     return model, tokenizer
 
-def run_extraction(config_path):
+def run_extraction(config_path, demo=False):
     cfg = load_config(config_path)
     # Força DML se configurado
     device_str = "dml" if cfg['device'] == "dml" else "cpu"
@@ -66,12 +66,16 @@ def run_extraction(config_path):
     
     print(f"⚙️  Pipeline configurado para: {device}")
     
+    if demo:
+        print("🚀 RUNNING IN DEMO MODE: Processing only 100 samples")
+    max_samples = 100 if demo else cfg['max_samples']
+
     shard_size = cfg['extraction']['shard_size']
     output_dir = cfg['extraction']['output_dir']
     os.makedirs(output_dir, exist_ok=True)
 
     print("📚 Loading prompts...")
-    ds = load_dataset(cfg['dataset_name'], split=f"train[:{cfg['max_samples']}]")
+    ds = load_dataset(cfg['dataset_name'], split=f"train[:{max_samples}]")
     
     existing_shards = glob.glob(os.path.join(output_dir, "shard_*.pt"))
     processed_indices = len(existing_shards) * shard_size
@@ -98,7 +102,7 @@ def run_extraction(config_path):
             prompts = [f"<|user|>\n{item['input']}\n{item['instruction']}</s>\n<|assistant|>\n" for item in subset]
             
             # Batch size conservador para GPU de 8GB com YouTube aberto
-            infer_batch = 7
+            infer_batch = 1 if demo else 7
 
             for i in tqdm.tqdm(range(0, len(prompts), infer_batch)):
                 p_batch = prompts[i:i+infer_batch]
@@ -200,8 +204,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/data_factory_config.yaml")
     parser.add_argument("--mode", type=str, choices=["mine_shards", "extract_reference"], default="mine_shards")
+    parser.add_argument("--demo", action="store_true", help="Run in demo mode (100 samples, batch size 1)")
     args = parser.parse_args()
     if args.mode == "extract_reference":
         run_extract_reference(args.config)
     else:
-        run_extraction(args.config)
+        run_extraction(args.config, demo=args.demo)
