@@ -17,7 +17,9 @@ except:
 def get_device(device_str):
     if device_str == "dml" and HAS_DML: 
         return torch_directml.device()
-    return "cpu"
+    if device_str == "cuda" and torch.cuda.is_available():
+        return torch.device("cuda")
+    return device_str
 
 def load_config(path):
     with open(path, 'r') as f: return yaml.safe_load(f)
@@ -59,8 +61,7 @@ def get_model(model_id, device):
 
 def run_extraction(config_path, demo=False):
     cfg = load_config(config_path)
-    device_str = "dml" if cfg['device'] == "dml" else "cpu"
-    device = get_device(device_str)
+    device = get_device(cfg['device'])
     
     print(f"⚙️  Pipeline configurado para: {device}")
     
