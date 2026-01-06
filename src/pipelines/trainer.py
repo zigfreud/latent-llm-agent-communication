@@ -5,6 +5,7 @@ import argparse
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset, ConcatDataset
+import json
 
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -90,17 +91,26 @@ def train(config_path):
 
     start_epoch = 0
     best_loss = float('inf')
+    history = []
     ckpt_path = os.path.join(cfg['output_dir'], "last_checkpoint.pth")
 
     if os.path.exists(ckpt_path):
         logger.info(f"🔄 Resuming by... {ckpt_path}")
-        checkpoint = torch.load(ckpt_path, map_location=device)
+        checkpoint = torch.load(ckpt_path, map_location="cpu")
         model.load_state_dict(checkpoint['model_state'])
         optimizer.load_state_dict(checkpoint['optimizer_state'])
         start_epoch = checkpoint['epoch'] + 1
         best_loss = checkpoint.get('best_loss', float('inf'))
+        history = checkpoint.get('history', [])
 
     model.train()
+
+    if start_epoch >= cfg['training']['epochs']:
+        logger.info("⚠️ Treino já concluído.")
+        metrics_path = os.path.join(cfg['output_dir'], "training_metrics.json")
+        with open(metrics_path, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+        return
 
     for epoch in range(start_epoch, cfg['training']['epochs']):
         epoch_loss = 0
@@ -124,13 +134,15 @@ def train(config_path):
         avg_loss = epoch_loss / steps
         avg_acc = epoch_acc / steps
         logger.info(f"Ep {epoch+1:03d} | Loss: {avg_loss:.4f} | Acc: {avg_acc*100:.2f}%")
+        history.append({"epoch": epoch + 1, "loss": avg_loss, "acc": avg_acc})
 
         torch.save({
             'epoch': epoch,
             'model_state': model.state_dict(),
             'optimizer_state': optimizer.state_dict(),
             'best_loss': best_loss,
-            'config': cfg
+            'config': cfg,
+            'history': history,
         }, ckpt_path)
 
 
@@ -140,6 +152,9 @@ def train(config_path):
             logger.info("🌟 New best model saved.")
 
     logger.info("🏁 Process completed.")
+    metrics_path = os.path.join(cfg['output_dir'], "training_metrics.json")
+    with open(metrics_path, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
