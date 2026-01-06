@@ -6,6 +6,7 @@ import csv
 import argparse
 from pathlib import Path
 import yaml
+from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
@@ -89,7 +90,7 @@ def main():
     results = []
     success = 0
 
-    for prompt, vec_cpu in zip(prompts, thought_vectors):
+    for prompt, vec_cpu in tqdm(zip(prompts, thought_vectors), total=len(prompts), desc="Evaluating"):
         vec_injected = build_vec_injected(
             vec_cpu,
             adapter=adapter,

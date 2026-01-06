@@ -1,6 +1,6 @@
 device: "cuda"
 dataset_name: "flytech/python-codes-25k"
-max_samples: 1000
+max_samples: 5000
 
 models:
   source: "deepseek-ai/deepseek-coder-1.3b-base"
