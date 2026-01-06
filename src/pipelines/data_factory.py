@@ -6,7 +6,7 @@ import tqdm
 import torch
 import argparse
 from datasets import load_dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 try:
     import torch_directml
@@ -35,19 +35,23 @@ def get_model(model_id, device):
     print(f"   🔧 RAM Disponível (aprox): {os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024.**3) if hasattr(os, 'sysconf') else 'N/A'} GB")
 
     try:
-        print("   1. Carregando na CPU (Float16)...")
+        print("   1. Carregando com quantização 4-bit para economizar RAM...")
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            llm_int8_enable_fp32_cpu_offload=True,
+        )
         model = AutoModelForCausalLM.from_pretrained(
             model_id, 
             torch_dtype=torch.float16,
             low_cpu_mem_usage=True,
             use_safetensors=True,
             trust_remote_code=True,
-            device_map=None
+            device_map=device,
+            quantization_config=bnb_config,
         )
         
-        print(f"   2. Movendo para GPU ({device})...")
-        model.to(device)
-        print("   ✅ SUCESSO! Modelo na GPU.")
+        print("   ✅ SUCESSO! Modelo carregado com 4-bit.")
         
     except Exception as e:
         print(f"\n❌ ERRO FATAL DE CARREGAMENTO:")
