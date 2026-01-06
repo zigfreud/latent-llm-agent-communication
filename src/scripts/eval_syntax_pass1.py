@@ -1,10 +1,14 @@
-import argparse
-import ast
-import csv
+import os
 import re
+import ast
+import sys
+import csv
+import argparse
 from pathlib import Path
-
 import yaml
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
 from datasets import load_dataset
 
 from src.pipelines.infer import (
@@ -131,3 +135,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    

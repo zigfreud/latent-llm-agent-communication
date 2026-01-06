@@ -55,20 +55,21 @@ def _cleanup_cuda():
 
 
 def load_source(model_id: str, device: str):
-    tok = AutoTokenizer.from_pretrained(model_id)
+    tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         torch_dtype=torch.float16,
         device_map=device,          # "cuda" is fine on most setups
         low_cpu_mem_usage=True,
-        use_safetensors=True
+        use_safetensors=True,
+        trust_remote_code=True,
     )
     model.eval()
     return model, tok
 
 
 def load_target(model_id: str, device: str, load_4bit: bool):
-    tok = AutoTokenizer.from_pretrained(model_id)
+    tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
 
     if load_4bit:
         bnb_config = BitsAndBytesConfig(
@@ -80,7 +81,8 @@ def load_target(model_id: str, device: str, load_4bit: bool):
             model_id,
             quantization_config=bnb_config,
             device_map=device,        # "auto" recommended when using offload
-            use_safetensors=True
+            use_safetensors=True,
+            trust_remote_code=True,
         )
     else:
         model = AutoModelForCausalLM.from_pretrained(
@@ -88,7 +90,8 @@ def load_target(model_id: str, device: str, load_4bit: bool):
             torch_dtype=torch.float16,
             device_map=device,
             low_cpu_mem_usage=True,
-            use_safetensors=True
+            use_safetensors=True,
+            trust_remote_code=True,
         )
 
     model.eval()

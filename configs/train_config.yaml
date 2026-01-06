@@ -13,9 +13,9 @@ model:
   hidden_dim: 1024
 
 training:
-  epochs: 100
+  epochs: 5        # Mude de 100 para 2 (só para testar o loop)
   learning_rate: 0.0001
-  save_every: 5
+  save_every: 1    # Mude de 5 para 1 (para garantir que salve o .pth logo)
 
 loss:
   temperature: 0.1
