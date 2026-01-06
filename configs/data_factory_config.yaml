@@ -7,6 +7,6 @@ models:
   target: "NousResearch/Meta-Llama-3-8B-Instruct"
 
 extraction:
-  output_dir: "datasets/Gen6.1/raw_shards"
+  output_dir: "datasets/Gen6.2/raw_shards"
   shard_size: 150
   batch_size: 4

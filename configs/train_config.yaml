@@ -3,7 +3,7 @@ device: "cuda"
 output_dir: "checkpoints/Gen6.2"
 
 data:
-  dataset_path: "datasets/Gen6.1/"
+  dataset_path: "datasets/Gen6.2/raw_shards/"
   batch_size: 16
   num_workers: 4
 
@@ -13,9 +13,9 @@ model:
   hidden_dim: 1024
 
 training:
-  epochs: 5        # Mude de 100 para 2 (só para testar o loop)
+  epochs: 100
   learning_rate: 0.0001
-  save_every: 1    # Mude de 5 para 1 (para garantir que salve o .pth logo)
+  save_every: 5
 
 loss:
   temperature: 0.1
