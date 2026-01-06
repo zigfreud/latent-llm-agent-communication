@@ -176,8 +176,32 @@ def run_extraction(config_path):
 
     print("🏁 Done.")
 
+def run_extract_reference(config_path):
+    cfg = load_config(config_path)
+    device_str = "dml" if cfg['device'] == "dml" else "cpu"
+    device = get_device(device_str)
+
+    os.makedirs("datasets", exist_ok=True)
+    output_file = os.path.join("datasets", "reference_embeddings.pt")
+
+    print("\n🏭 INICIANDO EXTRAÇÃO DE EMBEDDINGS DE REFERÊNCIA (Llama-3)...")
+    model_tgt, _ = get_model(cfg['models']['target'], device)
+
+    print("⛏️  Extraindo Matriz de Embeddings...")
+    with torch.no_grad():
+        embedding_matrix = model_tgt.get_input_embeddings().weight.detach()
+        embedding_matrix = embedding_matrix.to(dtype=torch.float16, device="cpu")
+    torch.save(embedding_matrix, output_file)
+
+    print(f"✅ Matriz salva em {output_file}")
+    if HAS_DML: torch.cuda.empty_cache()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/data_factory_config.yaml")
+    parser.add_argument("--mode", type=str, choices=["mine_shards", "extract_reference"], default="mine_shards")
     args = parser.parse_args()
-    run_extraction(args.config)
+    if args.mode == "extract_reference":
+        run_extract_reference(args.config)
+    else:
+        run_extraction(args.config)
