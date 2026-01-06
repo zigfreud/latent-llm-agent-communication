@@ -1,5 +1,5 @@
 experiment_name: "Gen6.2"
-device: "dml"
+device: "cuda"
 output_dir: "checkpoints/Gen6.2"
 
 data:

@@ -1,4 +1,4 @@
-device: "dml"
+device: "cuda"
 dataset_name: "flytech/python-codes-25k"
 max_samples: 1000
 
