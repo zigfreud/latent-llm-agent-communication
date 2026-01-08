@@ -36,7 +36,7 @@ def pick_prompt(example: dict) -> str:
     return str(example)
 
 
-def extract_code_block(text: str) -> str:
+def extract_code(text: str) -> str:
     code_match = re.search(r"```python\\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
     if code_match:
         return code_match.group(1).strip()
@@ -109,7 +109,7 @@ def main():
         )
 
         generated = ab[True]
-        code = extract_code_block(generated)
+        code = extract_code(generated)
         is_valid = True
         try:
             ast.parse(code)
