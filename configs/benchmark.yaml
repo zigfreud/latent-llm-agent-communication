@@ -1,0 +1,38 @@
+experiment:
+  name: "LIP_vs_JSON_Quantitative_Analysis_Gen1"
+  iterations: 5
+  warmup: 2
+
+models:
+  source:
+    path: "deepseek-ai/deepseek-coder-1.3b-base"
+    device: "cuda:0"
+  target:
+    path: "meta-llama/Meta-Llama-3-8B"
+    device: "cuda:0"
+  adapter:
+    path: "checkpoints/Gen6.2/adapter.pt"
+    input_dim: 2048
+    bottleneck_dim: 512
+    output_dim: 4096
+
+test_cases:
+  - category: "short_instruction"
+    id: "hello_world_python"
+    prompt: "Write a python function that prints 'Hello World'"
+
+  - category: "code_generation"
+    id: "game_loop"
+    prompt: "Create a simple Python game. The game should contain a main loop that runs infinitely. The user should be able to type commands."
+
+  - category: "heavy_context_rag_simulation"
+    id: "log_analysis"
+    prompt: |
+      Analyze the following log trace and extract error codes.
+      Context:
+      [2025-01-01 10:00:01] INFO Starting service...
+      [2025-01-01 10:00:02] DEBUG Connecting to DB...
+      [2025-01-01 10:00:03] ERROR Connection timeout at module X.
+      ... (imagine mais 200 linhas de logs aqui, o Cortex pode expandir isso) ...
+      Task: Return a list of error timestamps.
+      Dica para o Cortex: Quando voce pedir para ele gerar o script src/scripts/benchmark_suite.py, peça para ele ler este YAML. Se a categoria for heavy_context_rag_simulation, peça para ele multiplicar o texto do log para simular 2k ou 4k tokens.
