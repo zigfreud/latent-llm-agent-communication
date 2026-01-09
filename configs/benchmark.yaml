@@ -31,8 +31,229 @@ test_cases:
       Analyze the following log trace and extract error codes.
       Context:
       [2025-01-01 10:00:01] INFO Starting service...
-      [2025-01-01 10:00:02] DEBUG Connecting to DB...
-      [2025-01-01 10:00:03] ERROR Connection timeout at module X.
-      ... (imagine mais 200 linhas de logs aqui, o Cortex pode expandir isso) ...
+      [2025-01-01 10:00:02] DEBUG Loading configuration from /etc/app/config.yml
+      [2025-01-01 10:00:03] INFO Boot sequence initiated
+      [2025-01-01 10:00:04] DEBUG Connecting to DB...
+      [2025-01-01 10:00:05] WARN DB connection latency high
+      [2025-01-01 10:00:06] INFO DB connection established
+      [2025-01-01 10:00:07] DEBUG Warming cache region=users
+      [2025-01-01 10:00:08] DEBUG Warming cache region=projects
+      [2025-01-01 10:00:09] INFO Cache warmup complete
+      [2025-01-01 10:00:10] DEBUG HTTP server binding to 0.0.0.0:8080
+      [2025-01-01 10:00:11] INFO HTTP server ready
+      [2025-01-01 10:00:12] DEBUG Request id=8f1a4 path=/health
+      [2025-01-01 10:00:13] INFO Response id=8f1a4 status=200
+      [2025-01-01 10:00:14] DEBUG Request id=8f1a5 path=/api/login
+      [2025-01-01 10:00:15] WARN Auth latency high user_id=124
+      [2025-01-01 10:00:16] INFO Response id=8f1a5 status=200
+      [2025-01-01 10:00:17] DEBUG Request id=8f1a6 path=/api/projects
+      [2025-01-01 10:00:18] INFO Response id=8f1a6 status=200
+      [2025-01-01 10:00:19] DEBUG Request id=8f1a7 path=/api/projects/42
+      [2025-01-01 10:00:20] ERROR Upstream timeout code=E504 module=projects
+      [2025-01-01 10:00:21] INFO Response id=8f1a7 status=504
+      [2025-01-01 10:00:22] DEBUG Retrying request id=8f1a7 attempt=1
+      [2025-01-01 10:00:23] ERROR Upstream timeout code=E504 module=projects
+      [2025-01-01 10:00:24] INFO Response id=8f1a7 status=504
+      [2025-01-01 10:00:25] DEBUG Request id=8f1a8 path=/api/projects/42
+      [2025-01-01 10:00:26] INFO Response id=8f1a8 status=200
+      [2025-01-01 10:00:27] DEBUG Request id=8f1a9 path=/api/files
+      [2025-01-01 10:00:28] ERROR Storage unavailable code=E503 module=storage
+      [2025-01-01 10:00:29] INFO Response id=8f1a9 status=503
+      [2025-01-01 10:00:30] DEBUG Circuit breaker open service=storage
+      [2025-01-01 10:00:31] DEBUG Request id=8f1aa path=/api/files
+      [2025-01-01 10:00:32] ERROR Circuit open code=E509 module=storage
+      [2025-01-01 10:00:33] INFO Response id=8f1aa status=503
+      [2025-01-01 10:00:34] DEBUG Request id=8f1ab path=/api/search?q=alpha
+      [2025-01-01 10:00:35] INFO Response id=8f1ab status=200
+      [2025-01-01 10:00:36] DEBUG Request id=8f1ac path=/api/search?q=beta
+      [2025-01-01 10:00:37] INFO Response id=8f1ac status=200
+      [2025-01-01 10:00:38] DEBUG Request id=8f1ad path=/api/metrics
+      [2025-01-01 10:00:39] WARN Metrics scrape slow
+      [2025-01-01 10:00:40] INFO Response id=8f1ad status=200
+      [2025-01-01 10:00:41] DEBUG Request id=8f1ae path=/api/projects/99
+      [2025-01-01 10:00:42] ERROR DB deadlock code=E409 module=db
+      [2025-01-01 10:00:43] INFO Response id=8f1ae status=500
+      [2025-01-01 10:00:44] DEBUG Request id=8f1af path=/api/projects/99
+      [2025-01-01 10:00:45] INFO Response id=8f1af status=200
+      [2025-01-01 10:00:46] DEBUG Background job id=job-17 type=reindex
+      [2025-01-01 10:00:47] INFO Background job id=job-17 status=running
+      [2025-01-01 10:00:48] ERROR Reindex failed code=E701 module=search
+      [2025-01-01 10:00:49] INFO Background job id=job-17 status=failed
+      [2025-01-01 10:00:50] DEBUG Request id=8f1b0 path=/api/exports
+      [2025-01-01 10:00:51] INFO Response id=8f1b0 status=202
+      [2025-01-01 10:00:52] DEBUG Request id=8f1b1 path=/api/exports/12
+      [2025-01-01 10:00:53] ERROR Export timeout code=E702 module=exports
+      [2025-01-01 10:00:54] INFO Response id=8f1b1 status=504
+      [2025-01-01 10:00:55] DEBUG Request id=8f1b2 path=/api/audit
+      [2025-01-01 10:00:56] INFO Response id=8f1b2 status=200
+      [2025-01-01 10:00:57] DEBUG Request id=8f1b3 path=/api/permissions
+      [2025-01-01 10:00:58] ERROR Permission cache miss code=E412 module=auth
+      [2025-01-01 10:00:59] INFO Response id=8f1b3 status=500
+      [2025-01-01 10:01:00] DEBUG Request id=8f1b4 path=/api/permissions
+      [2025-01-01 10:01:01] INFO Response id=8f1b4 status=200
+      [2025-01-01 10:01:02] DEBUG Request id=8f1b5 path=/api/login
+      [2025-01-01 10:01:03] INFO Response id=8f1b5 status=200
+      [2025-01-01 10:01:04] DEBUG Request id=8f1b6 path=/api/logout
+      [2025-01-01 10:01:05] INFO Response id=8f1b6 status=204
+      [2025-01-01 10:01:06] DEBUG Request id=8f1b7 path=/api/projects/77
+      [2025-01-01 10:01:07] ERROR Connection timeout code=E408 module=network
+      [2025-01-01 10:01:08] INFO Response id=8f1b7 status=504
+      [2025-01-01 10:01:09] DEBUG Request id=8f1b8 path=/api/projects/77
+      [2025-01-01 10:01:10] INFO Response id=8f1b8 status=200
+      [2025-01-01 10:01:11] DEBUG Request id=8f1b9 path=/api/system
+      [2025-01-01 10:01:12] WARN Disk space low percent=92
+      [2025-01-01 10:01:13] INFO Response id=8f1b9 status=200
+      [2025-01-01 10:01:14] DEBUG Request id=8f1ba path=/api/system
+      [2025-01-01 10:01:15] ERROR Disk write failed code=E507 module=fs
+      [2025-01-01 10:01:16] INFO Response id=8f1ba status=500
+      [2025-01-01 10:01:17] DEBUG Request id=8f1bb path=/api/system
+      [2025-01-01 10:01:18] INFO Response id=8f1bb status=200
+      [2025-01-01 10:01:19] DEBUG Request id=8f1bc path=/api/backup
+      [2025-01-01 10:01:20] ERROR Backup failed code=E901 module=backup
+      [2025-01-01 10:01:21] INFO Response id=8f1bc status=500
+      [2025-01-01 10:01:22] DEBUG Request id=8f1bd path=/api/backup
+      [2025-01-01 10:01:23] INFO Response id=8f1bd status=200
+      [2025-01-01 10:01:24] DEBUG Request id=8f1be path=/api/health
+      [2025-01-01 10:01:25] INFO Response id=8f1be status=200
+      [2025-01-01 10:01:26] DEBUG Request id=8f1bf path=/api/health
+      [2025-01-01 10:01:27] INFO Response id=8f1bf status=200
+      [2025-01-01 10:01:28] DEBUG Request id=8f1c0 path=/api/health
+      [2025-01-01 10:01:29] INFO Response id=8f1c0 status=200
+      [2025-01-01 10:01:30] DEBUG Request id=8f1c1 path=/api/audit
+      [2025-01-01 10:01:31] WARN Audit stream lagging
+      [2025-01-01 10:01:32] INFO Response id=8f1c1 status=200
+      [2025-01-01 10:01:33] DEBUG Request id=8f1c2 path=/api/audit
+      [2025-01-01 10:01:34] INFO Response id=8f1c2 status=200
+      [2025-01-01 10:01:35] DEBUG Request id=8f1c3 path=/api/metrics
+      [2025-01-01 10:01:36] INFO Response id=8f1c3 status=200
+      [2025-01-01 10:01:37] DEBUG Request id=8f1c4 path=/api/metrics
+      [2025-01-01 10:01:38] INFO Response id=8f1c4 status=200
+      [2025-01-01 10:01:39] DEBUG Request id=8f1c5 path=/api/projects
+      [2025-01-01 10:01:40] INFO Response id=8f1c5 status=200
+      [2025-01-01 10:01:41] DEBUG Request id=8f1c6 path=/api/projects
+      [2025-01-01 10:01:42] INFO Response id=8f1c6 status=200
+      [2025-01-01 10:01:43] DEBUG Request id=8f1c7 path=/api/projects
+      [2025-01-01 10:01:44] INFO Response id=8f1c7 status=200
+      [2025-01-01 10:01:45] DEBUG Request id=8f1c8 path=/api/projects
+      [2025-01-01 10:01:46] INFO Response id=8f1c8 status=200
+      [2025-01-01 10:01:47] DEBUG Request id=8f1c9 path=/api/projects
+      [2025-01-01 10:01:48] INFO Response id=8f1c9 status=200
+      [2025-01-01 10:01:49] DEBUG Request id=8f1ca path=/api/projects
+      [2025-01-01 10:01:50] INFO Response id=8f1ca status=200
+      [2025-01-01 10:01:51] DEBUG Request id=8f1cb path=/api/exports/13
+      [2025-01-01 10:01:52] ERROR Export validation failed code=E703 module=exports
+      [2025-01-01 10:01:53] INFO Response id=8f1cb status=400
+      [2025-01-01 10:01:54] DEBUG Request id=8f1cc path=/api/exports/13
+      [2025-01-01 10:01:55] INFO Response id=8f1cc status=200
+      [2025-01-01 10:01:56] DEBUG Request id=8f1cd path=/api/users
+      [2025-01-01 10:01:57] INFO Response id=8f1cd status=200
+      [2025-01-01 10:01:58] DEBUG Request id=8f1ce path=/api/users/10
+      [2025-01-01 10:01:59] ERROR User lookup failed code=E404 module=users
+      [2025-01-01 10:02:00] INFO Response id=8f1ce status=404
+      [2025-01-01 10:02:01] DEBUG Request id=8f1cf path=/api/users/10
+      [2025-01-01 10:02:02] INFO Response id=8f1cf status=200
+      [2025-01-01 10:02:03] DEBUG Request id=8f1d0 path=/api/notifications
+      [2025-01-01 10:02:04] INFO Response id=8f1d0 status=200
+      [2025-01-01 10:02:05] DEBUG Request id=8f1d1 path=/api/notifications
+      [2025-01-01 10:02:06] WARN Notifications delay high
+      [2025-01-01 10:02:07] INFO Response id=8f1d1 status=200
+      [2025-01-01 10:02:08] DEBUG Request id=8f1d2 path=/api/notifications
+      [2025-01-01 10:02:09] INFO Response id=8f1d2 status=200
+      [2025-01-01 10:02:10] DEBUG Request id=8f1d3 path=/api/notifications
+      [2025-01-01 10:02:11] INFO Response id=8f1d3 status=200
+      [2025-01-01 10:02:12] DEBUG Request id=8f1d4 path=/api/cache
+      [2025-01-01 10:02:13] ERROR Cache node unreachable code=E902 module=cache
+      [2025-01-01 10:02:14] INFO Response id=8f1d4 status=503
+      [2025-01-01 10:02:15] DEBUG Request id=8f1d5 path=/api/cache
+      [2025-01-01 10:02:16] INFO Response id=8f1d5 status=200
+      [2025-01-01 10:02:17] DEBUG Request id=8f1d6 path=/api/cache
+      [2025-01-01 10:02:18] INFO Response id=8f1d6 status=200
+      [2025-01-01 10:02:19] DEBUG Request id=8f1d7 path=/api/billing
+      [2025-01-01 10:02:20] WARN Payment gateway latency high
+      [2025-01-01 10:02:21] INFO Response id=8f1d7 status=200
+      [2025-01-01 10:02:22] DEBUG Request id=8f1d8 path=/api/billing
+      [2025-01-01 10:02:23] ERROR Payment rejected code=E402 module=billing
+      [2025-01-01 10:02:24] INFO Response id=8f1d8 status=402
+      [2025-01-01 10:02:25] DEBUG Request id=8f1d9 path=/api/billing
+      [2025-01-01 10:02:26] INFO Response id=8f1d9 status=200
+      [2025-01-01 10:02:27] DEBUG Request id=8f1da path=/api/billing
+      [2025-01-01 10:02:28] INFO Response id=8f1da status=200
+      [2025-01-01 10:02:29] DEBUG Request id=8f1db path=/api/exports/14
+      [2025-01-01 10:02:30] ERROR Export failed code=E704 module=exports
+      [2025-01-01 10:02:31] INFO Response id=8f1db status=500
+      [2025-01-01 10:02:32] DEBUG Request id=8f1dc path=/api/exports/14
+      [2025-01-01 10:02:33] INFO Response id=8f1dc status=200
+      [2025-01-01 10:02:34] DEBUG Request id=8f1dd path=/api/projects/7
+      [2025-01-01 10:02:35] INFO Response id=8f1dd status=200
+      [2025-01-01 10:02:36] DEBUG Request id=8f1de path=/api/projects/7
+      [2025-01-01 10:02:37] ERROR Request aborted code=E499 module=api
+      [2025-01-01 10:02:38] INFO Response id=8f1de status=499
+      [2025-01-01 10:02:39] DEBUG Request id=8f1df path=/api/projects/7
+      [2025-01-01 10:02:40] INFO Response id=8f1df status=200
+      [2025-01-01 10:02:41] DEBUG Request id=8f1e0 path=/api/system
+      [2025-01-01 10:02:42] INFO Response id=8f1e0 status=200
+      [2025-01-01 10:02:43] DEBUG Request id=8f1e1 path=/api/system
+      [2025-01-01 10:02:44] ERROR System overload code=E503 module=system
+      [2025-01-01 10:02:45] INFO Response id=8f1e1 status=503
+      [2025-01-01 10:02:46] DEBUG Request id=8f1e2 path=/api/system
+      [2025-01-01 10:02:47] INFO Response id=8f1e2 status=200
+      [2025-01-01 10:02:48] DEBUG Request id=8f1e3 path=/api/system
+      [2025-01-01 10:02:49] INFO Response id=8f1e3 status=200
+      [2025-01-01 10:02:50] DEBUG Request id=8f1e4 path=/api/system
+      [2025-01-01 10:02:51] INFO Response id=8f1e4 status=200
+      [2025-01-01 10:02:52] DEBUG Request id=8f1e5 path=/api/system
+      [2025-01-01 10:02:53] INFO Response id=8f1e5 status=200
+      [2025-01-01 10:02:54] DEBUG Request id=8f1e6 path=/api/system
+      [2025-01-01 10:02:55] INFO Response id=8f1e6 status=200
+      [2025-01-01 10:02:56] DEBUG Request id=8f1e7 path=/api/system
+      [2025-01-01 10:02:57] INFO Response id=8f1e7 status=200
+      [2025-01-01 10:02:58] DEBUG Request id=8f1e8 path=/api/system
+      [2025-01-01 10:02:59] INFO Response id=8f1e8 status=200
+      [2025-01-01 10:03:00] DEBUG Request id=8f1e9 path=/api/system
+      [2025-01-01 10:03:01] INFO Response id=8f1e9 status=200
+      [2025-01-01 10:03:02] DEBUG Request id=8f1ea path=/api/system
+      [2025-01-01 10:03:03] INFO Response id=8f1ea status=200
+      [2025-01-01 10:03:04] DEBUG Request id=8f1eb path=/api/system
+      [2025-01-01 10:03:05] INFO Response id=8f1eb status=200
+      [2025-01-01 10:03:06] DEBUG Request id=8f1ec path=/api/system
+      [2025-01-01 10:03:07] INFO Response id=8f1ec status=200
+      [2025-01-01 10:03:08] DEBUG Request id=8f1ed path=/api/system
+      [2025-01-01 10:03:09] INFO Response id=8f1ed status=200
+      [2025-01-01 10:03:10] DEBUG Request id=8f1ee path=/api/system
+      [2025-01-01 10:03:11] INFO Response id=8f1ee status=200
+      [2025-01-01 10:03:12] DEBUG Request id=8f1ef path=/api/system
+      [2025-01-01 10:03:13] INFO Response id=8f1ef status=200
+      [2025-01-01 10:03:14] DEBUG Request id=8f1f0 path=/api/system
+      [2025-01-01 10:03:15] INFO Response id=8f1f0 status=200
+      [2025-01-01 10:03:16] DEBUG Request id=8f1f1 path=/api/system
+      [2025-01-01 10:03:17] INFO Response id=8f1f1 status=200
+      [2025-01-01 10:03:18] DEBUG Request id=8f1f2 path=/api/system
+      [2025-01-01 10:03:19] INFO Response id=8f1f2 status=200
+      [2025-01-01 10:03:20] DEBUG Request id=8f1f3 path=/api/system
+      [2025-01-01 10:03:21] INFO Response id=8f1f3 status=200
+      [2025-01-01 10:03:22] DEBUG Request id=8f1f4 path=/api/system
+      [2025-01-01 10:03:23] INFO Response id=8f1f4 status=200
+      [2025-01-01 10:03:24] DEBUG Request id=8f1f5 path=/api/system
+      [2025-01-01 10:03:25] INFO Response id=8f1f5 status=200
+      [2025-01-01 10:03:26] DEBUG Request id=8f1f6 path=/api/system
+      [2025-01-01 10:03:27] INFO Response id=8f1f6 status=200
+      [2025-01-01 10:03:28] DEBUG Request id=8f1f7 path=/api/system
+      [2025-01-01 10:03:29] INFO Response id=8f1f7 status=200
+      [2025-01-01 10:03:30] DEBUG Request id=8f1f8 path=/api/system
+      [2025-01-01 10:03:31] INFO Response id=8f1f8 status=200
+      [2025-01-01 10:03:32] DEBUG Request id=8f1f9 path=/api/system
+      [2025-01-01 10:03:33] INFO Response id=8f1f9 status=200
+      [2025-01-01 10:03:34] DEBUG Request id=8f1fa path=/api/system
+      [2025-01-01 10:03:35] INFO Response id=8f1fa status=200
+      [2025-01-01 10:03:36] DEBUG Request id=8f1fb path=/api/system
+      [2025-01-01 10:03:37] INFO Response id=8f1fb status=200
+      [2025-01-01 10:03:38] DEBUG Request id=8f1fc path=/api/system
+      [2025-01-01 10:03:39] INFO Response id=8f1fc status=200
+      [2025-01-01 10:03:40] DEBUG Request id=8f1fd path=/api/system
+      [2025-01-01 10:03:41] INFO Response id=8f1fd status=200
+      [2025-01-01 10:03:42] DEBUG Request id=8f1fe path=/api/system
+      [2025-01-01 10:03:43] INFO Response id=8f1fe status=200
+      [2025-01-01 10:03:44] DEBUG Request id=8f1ff path=/api/system
+      [2025-01-01 10:03:45] INFO Response id=8f1ff status=200
       Task: Return a list of error timestamps.
       Dica para o Cortex: Quando voce pedir para ele gerar o script src/scripts/benchmark_suite.py, peça para ele ler este YAML. Se a categoria for heavy_context_rag_simulation, peça para ele multiplicar o texto do log para simular 2k ou 4k tokens.
