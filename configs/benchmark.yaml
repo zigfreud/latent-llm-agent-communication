@@ -8,7 +8,7 @@ models:
     path: "deepseek-ai/deepseek-coder-1.3b-base"
     device: "cuda:0"
   target:
-    path: "meta-llama/Meta-Llama-3-8B"
+    path: "NousResearch/Meta-Llama-3-8B-Instruct"
     device: "cuda:0"
   adapter:
     path: "checkpoints/Gen6.2/adapter.pt"
