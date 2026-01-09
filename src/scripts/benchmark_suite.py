@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import os
+import sys
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, os.pardir, os.pardir))
+sys.path.insert(0, _PROJECT_ROOT)
+
 import abc
 import argparse
 import csv
 import json
-import os
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
