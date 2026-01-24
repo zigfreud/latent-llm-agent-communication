@@ -19,7 +19,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import torch
 import yaml
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 from src.core.models import LIPAdapter
 from src.integrations.hooks import make_lip_hook
@@ -201,6 +201,7 @@ class LipProtocolScenario(BenchmarkScenario):
         self.target_max_new_tokens = target_max_new_tokens
         self.source_model: Optional[Any] = None
         self.target_model: Optional[Any] = None
+        self.ref_energy: float = 1.0
 
     def prepare(self, source_model: Any, target_model: Any) -> None:
         self.source_model = source_model
@@ -212,16 +213,15 @@ class LipProtocolScenario(BenchmarkScenario):
         if hasattr(self.adapter, "eval"):
             self.adapter.eval()
 
+        print("Calculating Reference Energy (safely)...")
+        with torch.no_grad():
+            embeddings = self.target_model.get_input_embeddings().weight
+            self.ref_energy = embeddings.float().norm(p=2, dim=-1).mean().item()
+        print(f"Reference Energy: {self.ref_energy:.4f}")
+
     def _build_vec_injected(self, vec: torch.Tensor) -> torch.Tensor:
-        # Calibrate energy against target embeddings (project physics alignment).
-        ref_energy = (
-            self.target_model.get_input_embeddings()
-            .weight.norm(p=2, dim=-1)
-            .mean()
-            .item()
-        )
         current_norm = vec.norm(p=2, dim=-1)
-        scale = (ref_energy / (current_norm + 1e-6)) * float(self.gain)
+        scale = (self.ref_energy / (current_norm + 1e-6)) * float(self.gain)
         return (vec * scale).to(self.target_model.device).to(self.target_model.dtype)
 
     def execute(self, prompt: str) -> Dict[str, Any]:
@@ -393,35 +393,46 @@ def main() -> None:
     target_cfg = cfg["models"]["target"]
     adapter_cfg = cfg["models"]["adapter"]
 
-    source_device = torch.device(source_cfg.get("device", "cpu"))
-    target_device = torch.device(target_cfg.get("device", "cpu"))
-    torch_dtype = torch.float16 if source_device.type == "cuda" else torch.float32
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.float16,
+        llm_int8_enable_fp32_cpu_offload=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+    )
 
+    print("Loading Source Model (4-bit)...")
     source_tokenizer = AutoTokenizer.from_pretrained(source_cfg["path"], trust_remote_code=True)
     source_model = AutoModelForCausalLM.from_pretrained(
         source_cfg["path"],
-        torch_dtype=torch_dtype,
+        quantization_config=bnb_config,
+        device_map="auto",
         low_cpu_mem_usage=True,
         use_safetensors=True,
         trust_remote_code=True,
-    ).to(source_device)
-    source_model.eval()
+    )
 
+    print("Loading Target Model (4-bit)...")
     target_tokenizer = AutoTokenizer.from_pretrained(target_cfg["path"], trust_remote_code=True)
     target_model = AutoModelForCausalLM.from_pretrained(
         target_cfg["path"],
-        torch_dtype=torch_dtype,
+        quantization_config=bnb_config,
+        device_map="auto",
         low_cpu_mem_usage=True,
         use_safetensors=True,
         trust_remote_code=True,
-    ).to(target_device)
-    target_model.eval()
+    )
 
+    # Detetar dispositivo real onde o target foi carregado (para o adaptador)
+    target_device = target_model.device
+
+    print("Loading Adapter...")
     adapter = LIPAdapter(
         input_dim=int(adapter_cfg.get("input_dim", 2048)),
         hidden_dim=int(adapter_cfg.get("bottleneck_dim", 512)),
         output_dim=int(adapter_cfg.get("output_dim", 4096)),
     ).to(target_device)
+
     state = torch.load(adapter_cfg["path"], map_location=target_device, weights_only=False)
     adapter.load_state_dict(state)
     adapter.eval()
@@ -436,8 +447,9 @@ def main() -> None:
     json_scenario = JsonBaselineScenario(
         source_tokenizer=source_tokenizer,
         target_tokenizer=target_tokenizer,
-        device=source_device,
     )
+    json_scenario.device = source_model.device
+
     lip_scenario = LipProtocolScenario(
         source_tokenizer=source_tokenizer,
         target_tokenizer=target_tokenizer,
@@ -451,12 +463,17 @@ def main() -> None:
     warmup = int(cfg["experiment"].get("warmup", 0))
 
     all_results: List[BenchmarkResult] = []
+    print(f"Starting Benchmark Loop ({len(prompts)} prompts)...")
+
     for idx in range(warmup + iterations):
+        is_warmup = idx < warmup
+        print(f"   Iteration {idx + 1}/{warmup + iterations} {'(Warmup)' if is_warmup else ''}")
         results = _collect_results([json_scenario, lip_scenario], prompts)
-        if idx >= warmup:
+        if not is_warmup:
             all_results.extend(results)
 
     _write_results_csv(Path(args.output), all_results)
+    print(f"Done! Results saved to {args.output}")
 
 
 if __name__ == "__main__":
