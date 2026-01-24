@@ -59,7 +59,7 @@ def main():
     # Reference energy (critical for LIP).
     ref_energy = 1.0
     if args.mode == "lip":
-        print("⚡ Calculando Energia de Referencia...")
+        print("⚡ Energy Matching...")
         with torch.no_grad():
             ref_energy = t_mod.get_input_embeddings().weight.float().norm(p=2, dim=-1).mean().item()
 
@@ -118,10 +118,9 @@ def main():
             scale = (ref_energy / (current_norm + 1e-6)) * 10.0 # Fixed gain 10.0.
             vec_inj = (vec_trans * scale).to(t_mod.device).to(t_mod.dtype)
             
-            # 3) Target receives anchor + vector (no original text).
-            # Anchor encourages Python code generation.
-            anchor = "# Solution:"
-            t_inputs = t_tok(anchor, return_tensors="pt").to(t_mod.device)
+            # 3) Target receives the prompt as anchor + vector.
+            # This keeps the target focused on the correct task.
+            t_inputs = t_tok(prompt_text, return_tensors="pt").to(t_mod.device)
             
             # Inject at the last anchor position.
             inj_pos = t_inputs.input_ids.shape[1] - 1
@@ -137,9 +136,8 @@ def main():
                 )
             handle.remove()
             
-            # Code is everything after the anchor.
-            full_out = t_tok.decode(out_ids[0], skip_special_tokens=True)
-            code = full_out.replace(anchor, "", 1).strip()
+            # Code is the new tokens after the prompt.
+            code = t_tok.decode(out_ids[0][t_inputs.input_ids.shape[1]:], skip_special_tokens=True)
 
         # Save result.
         samples.append(dict(task_id=task_id, completion=code))
