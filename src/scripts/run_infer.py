@@ -1,4 +1,3 @@
-# scripts/run_infer.py
 import argparse
 import yaml
 

@@ -4,7 +4,7 @@ adapter_ckpt: checkpoints/Gen6.2/best_model.pth
 
 runtime:
   device_src: cuda
-  device_tgt: auto
+  device_tgt: cuda
   load_4bit: true
 
 lip:

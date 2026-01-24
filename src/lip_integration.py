@@ -32,12 +32,12 @@ class LIPSender:
 
         try:
             state = torch.load(adapter_path, map_location=DEVICE)
-            # Mapping HeteroAdapter (named layers) to Sequential (indexed layers) if necessary
-            # Ideally, define the class structure identically.
+            # Map HeteroAdapter (named layers) to Sequential (indexed layers) when needed.
+            # Prefer matching class structures to avoid this path.
             try:
                 self.adapter.load_state_dict(state)
             except:
-                # Quick fix for structure mismatch between class and sequential
+                # Quick fix for structure mismatch between class and Sequential.
                 from collections import OrderedDict
                 new_state = OrderedDict()
                 new_state['0.weight'] = state['encoder.0.weight']
@@ -74,7 +74,7 @@ class LIPReceiver:
         
         print(f"   Trying to load model on {DEVICE}...")
         try:
-            # Tentativa 1: Otimizada (bfloat16)
+            # Attempt 1: optimized path (bfloat16).
             print("   [1/2] Attempting bfloat16 load (Low RAM)...")
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_id, 
@@ -86,7 +86,7 @@ class LIPReceiver:
         except Exception as e:
             print(f"   ⚠️ bfloat16 failed: {e}")
             print("   [2/2] Attempting float32 load (High RAM usage!)...")
-            # Tentativa 2: Fallback explícito
+            # Attempt 2: explicit fallback.
             try:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     self.model_id, 
@@ -96,7 +96,7 @@ class LIPReceiver:
                 print("   ✅ Loaded in float32.")
             except Exception as e2:
                 print(f"   ❌ FATAL: Could not load model. Error: {e2}")
-                sys.exit(1) # Mata o processo se falhar
+                sys.exit(1) # Stop the process on failure.
 
         self.model.eval()
 
@@ -120,7 +120,7 @@ class LIPReceiver:
         bos_id = self.tokenizer.bos_token_id if self.tokenizer.bos_token_id else self.tokenizer.eos_token_id
         bos_tensor = torch.tensor([[bos_id]], device=DEVICE)
 
-        # Context Priming
+        # Context priming.
         priming_text = "Here is the Python code snippet:\n"
         priming_ids = self.tokenizer(priming_text, return_tensors="pt", add_special_tokens=False).input_ids.to(DEVICE)
 
