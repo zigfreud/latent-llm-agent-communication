@@ -1,12 +1,27 @@
-torch>=2.0.0
-transformers>=4.30.0
-accelerate>=0.20.0
-datasets>=2.14.0
-bitsandbytes>=0.41.0
-sentence-transformers>=2.2.2
-matplotlib
-pandas
-numpy
-scipy
-tqdm
+# Core ML Framework
+torch==2.4.1
 torch-directml
+# Removed torchvision and torchaudio to avoid direcml conflicts
+
+# Hugging Face Ecosystem
+transformers==4.44.2
+accelerate==0.34.0
+datasets==2.21.0
+bitsandbytes==0.43.3
+sentence-transformers==3.0.1
+safetensors>=0.4.0
+
+# Scientific & Math
+numpy<2.0.0
+scipy==1.13.1
+pandas==2.2.2
+
+# Utilities & Visualization
+tqdm==4.66.5
+matplotlib==3.9.2
+seaborn==0.13.2
+pyyaml>=6.0.1
+human-eval==1.0.3
+
+# Testing
+pytest==8.3.2
