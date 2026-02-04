@@ -148,7 +148,7 @@ def train(config_path):
 
         if avg_loss < best_loss:
             best_loss = avg_loss
-            torch.save(model.state_dict(), os.path.join(cfg['output_dir'], "best_model.pth"))
+            torch.save(model.state_dict(), os.path.join(cfg['output_dir'], "adapter_pth"))
             logger.info("🌟 New best model saved.")
 
     logger.info("🏁 Process completed.")

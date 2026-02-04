@@ -190,6 +190,63 @@ def run_ab(
     return results
 
 
+def run_ab_no_text(
+    prompt_text: str,
+    anchor_prompt: str,
+    vec_injected: torch.Tensor,
+    tgt_model,
+    tgt_tok,
+    layer_idx: int,
+    inject_pos_mode: str,
+    gen_kwargs: Dict,
+) -> Dict[str, str]:
+    """
+    Runs deterministic AB for no-text telepathy.
+    baseline_text: full prompt, no injection (same behavior as run_ab).
+    no_text: anchor prompt only, with injection enabled.
+    """
+    gen_kwargs = dict(gen_kwargs or {})
+    gen_kwargs.setdefault("do_sample", False)
+
+    def _calc_inject_pos(input_ids: torch.Tensor) -> int:
+        if inject_pos_mode == "last":
+            return input_ids.shape[1] - 1
+        if inject_pos_mode == "last_minus_1":
+            pos = input_ids.shape[1] - 2
+            return max(pos, 0)
+        raise ValueError(f"Unknown inject_pos_mode: {inject_pos_mode}")
+
+    def _run(prompt: str, enable_lip: bool) -> str:
+        inputs = tgt_tok(prompt, return_tensors="pt", add_special_tokens=False).to(tgt_model.device)
+        input_ids = inputs["input_ids"]
+        attn_mask = inputs.get("attention_mask", None)
+        inject_pos = _calc_inject_pos(input_ids)
+
+        hook_fn = make_lip_hook(vec_injected=vec_injected, inject_pos=inject_pos, enable=enable_lip)
+        handle = tgt_model.model.layers[layer_idx].register_forward_hook(hook_fn)
+        try:
+            with torch.no_grad():
+                gen = tgt_model.generate(
+                    input_ids=input_ids,
+                    attention_mask=attn_mask,
+                    **gen_kwargs
+                )
+        finally:
+            handle.remove()
+
+        out_ids = gen[0][input_ids.shape[1]:]
+        text = tgt_tok.decode(out_ids, skip_special_tokens=True)
+        return text
+
+    baseline_prompt = format_prompt_like_dataset(prompt_text)
+    anchor_only_prompt = format_prompt_like_dataset(anchor_prompt)
+
+    return {
+        "baseline_text": _run(baseline_prompt, enable_lip=False),
+        "no_text": _run(anchor_only_prompt, enable_lip=True),
+    }
+
+
 def run_inference(cfg_dict: Dict):
     # Parse cfg dict -> config object
     cfg = InferenceConfig(

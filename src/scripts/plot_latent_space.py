@@ -41,9 +41,9 @@ def _load_model(cfg: dict, device: torch.device, output_dir: Path) -> LIPAdapter
         hidden_dim=model_cfg.get("hidden_dim", 1024),
         output_dim=model_cfg.get("output_dim", 4096),
     )
-    weights_path = output_dir / "adapter.pth"
+    weights_path = output_dir / "adapter_pth"
     if not weights_path.exists():
-        raise FileNotFoundError(f"adapter.pth not found at {weights_path}")
+        raise FileNotFoundError(f"adapter_pth not found at {weights_path}")
     state = torch.load(weights_path, map_location="cpu")
     model.load_state_dict(state)
     model.to(device)
