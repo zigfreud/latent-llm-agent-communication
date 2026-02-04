@@ -37,12 +37,30 @@ def pick_prompt(example: dict) -> str:
 
 
 def extract_code(text: str) -> str:
+    text = text.replace("```\n```python", "```python")
+    text = text.replace("```\n```Python", "```python")
+
     code_match = re.search(r"```python\\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
     if code_match:
         return code_match.group(1).strip()
-    generic = re.search(r"```\\s*(.*?)```", text, re.DOTALL)
+
+    code_match = re.search(r"```\\s*python\\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+    if code_match:
+        return code_match.group(1).strip()
+
+    generic = re.search(r"```(?:\\w+)?\\s*(.*?)```", text, re.DOTALL)
     if generic:
         return generic.group(1).strip()
+
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if re.match(r"\\s*(def |class |import |from )", line):
+            start = i
+            break
+    if start is not None:
+        return "\n".join(lines[start:]).strip()
+
     return text.strip()
 
 

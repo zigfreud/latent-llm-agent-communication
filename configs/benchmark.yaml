@@ -9,7 +9,7 @@ models:
   target:
     path: "NousResearch/Meta-Llama-3-8B-Instruct"
   adapter:
-    path: "checkpoints/Gen6.2/best_model.pth"
+    path: "checkpoints/Gen6.2/adapter_pth"
     input_dim: 2048
     bottleneck_dim: 1024 
     output_dim: 4096

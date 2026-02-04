@@ -1,6 +1,6 @@
 source_model: deepseek-ai/deepseek-coder-1.3b-base
 target_model: NousResearch/Meta-Llama-3-8B-Instruct
-adapter_ckpt: checkpoints/Gen6.2/best_model.pth
+adapter_ckpt: checkpoints/Gen6.2/adapter_pth
 
 runtime:
   device_src: cuda

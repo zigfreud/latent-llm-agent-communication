@@ -1,0 +1,13 @@
+source_model: "deepseek-ai/deepseek-coder-1.3b-base"
+target_model: "NousResearch/Meta-Llama-3-8B-Instruct"
+adapter_ckpt: "checkpoints/Gen6.2/adapter_pth"
+
+lip:
+  gain: 10.0
+  layer_idx: -2
+  inject_pos_mode: "last"
+  anchor_prompt: "Write ONLY valid Python code. No explanation. Output inside a single ```python``` block."
+
+generation:
+  max_new_tokens: 100
+  temperature: 0.1
