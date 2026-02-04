@@ -93,6 +93,7 @@ def main():
     )
 
     anchor_prompt = str(cfg.get("lip", {}).get("anchor_prompt", "Received instruction via LIP:"))
+    baseline_suffix = "\n\nReturn only Python code in a ```python``` block."
 
     results = []
     baseline_passes = 0
@@ -106,8 +107,9 @@ def main():
             gain=float(cfg.get("lip", {}).get("gain", 10.0)),
         )
 
+        baseline_prompt = f"{prompt}{baseline_suffix}"
         ab = run_ab_no_text(
-            prompt_text=prompt,
+            prompt_text=baseline_prompt,
             anchor_prompt=anchor_prompt,
             vec_injected=vec_injected,
             tgt_model=tgt_model,
