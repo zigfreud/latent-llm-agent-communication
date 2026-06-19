@@ -57,6 +57,28 @@ Use `--device cpu` only if the host has enough memory and runtime budget. The
 builder loads the source model, extracts source vectors, frees it, then loads
 the target model and extracts target vectors for the same prompts.
 
+## Colab/free GPU notes
+
+Use dry-run first to verify packaging and validation before downloading any
+models:
+
+```bash
+python -m src.scripts.build_real_tiny_latent_bundle \
+  --config config/LIP-H0-005_real_tiny_bundle.yaml \
+  --dry-run
+```
+
+For real extraction, install the project requirements in the notebook or local
+environment and authenticate with Hugging Face if the target model requires
+access. The configured target model may require 4-bit loading on free GPU
+environments. The default H0-005 config enables `load_in_4bit` and
+`device_map: "auto"` for that reason.
+
+If real extraction runs out of memory, reduce `--max-samples` to `1` or `2`,
+keep `batch_size: 1`, or switch to a smaller target model for infrastructure
+testing. The produced zip must stay outside git and should be passed to the
+H0-003 workflow with both `latent_bundle_url` and `latent_bundle_sha256`.
+
 Optional overrides:
 
 ```bash

@@ -1,0 +1,61 @@
+name: LIP-H0-005 Real Tiny Bundle Dry Run
+
+on:
+  pull_request:
+    branches:
+      - feature/lip-v2-contrastive
+    paths:
+      - ".github/workflows/LIP-H0-005_real_tiny_bundle_dry_run.yml"
+      - "config/LIP-H0-005_real_tiny_bundle.yaml"
+      - "docs/LIP-H0-005_real_tiny_bundle_runbook.md"
+      - "src/scripts/build_real_tiny_latent_bundle.py"
+      - "src/scripts/package_latent_bundle.py"
+      - "src/scripts/validate_latent_bundle.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+          python -m pip install PyYAML numpy
+
+      - name: Compile scripts
+        run: |
+          python -m compileall \
+            src/scripts/build_real_tiny_latent_bundle.py \
+            src/scripts/package_latent_bundle.py \
+            src/scripts/validate_latent_bundle.py
+
+      - name: Build dry-run latent bundle
+        run: |
+          python -m src.scripts.build_real_tiny_latent_bundle \
+            --config config/LIP-H0-005_real_tiny_bundle.yaml \
+            --dry-run
+
+      - name: Validate latent bundle
+        run: |
+          python -m src.scripts.validate_latent_bundle \
+            --bundle-dir datasets/LIP-H0-005/real_tiny_bundle
+
+      - name: Verify expected files
+        run: |
+          test -f datasets/LIP-H0-005/real_tiny_bundle/manifest.json
+          test -f datasets/LIP-H0-005/real_tiny_bundle/shards/shard_0.pt
+          test -f datasets/LIP-H0-005/LIP-H0-005_real_tiny_latent_bundle.zip

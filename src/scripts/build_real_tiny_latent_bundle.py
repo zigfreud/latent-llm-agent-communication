@@ -65,6 +65,35 @@ def positive_int(value, name):
     return value
 
 
+def config_bool(config_section, key, default):
+    value = config_section.get(key, default)
+    if not isinstance(value, bool):
+        raise ValueError(f"extraction.{key} must be a boolean")
+    return value
+
+
+def normalize_device_map(value):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("extraction.device_map must be auto, none, or null")
+
+    normalized = value.strip().lower()
+    if normalized == "auto":
+        return "auto"
+    if normalized == "none":
+        return None
+    raise ValueError("extraction.device_map must be auto, none, or null")
+
+
+def normalize_cache_dir(value):
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("extraction.cache_dir must be null or a non-empty string")
+    return value
+
+
 def selected_prompts(config, max_samples):
     prompts = get_nested(config, "data", "prompts")
     if not isinstance(prompts, list) or not prompts:
@@ -152,30 +181,85 @@ def tokenize_batch(tokenizer, prompts, max_length, device):
     return {key: value.to(device) for key, value in encoded.items()}
 
 
-def extract_hidden_vectors(model_name, prompts, layer_index, expected_dim, config, device, dtype):
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-
+def build_model_load_kwargs(config, dtype):
     extraction_config = get_nested(config, "extraction")
     trust_remote_code = bool(extraction_config.get("trust_remote_code", False))
+    low_cpu_mem_usage = config_bool(extraction_config, "low_cpu_mem_usage", False)
+    device_map = normalize_device_map(extraction_config.get("device_map"))
+    load_in_4bit = config_bool(extraction_config, "load_in_4bit", False)
+    cache_dir = normalize_cache_dir(extraction_config.get("cache_dir"))
+    local_files_only = config_bool(extraction_config, "local_files_only", False)
+
+    kwargs = {
+        "trust_remote_code": trust_remote_code,
+        "low_cpu_mem_usage": low_cpu_mem_usage,
+        "local_files_only": local_files_only,
+    }
+    tokenizer_kwargs = {
+        "trust_remote_code": trust_remote_code,
+        "local_files_only": local_files_only,
+    }
+
+    if cache_dir is not None:
+        kwargs["cache_dir"] = cache_dir
+        tokenizer_kwargs["cache_dir"] = cache_dir
+
+    if device_map is not None:
+        kwargs["device_map"] = device_map
+
+    if load_in_4bit:
+        try:
+            from transformers import BitsAndBytesConfig
+
+            kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True)
+        except Exception as exc:
+            raise RuntimeError(
+                "load_in_4bit=true requires a transformers version with "
+                "BitsAndBytesConfig and a working bitsandbytes installation."
+            ) from exc
+    else:
+        kwargs["torch_dtype"] = dtype
+
+    return kwargs, tokenizer_kwargs, device_map, load_in_4bit
+
+
+def extract_hidden_vectors(model_name, prompts, layer_index, expected_dim, config, device, dtype):
+    try:
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+    except Exception as exc:
+        raise RuntimeError(
+            "Real extraction requires transformers. Dry-run mode does not import "
+            "or load Hugging Face models."
+        ) from exc
+
+    extraction_config = get_nested(config, "extraction")
     max_length = positive_int(extraction_config.get("max_length"), "extraction.max_length")
     batch_size = positive_int(extraction_config.get("batch_size"), "extraction.batch_size")
     token_position = extraction_config.get("token_position", "last")
     if token_position != "last":
         raise ValueError("only token_position=last is supported")
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name,
-        trust_remote_code=trust_remote_code,
+    model_kwargs, tokenizer_kwargs, device_map, load_in_4bit = build_model_load_kwargs(
+        config,
+        dtype,
     )
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name, **tokenizer_kwargs)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    model_kwargs = {
-        "trust_remote_code": trust_remote_code,
-        "torch_dtype": dtype,
-    }
-    model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
-    model.to(device)
+    try:
+        model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
+    except Exception as exc:
+        if load_in_4bit:
+            raise RuntimeError(
+                f"Failed to load {model_name} with load_in_4bit=true. "
+                "Install compatible transformers, accelerate, and bitsandbytes "
+                "packages, and run on hardware that supports 4-bit loading."
+            ) from exc
+        raise
+
+    if device_map is None:
+        model.to(device)
     model.eval()
 
     vectors = []
