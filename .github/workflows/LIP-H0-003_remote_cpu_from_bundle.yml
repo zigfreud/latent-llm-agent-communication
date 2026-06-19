@@ -124,6 +124,7 @@ jobs:
 
           export BUNDLE_ZIP="$bundle_zip"
           python - <<'PY'
+          import json
           import os
           import shutil
           import zipfile
@@ -133,6 +134,7 @@ jobs:
           bundle_dir = Path(os.environ["BUNDLE_DIR"])
           max_uncompressed_bytes = 512 * 1024 * 1024
           allowed_names = set()
+          zip_shard_names = set()
           total_size = 0
 
           with zipfile.ZipFile(bundle_zip) as archive:
@@ -155,6 +157,8 @@ jobs:
                       raise SystemExit(f"Duplicate zip entry: {name}")
 
                   allowed_names.add(path.as_posix())
+                  if is_shard:
+                      zip_shard_names.add(path.as_posix())
                   total_size += info.file_size
                   if total_size > max_uncompressed_bytes:
                       raise SystemExit("Latent bundle exceeds 512 MB uncompressed size limit")
@@ -163,6 +167,48 @@ jobs:
                   raise SystemExit("Latent bundle is missing manifest.json")
               if "shards/shard_0.pt" not in allowed_names:
                   raise SystemExit("Latent bundle is missing shards/shard_0.pt")
+
+              with archive.open("manifest.json") as manifest_file:
+                  manifest = json.load(manifest_file)
+
+              manifest_shards = manifest.get("shards")
+              if not isinstance(manifest_shards, list) or not manifest_shards:
+                  raise SystemExit("manifest.json must include a non-empty shards list")
+
+              listed_shard_names = set()
+              for shard in manifest_shards:
+                  if not isinstance(shard, dict):
+                      raise SystemExit("each manifest shard entry must be an object")
+                  shard_name = shard.get("path")
+                  if not isinstance(shard_name, str) or not shard_name:
+                      raise SystemExit("each manifest shard entry must include a path")
+                  if "\\" in shard_name:
+                      raise SystemExit(f"Manifest shard path must not contain backslashes: {shard_name}")
+                  shard_path = PurePosixPath(shard_name)
+                  if shard_path.is_absolute() or ".." in shard_path.parts:
+                      raise SystemExit(f"Unsafe manifest shard path: {shard_name}")
+                  if len(shard_path.parts) != 2 or shard_path.parts[0] != "shards" or shard_path.suffix != ".pt":
+                      raise SystemExit(f"Manifest shard path must be a direct shards/*.pt file: {shard_name}")
+                  if shard_path.as_posix() in listed_shard_names:
+                      raise SystemExit(f"Duplicate manifest shard path: {shard_name}")
+                  listed_shard_names.add(shard_path.as_posix())
+
+              if "shards/shard_0.pt" not in listed_shard_names:
+                  raise SystemExit("manifest.json must list shards/shard_0.pt")
+
+              unlisted_shards = sorted(zip_shard_names - listed_shard_names)
+              if unlisted_shards:
+                  raise SystemExit(
+                      "Zip contains shard file(s) not listed in manifest.json: "
+                      + ", ".join(unlisted_shards)
+                  )
+
+              missing_shards = sorted(listed_shard_names - zip_shard_names)
+              if missing_shards:
+                  raise SystemExit(
+                      "manifest.json lists shard file(s) missing from zip: "
+                      + ", ".join(missing_shards)
+                  )
 
               for info in archive.infolist():
                   path = PurePosixPath(info.filename)

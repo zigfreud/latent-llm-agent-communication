@@ -57,6 +57,10 @@ Field rules:
 - `shards/shard_0.pt` must be listed.
 - Each shard object must include a relative direct-child `path` matching
   `shards/*.pt` using forward slashes.
+- Every `shards/*.pt` file present in the bundle must be listed in
+  `manifest.json`.
+- Unlisted shard files are rejected because the trainer consumes every direct
+  `*.pt` file in the configured shard directory.
 - `records` is optional. When any shard provides `records`, every shard must
   provide it, and the sum must equal `num_samples`.
 - Loaded shard record counts must equal `num_samples`.

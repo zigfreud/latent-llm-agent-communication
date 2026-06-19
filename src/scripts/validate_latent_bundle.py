@@ -199,11 +199,72 @@ def validate_shard(bundle_dir, shard_entry, input_dim, output_dim):
     }
 
 
+def collect_listed_shard_paths(manifest):
+    listed = set()
+    for shard_entry in manifest["shards"]:
+        if not isinstance(shard_entry, dict):
+            fail("each shard entry must be an object")
+
+        shard_path = normalize_shard_path(shard_entry.get("path"))
+        shard_name = shard_path.as_posix()
+        if shard_name in listed:
+            fail(f"duplicate shard path listed in manifest.json: {shard_name}")
+        listed.add(shard_name)
+
+    return listed
+
+
+def collect_actual_shard_paths(bundle_dir):
+    shards_dir = bundle_dir / "shards"
+    if not shards_dir.is_dir():
+        fail(f"missing shards directory: {shards_dir}")
+
+    direct_shards = {
+        PurePosixPath("shards", path.name).as_posix()
+        for path in shards_dir.glob("*.pt")
+        if path.is_file()
+    }
+    nested_shards = [
+        path.relative_to(bundle_dir).as_posix()
+        for path in shards_dir.rglob("*.pt")
+        if path.is_file() and len(path.relative_to(shards_dir).parts) != 1
+    ]
+    if nested_shards:
+        fail(
+            "nested shard files are not allowed; shards must be direct shards/*.pt files: "
+            + ", ".join(sorted(nested_shards))
+        )
+
+    return direct_shards
+
+
+def validate_shard_file_set(bundle_dir, manifest):
+    listed_shards = collect_listed_shard_paths(manifest)
+    actual_shards = collect_actual_shard_paths(bundle_dir)
+
+    unlisted_shards = sorted(actual_shards - listed_shards)
+    if unlisted_shards:
+        fail(
+            "unlisted shard file(s) found in bundle: "
+            + ", ".join(unlisted_shards)
+        )
+
+    missing_shards = sorted(listed_shards - actual_shards)
+    if missing_shards:
+        fail(
+            "listed shard file(s) missing from bundle: "
+            + ", ".join(missing_shards)
+        )
+
+    return sorted(listed_shards), sorted(actual_shards)
+
+
 def validate_bundle(bundle_dir):
     manifest = read_manifest(bundle_dir)
     input_dim = manifest["input_dim"]
     output_dim = manifest["output_dim"]
     num_samples = manifest["num_samples"]
+    listed_shards, actual_shards = validate_shard_file_set(bundle_dir, manifest)
 
     shard_reports = [
         validate_shard(bundle_dir, shard_entry, input_dim, output_dim)
@@ -233,6 +294,8 @@ def validate_bundle(bundle_dir):
         "input_dim": input_dim,
         "output_dim": output_dim,
         "total_records": total_records,
+        "listed_shard_paths": listed_shards,
+        "actual_shard_paths": actual_shards,
         "shards": shard_reports,
         "validation_status": "passed",
     }
