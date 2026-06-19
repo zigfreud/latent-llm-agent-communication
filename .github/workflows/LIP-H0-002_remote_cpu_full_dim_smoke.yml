@@ -3,6 +3,7 @@ name: LIP-H0-002 Remote CPU Full-Dim Smoke
 on:
   pull_request:
     branches:
+      - main
       - feature/lip-v2-contrastive
     paths:
       - ".github/workflows/LIP-H0-002_remote_cpu_full_dim_smoke.yml"

@@ -3,6 +3,7 @@ name: LIP-H0-005 Real Tiny Bundle Dry Run
 on:
   pull_request:
     branches:
+      - main
       - feature/lip-v2-contrastive
     paths:
       - ".github/workflows/LIP-H0-005_real_tiny_bundle_dry_run.yml"

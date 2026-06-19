@@ -3,6 +3,7 @@ name: LIP-H0-001 Remote CPU Smoke
 on:
   pull_request:
     branches:
+      - main
       - feature/lip-v2-contrastive
     paths:
       - ".github/workflows/LIP-H0-001_remote_cpu_smoke.yml"

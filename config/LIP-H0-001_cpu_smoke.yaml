@@ -12,7 +12,7 @@ data:
 
 model:
   input_dim: 16
-  hidden_dim: 32
+  hidden_dim: 8
   output_dim: 16
 
 training:
