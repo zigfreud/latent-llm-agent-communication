@@ -1,0 +1,27 @@
+experiment_id: "LIP-H0-003"
+experiment_name: "LIP-H0-003 Remote CPU Real Tiny Bundle"
+device: "cpu"
+output_dir: "runs/LIP-H0-003"
+seed: 42
+
+data:
+  dataset_path: "datasets/LIP-H0-003/latent_bundle/shards"
+  batch_size: 2
+  num_workers: 0
+  drop_last: true
+
+model:
+  input_dim: 2048
+  hidden_dim: 1024
+  output_dim: 4096
+
+training:
+  epochs: 1
+  max_steps: 2
+  learning_rate: 0.001
+  weight_decay: 0.0
+  resume: false
+
+loss:
+  temperature: 0.1
+  lambda_mse: 0.1
