@@ -4,6 +4,14 @@ on:
   pull_request:
     branches:
       - feature/lip-v2-contrastive
+    paths:
+      - ".github/workflows/LIP-H0-002_remote_cpu_full_dim_smoke.yml"
+      - "config/LIP-H0-002_full_dim_cpu_smoke.yaml"
+      - "src/scripts/make_toy_shards.py"
+      - "src/pipelines/trainer.py"
+      - "src/core/models.py"
+      - "src/core/loss.py"
+      - "src/core/utils.py"
   workflow_dispatch:
 
 permissions:

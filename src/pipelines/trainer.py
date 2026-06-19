@@ -16,9 +16,24 @@ from src.core.loss import HybridContrastiveLoss
 from src.core.utils import get_device, set_seed, setup_logger
 
 
+def load_pt_shard(filepath):
+    try:
+        return torch.load(filepath, map_location="cpu", weights_only=True)
+    except TypeError as exc:
+        raise RuntimeError(
+            "This trainer requires a PyTorch version supporting "
+            "torch.load(..., weights_only=True) for shard loading."
+        ) from exc
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to safely load shard {filepath} with weights_only=True. "
+            "Shards must be saved in a weights_only-compatible tensor/list/dict format."
+        ) from exc
+
+
 class ShardDataset(Dataset):
     def __init__(self, filepath):
-        data = torch.load(filepath, map_location="cpu")
+        data = load_pt_shard(filepath)
         self.data = data if isinstance(data, list) else []
 
     def __len__(self):

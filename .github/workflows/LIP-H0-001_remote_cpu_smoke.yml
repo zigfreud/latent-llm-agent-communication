@@ -4,6 +4,14 @@ on:
   pull_request:
     branches:
       - feature/lip-v2-contrastive
+    paths:
+      - ".github/workflows/LIP-H0-001_remote_cpu_smoke.yml"
+      - "config/LIP-H0-001_cpu_smoke.yaml"
+      - "src/scripts/make_toy_shards.py"
+      - "src/pipelines/trainer.py"
+      - "src/core/models.py"
+      - "src/core/loss.py"
+      - "src/core/utils.py"
   workflow_dispatch:
     inputs:
       experiment_id:
@@ -51,7 +59,8 @@ env:
 
 jobs:
   cpu-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     steps:
       - name: Check out repository
@@ -173,3 +182,4 @@ jobs:
           name: ${{ env.EXPERIMENT_ID }}-${{ github.run_id }}-remote-cpu-smoke
           path: ${{ env.RUN_OUTPUT_DIR }}
           if-no-files-found: warn
+          retention-days: 7
