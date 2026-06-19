@@ -1,0 +1,27 @@
+experiment_id: "LIP-H0-001"
+experiment_name: "LIP-H0-001 Remote CPU Smoke"
+device: "cpu"
+output_dir: "runs/LIP-H0-001"
+seed: 42
+
+data:
+  dataset_path: "datasets/LIP-H0-001/smoke_shards"
+  batch_size: 4
+  num_workers: 0
+  drop_last: true
+
+model:
+  input_dim: 16
+  hidden_dim: 32
+  output_dim: 16
+
+training:
+  epochs: 2
+  max_steps: 3
+  learning_rate: 0.001
+  weight_decay: 0.0
+  resume: false
+
+loss:
+  temperature: 0.1
+  lambda_mse: 0.1

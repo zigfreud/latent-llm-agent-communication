@@ -18,6 +18,7 @@ datasets/
 experiments/logs/
 experiments/experiments_log/
 paper_resources/data/
+runs/
 
 # OS Junk
 .DS_Store

@@ -1,0 +1,49 @@
+name: LIP-H0-001 Remote CPU Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cpu-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU-compatible dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+          python -m pip install PyYAML numpy
+
+      - name: Generate toy shards
+        run: |
+          python -m src.scripts.make_toy_shards \
+            --output-dir datasets/LIP-H0-001/smoke_shards \
+            --num-samples 12 \
+            --input-dim 16 \
+            --output-dim 16
+
+      - name: Run CPU smoke trainer
+        run: |
+          python -m src.pipelines.trainer \
+            --config config/LIP-H0-001_cpu_smoke.yaml \
+            --experiment-id LIP-H0-001 \
+            --output-dir runs/LIP-H0-001 \
+            --max-steps 3 \
+            --device cpu
+
+      - name: Append run summary
+        run: cat runs/LIP-H0-001/run_summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload smoke run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LIP-H0-001-remote-cpu-smoke
+          path: runs/LIP-H0-001
