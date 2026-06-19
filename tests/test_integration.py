@@ -15,6 +15,13 @@ from src.core.models import LIPAdapter
 from src.core.loss import HybridContrastiveLoss
 
 
+def _loss_and_acc(loss_result):
+    if len(loss_result) == 4:
+        loss, _, _, acc = loss_result
+        return loss, acc
+    return loss_result
+
+
 def _write_mock_shard(path, num_rows=2, src_dim=2048, tgt_dim=4096):
     data = []
     for _ in range(num_rows):
@@ -52,7 +59,7 @@ def test_single_train_step_forward_backward(shard_dir):
 
     src_batch, tgt_batch = next(iter(loader))
     output = model(src_batch)
-    loss, acc = criterion(output, tgt_batch)
+    loss, acc = _loss_and_acc(criterion(output, tgt_batch))
     loss.backward()
     optimizer.step()
 
@@ -70,7 +77,7 @@ def test_inference_output_shape_after_minimal_training(shard_dir):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     src_batch, tgt_batch = next(iter(loader))
-    loss, _ = criterion(model(src_batch), tgt_batch)
+    loss, _ = _loss_and_acc(criterion(model(src_batch), tgt_batch))
     loss.backward()
     optimizer.step()
 
