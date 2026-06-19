@@ -4,6 +4,30 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 
+REQUIRED_MANIFEST_FIELDS = {
+    "bundle_format",
+    "schema_version",
+    "trace_id",
+    "source_model",
+    "target_model",
+    "dataset_origin",
+    "input_dim",
+    "output_dim",
+    "num_samples",
+    "created_at",
+    "license_notes",
+    "shards",
+}
+REQUIRED_STRING_FIELDS = {
+    "trace_id",
+    "source_model",
+    "target_model",
+    "dataset_origin",
+    "created_at",
+    "license_notes",
+}
+EXPECTED_BUNDLE_FORMAT = "lip_latent_bundle"
+EXPECTED_SCHEMA_VERSION = 1
 BLOCKED_PARTS = {
     ".git",
     ".pytest_cache",
@@ -32,7 +56,25 @@ def read_manifest(manifest_path):
     if not isinstance(manifest, dict):
         fail("manifest must contain a JSON object")
 
-    shards = manifest.get("shards")
+    missing = sorted(REQUIRED_MANIFEST_FIELDS.difference(manifest))
+    if missing:
+        fail(f"manifest missing required field(s): {', '.join(missing)}")
+
+    if manifest["bundle_format"] != EXPECTED_BUNDLE_FORMAT:
+        fail(f"bundle_format must be {EXPECTED_BUNDLE_FORMAT}")
+
+    if manifest["schema_version"] != EXPECTED_SCHEMA_VERSION:
+        fail(f"schema_version must be {EXPECTED_SCHEMA_VERSION}")
+
+    for field in REQUIRED_STRING_FIELDS:
+        if not isinstance(manifest[field], str) or not manifest[field].strip():
+            fail(f"{field} must be a non-empty string")
+
+    for field in ("input_dim", "output_dim", "num_samples"):
+        if not isinstance(manifest[field], int) or manifest[field] <= 0:
+            fail(f"{field} must be a positive integer")
+
+    shards = manifest["shards"]
     if not isinstance(shards, list) or not shards:
         fail("manifest must include a non-empty shards list")
 
@@ -42,6 +84,19 @@ def read_manifest(manifest_path):
     ):
         fail("manifest must list required shard path: shards/shard_0.pt")
 
+    if any(isinstance(shard, dict) and "records" in shard for shard in shards):
+        if any(not isinstance(shard, dict) or "records" not in shard for shard in shards):
+            fail("records must be provided for every shard when any shard provides records")
+        for shard in shards:
+            if not isinstance(shard["records"], int) or shard["records"] < 0:
+                fail("records must be a non-negative integer for every shard")
+        records_total = sum(shard["records"] for shard in shards)
+        if records_total != manifest["num_samples"]:
+            fail(
+                f"sum of shard records {records_total} "
+                f"does not match num_samples={manifest['num_samples']}"
+            )
+
     return manifest
 
 
@@ -49,12 +104,18 @@ def normalize_shard_path(path_value):
     if not isinstance(path_value, str) or not path_value:
         fail("each shard entry must include a non-empty string path")
 
+    if "\\" in path_value:
+        fail(f"shard path must use forward slashes: {path_value}")
+
     shard_path = PurePosixPath(path_value)
     if shard_path.is_absolute() or ".." in shard_path.parts:
         fail(f"shard path must be relative and stay inside the bundle: {path_value}")
 
-    if len(shard_path.parts) < 2 or shard_path.parts[0] != "shards":
-        fail(f"shard path must be under shards/: {path_value}")
+    if len(shard_path.parts) != 2 or shard_path.parts[0] != "shards":
+        fail(f"shard path must be a direct child of shards/: {path_value}")
+
+    if shard_path.suffix != ".pt":
+        fail(f"shard path must end in .pt: {path_value}")
 
     if any(part in BLOCKED_PARTS for part in shard_path.parts):
         fail(f"shard path includes a blocked directory: {path_value}")
