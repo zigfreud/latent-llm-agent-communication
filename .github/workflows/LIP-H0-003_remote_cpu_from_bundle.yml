@@ -8,6 +8,7 @@ on:
       - ".github/workflows/LIP-H0-003_remote_cpu_from_bundle.yml"
       - "config/LIP-H0-003_real_tiny_cpu.yaml"
       - "docs/LIP-H0-003_latent_bundle_contract.md"
+      - "docs/LIP-H0-006_gdrive_bundle_download.md"
       - "src/scripts/make_toy_shards.py"
       - "src/scripts/package_latent_bundle.py"
       - "src/scripts/validate_latent_bundle.py"
@@ -23,7 +24,12 @@ on:
         default: ""
         type: string
       latent_bundle_sha256:
-        description: Optional SHA256 digest for latent_bundle_url.
+        description: SHA256 digest required for latent_bundle_url or google_drive_file_id.
+        required: false
+        default: ""
+        type: string
+      google_drive_file_id:
+        description: Optional Google Drive file ID for latent bundle zip. Mutually exclusive with latent_bundle_url.
         required: false
         default: ""
         type: string
@@ -42,6 +48,7 @@ env:
   MAX_STEPS: "2"
   LATENT_BUNDLE_URL: ${{ github.event.inputs.latent_bundle_url || '' }}
   LATENT_BUNDLE_SHA256: ${{ github.event.inputs.latent_bundle_sha256 || '' }}
+  GOOGLE_DRIVE_FILE_ID: ${{ github.event.inputs.google_drive_file_id || '' }}
 
 jobs:
   cpu-from-latent-bundle:
@@ -69,7 +76,20 @@ jobs:
           rm -rf "$BUNDLE_DIR"
           mkdir -p "$BUNDLE_DIR"
 
-          if [ -z "$LATENT_BUNDLE_URL" ]; then
+          external_sources=0
+          if [ -n "$LATENT_BUNDLE_URL" ]; then
+            external_sources=$((external_sources + 1))
+          fi
+          if [ -n "$GOOGLE_DRIVE_FILE_ID" ]; then
+            external_sources=$((external_sources + 1))
+          fi
+
+          if [ "$external_sources" -gt 1 ]; then
+            echo "latent_bundle_url and google_drive_file_id are mutually exclusive" >&2
+            exit 1
+          fi
+
+          if [ "$external_sources" -eq 0 ]; then
             synthetic_dir="$RUNNER_TEMP/LIP-H0-003-synthetic"
             rm -rf "$synthetic_dir"
             mkdir -p "$synthetic_dir"
@@ -124,11 +144,16 @@ jobs:
             bundle_zip="$synthetic_dir/latent_bundle.zip"
           else
             if [ -z "$LATENT_BUNDLE_SHA256" ]; then
-              echo "latent_bundle_sha256 is required when latent_bundle_url is provided" >&2
+              echo "latent_bundle_sha256 is required when latent_bundle_url or google_drive_file_id is provided" >&2
               exit 1
             fi
             download_path="$RUNNER_TEMP/LIP-H0-003_latent_bundle.zip"
-            curl --fail --location --show-error "$LATENT_BUNDLE_URL" --output "$download_path"
+            if [ -n "$LATENT_BUNDLE_URL" ]; then
+              curl --fail --location --show-error "$LATENT_BUNDLE_URL" --output "$download_path"
+            else
+              python -m pip install gdown
+              gdown "https://drive.google.com/uc?id=${GOOGLE_DRIVE_FILE_ID}" -O "$download_path"
+            fi
             echo "${LATENT_BUNDLE_SHA256}  ${download_path}" | sha256sum --check -
             bundle_zip="$download_path"
           fi
