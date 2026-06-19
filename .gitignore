@@ -8,11 +8,15 @@ venv/
 # Modelos e Dados Pesados (NÃO SUBIR PARA O GITHUB)
 *.pth
 *.pt
+*.zip
 *.bin
 *.gguf
 models/
 checkpoints/
 datasets/
+.cache/
+hf_cache/
+huggingface/
 
 # Logs e Artefatos Temporários
 experiments/logs/
