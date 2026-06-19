@@ -1,0 +1,135 @@
+name: LIP-H0-002 Remote CPU Full-Dim Smoke
+
+on:
+  pull_request:
+    branches:
+      - feature/lip-v2-contrastive
+    paths:
+      - ".github/workflows/LIP-H0-002_remote_cpu_full_dim_smoke.yml"
+      - "config/LIP-H0-002_full_dim_cpu_smoke.yaml"
+      - "src/scripts/make_toy_shards.py"
+      - "src/pipelines/trainer.py"
+      - "src/core/models.py"
+      - "src/core/loss.py"
+      - "src/core/utils.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPERIMENT_ID: LIP-H0-002
+  CONFIG_PATH: config/LIP-H0-002_full_dim_cpu_smoke.yaml
+  DATASET_PATH: datasets/LIP-H0-002/full_dim_smoke_shards
+  RUN_OUTPUT_DIR: runs/LIP-H0-002
+  NUM_SAMPLES: "8"
+  INPUT_DIM: "2048"
+  OUTPUT_DIM: "4096"
+  MAX_STEPS: "2"
+
+jobs:
+  cpu-full-dim-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU-compatible dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+          python -m pip install PyYAML numpy
+
+      - name: Generate synthetic full-dimension shards
+        run: |
+          python -m src.scripts.make_toy_shards \
+            --output-dir "$DATASET_PATH" \
+            --num-samples "$NUM_SAMPLES" \
+            --input-dim "$INPUT_DIM" \
+            --output-dim "$OUTPUT_DIM"
+
+      - name: Run full-dimension CPU smoke trainer
+        run: |
+          python -m src.pipelines.trainer \
+            --config "$CONFIG_PATH" \
+            --experiment-id "$EXPERIMENT_ID" \
+            --output-dir "$RUN_OUTPUT_DIR" \
+            --max-steps "$MAX_STEPS" \
+            --device cpu
+
+      - name: Validate smoke outputs
+        run: |
+          python - <<'PY'
+          import csv
+          import json
+          import os
+          from pathlib import Path
+
+          output_dir = Path(os.environ["RUN_OUTPUT_DIR"])
+          required_files = [
+              "metrics.json",
+              "train_log.csv",
+              "run_summary.md",
+              "last_checkpoint.pth",
+              "best_model.pth",
+          ]
+          missing = [name for name in required_files if not (output_dir / name).is_file()]
+          if missing:
+              raise SystemExit(f"Missing expected output files: {', '.join(missing)}")
+
+          with open(output_dir / "metrics.json", "r", encoding="utf-8") as handle:
+              metrics = json.load(handle)
+
+          expected_experiment = os.environ["EXPERIMENT_ID"]
+          if metrics.get("experiment_id") != expected_experiment:
+              raise SystemExit(
+                  f"Expected experiment_id={expected_experiment}, got {metrics.get('experiment_id')}"
+              )
+
+          max_steps = int(os.environ["MAX_STEPS"])
+          steps_completed = int(metrics.get("steps_completed", 0))
+          if steps_completed <= 0:
+              raise SystemExit("Trainer completed zero steps")
+          if steps_completed > max_steps:
+              raise SystemExit(
+                  f"Trainer completed {steps_completed} steps, exceeding max_steps={max_steps}"
+              )
+
+          with open(output_dir / "train_log.csv", "r", encoding="utf-8") as handle:
+              rows = list(csv.DictReader(handle))
+          if len(rows) != steps_completed:
+              raise SystemExit(
+                  f"train_log.csv has {len(rows)} rows, expected {steps_completed}"
+              )
+
+          print(f"Validated {steps_completed} smoke training step(s) in {output_dir}")
+          PY
+
+      - name: Append run summary
+        if: always()
+        run: |
+          if [ -f "$RUN_OUTPUT_DIR/run_summary.md" ]; then
+            cat "$RUN_OUTPUT_DIR/run_summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "# ${EXPERIMENT_ID} Remote CPU Full-Dim Smoke"
+              echo
+              echo "run_summary.md was not produced."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload smoke run artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LIP-H0-002-${{ github.run_id }}-remote-cpu-full-dim-smoke
+          path: runs/LIP-H0-002
+          if-no-files-found: warn
+          retention-days: 7
