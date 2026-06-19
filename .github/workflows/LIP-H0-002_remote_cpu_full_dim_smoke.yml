@@ -21,7 +21,8 @@ env:
 
 jobs:
   cpu-full-dim-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     steps:
       - name: Check out repository
@@ -123,3 +124,4 @@ jobs:
           name: LIP-H0-002-${{ github.run_id }}-remote-cpu-full-dim-smoke
           path: runs/LIP-H0-002
           if-no-files-found: warn
+          retention-days: 7
