@@ -1,0 +1,168 @@
+{
+  "trace_id": "LIP-EVAL-004",
+  "title": "Configurable 32-step bridge evaluation",
+  "recorded_at": "2026-06-21",
+  "evaluator": {
+    "trace_id": "LIP-EVAL-001",
+    "script": "src/scripts/evaluate_bridge.py",
+    "config": "config/LIP-EVAL-001_bridge_eval.yaml",
+    "command": [
+      "python",
+      "-m",
+      "src.scripts.evaluate_bridge",
+      "--config",
+      "config/LIP-EVAL-001_bridge_eval.yaml",
+      "--checkpoint",
+      "runs/LIP-TRAIN-001-data001-steps32-lambda01/best_model.pth",
+      "--bundle-dir",
+      "datasets/LIP-H0-003/latent_bundle",
+      "--output-dir",
+      "runs/LIP-EVAL-004"
+    ]
+  },
+  "checkpoint": {
+    "source": "LIP-TRAIN-001 configurable remote training artifact",
+    "run_id": 27904764823,
+    "job_id": 82571317401,
+    "artifact_id": 7775415799,
+    "artifact_name": "LIP-TRAIN-001-27904764823-LIP-TRAIN-001-data001-steps32-lambda01",
+    "artifact_digest": "sha256:9874bf1c34206d36abf0deee1c7ab961ee7976088bf47c528551df219ae7fc69",
+    "checkpoint_used": "best_model.pth",
+    "head_branch": "main",
+    "head_sha": "5ad298de516e29ec8c0973d2630cd5a5b9abd9d8"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-001",
+    "source_model": "deepseek-ai/deepseek-coder-1.3b-base",
+    "target_model": "NousResearch/Meta-Llama-3-8B-Instruct",
+    "dataset_origin": "LIP-DATA-001 curated 8-prompt code task set",
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "num_samples": 8,
+    "source_layer": -1,
+    "target_layer": -1,
+    "extraction_notes": "Real hidden-state extraction; raw prompts and model text outputs are not stored in shards.",
+    "bundle_zip_sha256": "c733242c173ce23837d540f29b1769e668e000009c0eee80e8d173076d44b9e6",
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "015d0bec1889f3aeb2b92356def0c5a9abaca83fbee9f8f2a6081619bd1ea0d6"
+      }
+    ]
+  },
+  "training_metadata": {
+    "experiment_id": "LIP-TRAIN-001-data001-steps32-lambda01",
+    "samples": 8,
+    "batch_size": 2,
+    "epochs_requested": 8,
+    "max_steps": 32,
+    "steps_completed": 32,
+    "learning_rate": 0.0001,
+    "lambda_mse": 0.1,
+    "best_loss": 0.7296363562345505,
+    "final_loss": 0.7296363562345505,
+    "final_accuracy": 0.75
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 8,
+    "input_dim": 2048,
+    "hidden_dim": 1024,
+    "output_dim": 4096,
+    "device": "cpu",
+    "validation_status": "passed",
+    "latent_mse_mean": 1.9026975631713867,
+    "latent_rmse_mean": 1.3739054203033447,
+    "cosine_diag_mean": 0.8337277770042419,
+    "cosine_diag_std": 0.034103695303201675,
+    "prediction_norm_mean": 118.3647689819336,
+    "target_norm_mean": 157.0719757080078,
+    "norm_ratio_mean": 0.7536500096321106,
+    "energy_drift_mean": 38.70719909667969,
+    "retrieval_top1": 0.625,
+    "retrieval_topk": {
+      "1": 0.625,
+      "5": 1.0
+    },
+    "offdiag_cosine_mean": 0.7441755533218384,
+    "diagonal_margin_mean": 0.013561271131038666,
+    "cosine_diag_minus_offdiag": 0.08955222368240356
+  },
+  "per_sample_retrieval": {
+    "correct_top1_samples": [0, 1, 4, 6, 7],
+    "incorrect_top1_samples": [2, 3, 5],
+    "incorrect_nearest_target": {
+      "2": 7,
+      "3": 7,
+      "5": 7
+    }
+  },
+  "comparison_against_LIP_EVAL_003": {
+    "baseline_training_steps": 2,
+    "current_training_steps": 32,
+    "sample_count": 8,
+    "latent_mse_mean": {
+      "from": 4.753047943115234,
+      "to": 1.9026975631713867,
+      "direction": "improved"
+    },
+    "latent_rmse_mean": {
+      "from": 2.177975654602051,
+      "to": 1.3739054203033447,
+      "direction": "improved"
+    },
+    "cosine_diag_mean": {
+      "from": 0.45896223187446594,
+      "to": 0.8337277770042419,
+      "direction": "improved"
+    },
+    "norm_ratio_mean": {
+      "from": 0.46201658248901367,
+      "to": 0.7536500096321106,
+      "direction": "improved"
+    },
+    "energy_drift_mean": {
+      "from": 84.504638671875,
+      "to": 38.70719909667969,
+      "direction": "improved"
+    },
+    "retrieval_top1": {
+      "from": 0.125,
+      "to": 0.625,
+      "direction": "improved"
+    },
+    "retrieval_top5": {
+      "from": 0.625,
+      "to": 1.0,
+      "direction": "improved"
+    },
+    "diagonal_margin_mean": {
+      "from": -0.11237937957048416,
+      "to": 0.013561271131038666,
+      "direction": "improved"
+    },
+    "cosine_diag_minus_offdiag": {
+      "from_approx": 0.00148,
+      "to_approx": 0.08955,
+      "direction": "improved"
+    }
+  },
+  "interpretation": [
+    "The 32-step configurable training run substantially improved latent-space reconstruction and alignment relative to the 2-step H0-003 run.",
+    "retrieval_top1=0.625 over 8 candidates is above random chance of 0.125, indicating emerging pair-level discrimination.",
+    "diagonal_margin_mean is now positive, but still small, indicating weak separation between correct and strongest incorrect targets.",
+    "cosine_diag_mean and offdiag_cosine_mean are both high, suggesting predictions occupy a shared target-space region; however, the diagonal/offdiag gap is now meaningfully larger than in LIP-EVAL-003.",
+    "norm_ratio and energy drift improved substantially, suggesting better target-space energy calibration, but norm_ratio remains below 1.0.",
+    "Samples 2, 3, and 5 were misretrieved toward target 7, suggesting possible local attraction/collapse around one target or insufficient pair-level separation.",
+    "This is not yet semantic validation because evaluation remains in-sample, tiny-scale, and latent-only."
+  ],
+  "known_limitations": [
+    "The evaluation uses only eight real latent pairs.",
+    "The evaluation is in-sample against the bundle used for training.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "retrieval_top1 is above chance but still based on a tiny candidate set.",
+    "The result does not establish model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "This PR registers a latent-space bridge evaluation result for a configurable 32-step remote training run. It does not claim semantic transfer, text-level fidelity, model-to-model alignment, generalization, or production readiness."
+}
