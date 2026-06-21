@@ -1,0 +1,18 @@
+experiment_id: "LIP-EVAL-001"
+device: "cpu"
+
+model:
+  input_dim: 2048
+  hidden_dim: 1024
+  output_dim: 4096
+
+data:
+  bundle_dir: "datasets/LIP-H0-003/latent_bundle"
+
+checkpoint:
+  path: "runs/LIP-H0-003/best_model.pth"
+
+output_dir: "runs/LIP-EVAL-001"
+
+metrics:
+  retrieval_topk: [1, 5]
