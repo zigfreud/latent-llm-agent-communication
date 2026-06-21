@@ -1,0 +1,158 @@
+{
+  "trace_id": "LIP-EVAL-003",
+  "title": "8-sample real bridge evaluation baseline",
+  "recorded_at": "2026-06-21",
+  "evaluator": {
+    "trace_id": "LIP-EVAL-001",
+    "script": "src/scripts/evaluate_bridge.py",
+    "config": "config/LIP-EVAL-001_bridge_eval.yaml",
+    "command": [
+      "python",
+      "-m",
+      "src.scripts.evaluate_bridge",
+      "--config",
+      "config/LIP-EVAL-001_bridge_eval.yaml",
+      "--checkpoint",
+      "runs/LIP-H0-003-data-001-remote/best_model.pth",
+      "--bundle-dir",
+      "datasets/LIP-H0-003/latent_bundle",
+      "--output-dir",
+      "runs/LIP-EVAL-003"
+    ]
+  },
+  "checkpoint": {
+    "source": "H0-003 remote run artifact for LIP-DATA-001",
+    "run_id": 27903029567,
+    "artifact_id": 7774881054,
+    "artifact_name": "LIP-H0-003-27903029567-remote-cpu-from-latent-bundle",
+    "artifact_digest": "sha256:125c803450f6cbd5288bf90ef6fca63faa254336ab18d3d70ffe4aee9f68263a",
+    "checkpoint_used": "best_model.pth",
+    "head_branch": "main",
+    "head_sha": "a95427fe300b696c16016237658388238d30e576"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-001",
+    "source_model": "deepseek-ai/deepseek-coder-1.3b-base",
+    "target_model": "NousResearch/Meta-Llama-3-8B-Instruct",
+    "dataset_origin": "LIP-DATA-001 curated 8-prompt code task set",
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "num_samples": 8,
+    "source_layer": -1,
+    "target_layer": -1,
+    "extraction_notes": "Real hidden-state extraction; raw prompts and model text outputs are not stored in shards.",
+    "bundle_zip_sha256": "c733242c173ce23837d540f29b1769e668e000009c0eee80e8d173076d44b9e6",
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "015d0bec1889f3aeb2b92356def0c5a9abaca83fbee9f8f2a6081619bd1ea0d6"
+      }
+    ]
+  },
+  "remote_training_metrics": {
+    "experiment_id": "LIP-H0-003",
+    "samples": 8,
+    "batch_size": 2,
+    "max_steps": 2,
+    "steps_completed": 2,
+    "best_loss": 1.2974371314048767,
+    "final_loss": 1.2974371314048767,
+    "final_accuracy": 0.5,
+    "train_log": [
+      {
+        "step": 1,
+        "loss": 1.305346,
+        "nce_loss": 0.680488,
+        "mse_loss": 6.248584,
+        "accuracy": 0.5
+      },
+      {
+        "step": 2,
+        "loss": 1.289528,
+        "nce_loss": 0.70009,
+        "mse_loss": 5.894382,
+        "accuracy": 0.5
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 8,
+    "input_dim": 2048,
+    "hidden_dim": 1024,
+    "output_dim": 4096,
+    "device": "cpu",
+    "validation_status": "passed",
+    "latent_mse_mean": 4.753047943115234,
+    "latent_rmse_mean": 2.177975654602051,
+    "cosine_diag_mean": 0.45896223187446594,
+    "cosine_diag_std": 0.07422509789466858,
+    "prediction_norm_mean": 72.56733703613281,
+    "target_norm_mean": 157.0719757080078,
+    "norm_ratio_mean": 0.46201658248901367,
+    "energy_drift_mean": 84.504638671875,
+    "retrieval_top1": 0.125,
+    "retrieval_topk": {
+      "1": 0.125,
+      "5": 0.625
+    },
+    "offdiag_cosine_mean": 0.4574820101261139,
+    "diagonal_margin_mean": -0.11237937957048416
+  },
+  "comparison_against_LIP_EVAL_002": {
+    "baseline_sample_count": 2,
+    "current_sample_count": 8,
+    "latent_mse_mean": {
+      "from": 6.012866973876953,
+      "to": 4.753047943115234,
+      "direction": "improved"
+    },
+    "latent_rmse_mean": {
+      "from": 2.452113151550293,
+      "to": 2.177975654602051,
+      "direction": "improved"
+    },
+    "cosine_diag_mean": {
+      "from": 0.11214403808116913,
+      "to": 0.45896223187446594,
+      "direction": "improved"
+    },
+    "norm_ratio_mean": {
+      "from": 0.22647474706172943,
+      "to": 0.46201658248901367,
+      "direction": "improved"
+    },
+    "energy_drift_mean": {
+      "from": 121.36544799804688,
+      "to": 84.504638671875,
+      "direction": "improved"
+    },
+    "retrieval_top1": {
+      "from": 1.0,
+      "to": 0.125,
+      "direction": "dropped_to_chance_at_8_candidates"
+    },
+    "diagonal_margin_mean": {
+      "from": 0.04042129963636398,
+      "to": -0.11237937957048416,
+      "direction": "worse"
+    }
+  },
+  "interpretation": [
+    "The 8-sample run shows stronger global latent-space alignment than the 2-sample baseline: lower MSE/RMSE, higher matching cosine, better norm ratio, and lower energy drift.",
+    "Retrieval metrics do not yet show pair-level discrimination. retrieval_top1=0.125 equals chance for 8 candidates; retrieval_top5=0.625 equals chance for top-5 among 8 candidates.",
+    "cosine_diag_mean and offdiag_cosine_mean are nearly identical, indicating that predictions are entering a shared target-space region but not separating the correct target from incorrect targets.",
+    "diagonal_margin_mean is negative, indicating that the correct target is often not more similar than the strongest incorrect target.",
+    "The likely cause is undertraining: the H0-003 workflow used max_steps=2, so the model saw only two mini-batches.",
+    "The next technical step should be a configurable remote training workflow with larger max_steps/epochs and possibly stronger norm/MSE calibration."
+  ],
+  "known_limitations": [
+    "The evaluation uses eight real latent pairs, which is larger than LIP-EVAL-002 but still tiny.",
+    "The remote training run completed only two CPU training steps.",
+    "Retrieval top-1 and top-5 match random chance for this candidate count.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The result does not establish model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "This PR registers a latent-space bridge evaluation baseline for an 8-sample real bundle. It does not claim semantic transfer, text-level fidelity, model-to-model alignment, generalization, or production readiness."
+}
