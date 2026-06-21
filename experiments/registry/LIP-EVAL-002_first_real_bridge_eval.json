@@ -1,0 +1,89 @@
+{
+  "trace_id": "LIP-EVAL-002",
+  "title": "First real bridge evaluation baseline",
+  "recorded_at": "2026-06-21",
+  "evaluator": {
+    "trace_id": "LIP-EVAL-001",
+    "script": "src/scripts/evaluate_bridge.py",
+    "config": "config/LIP-EVAL-001_bridge_eval.yaml",
+    "command": [
+      "python",
+      "-m",
+      "src.scripts.evaluate_bridge",
+      "--config",
+      "config/LIP-EVAL-001_bridge_eval.yaml",
+      "--checkpoint",
+      "runs/LIP-H0-003-real-remote/best_model.pth",
+      "--bundle-dir",
+      "datasets/LIP-H0-003/latent_bundle",
+      "--output-dir",
+      "runs/LIP-EVAL-002"
+    ]
+  },
+  "checkpoint": {
+    "source": "H0-003 real remote run artifact",
+    "run_id": 27833132397,
+    "job_id": 82374579828,
+    "artifact_id": 7752805337,
+    "artifact_name": "LIP-H0-003-27833132397-remote-cpu-from-latent-bundle",
+    "artifact_digest": "sha256:18dcdb307a7e992d113e0b0f3f89fafc1dbd680749ffb4ee64b4a1bae7d8d579",
+    "checkpoint_used": "best_model.pth"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-H0-005",
+    "source_model": "deepseek-ai/deepseek-coder-1.3b-base",
+    "target_model": "NousResearch/Meta-Llama-3-8B-Instruct",
+    "dataset_origin": "LIP-H0-005 curated tiny prompt set",
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "num_samples": 2,
+    "source_layer": -1,
+    "target_layer": -1,
+    "extraction_notes": "Real hidden-state extraction; raw prompts and model text outputs are not stored in shards.",
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "f40cd861383dfd2dadfd58f0b9fe727a03df1b976e5f26d63891a28b3496dfc3"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 2,
+    "input_dim": 2048,
+    "hidden_dim": 1024,
+    "output_dim": 4096,
+    "device": "cpu",
+    "validation_status": "passed",
+    "latent_mse_mean": 6.012866973876953,
+    "latent_rmse_mean": 2.452113151550293,
+    "cosine_diag_mean": 0.11214403808116913,
+    "cosine_diag_std": 0.013238072395324707,
+    "prediction_norm_mean": 35.53398132324219,
+    "target_norm_mean": 156.8994140625,
+    "norm_ratio_mean": 0.22647474706172943,
+    "energy_drift_mean": 121.36544799804688,
+    "retrieval_top1": 1.0,
+    "retrieval_topk": {
+      "1": 1.0
+    },
+    "offdiag_cosine_mean": 0.07172273844480515,
+    "diagonal_margin_mean": 0.04042129963636398
+  },
+  "interpretation": [
+    "retrieval_top1=1.0 over two samples is a positive operational signal but statistically weak because sample_count=2.",
+    "cosine_diag_mean=0.1121 indicates weak absolute directional alignment.",
+    "diagonal_margin_mean=0.0404 indicates the correct target was only slightly closer than the best incorrect target.",
+    "norm_ratio_mean=0.2265 and energy_drift_mean=121.3654 indicate substantial target-space energy/norm mismatch.",
+    "This baseline suggests the bridge has early discriminative signal but needs larger bundles, more training, and energy/norm calibration."
+  ],
+  "known_limitations": [
+    "The evaluation uses only two real latent pairs.",
+    "The checkpoint was trained for one completed CPU step in the recorded H0-003 run.",
+    "retrieval_top1 is not statistically meaningful at this sample count.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The result does not establish model-to-model alignment or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "This PR registers the first real latent-space bridge evaluation baseline. It does not claim semantic transfer, text-level fidelity, model-to-model alignment, or production readiness."
+}
