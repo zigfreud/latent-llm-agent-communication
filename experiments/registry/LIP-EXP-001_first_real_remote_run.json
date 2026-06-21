@@ -1,0 +1,77 @@
+{
+  "trace_id": "LIP-EXP-001",
+  "title": "First real remote latent-bundle run",
+  "recorded_at": "2026-06-21",
+  "run_metadata": {
+    "workflow": "LIP-H0-003 Remote CPU From Latent Bundle",
+    "run_id": 27833132397,
+    "job_id": 82374579828,
+    "head_branch": "main",
+    "head_sha": "f7f5cd5f769217ab70d2faf1e49a72bdf843897d"
+  },
+  "artifact": {
+    "artifact_id": 7752805337,
+    "name": "LIP-H0-003-27833132397-remote-cpu-from-latent-bundle",
+    "digest": "sha256:18dcdb307a7e992d113e0b0f3f89fafc1dbd680749ffb4ee64b4a1bae7d8d579",
+    "expires_at": "2026-06-26T15:00:16Z",
+    "external_backup": "Google Drive / user-managed storage"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-H0-005",
+    "source_model": "deepseek-ai/deepseek-coder-1.3b-base",
+    "target_model": "NousResearch/Meta-Llama-3-8B-Instruct",
+    "dataset_origin": "LIP-H0-005 curated tiny prompt set",
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "num_samples": 2,
+    "source_layer": "-1",
+    "target_layer": "-1",
+    "extraction_notes": "Real hidden-state extraction; raw prompts and model text outputs are not stored in shards.",
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "f40cd861383dfd2dadfd58f0b9fe727a03df1b976e5f26d63891a28b3496dfc3"
+      }
+    ]
+  },
+  "validation_status": {
+    "workflow_conclusion": "success",
+    "artifact_produced": true,
+    "artifact_digest_recorded": true,
+    "input_bundle_manifest_recorded": true,
+    "trainer_execution_recorded": true,
+    "steps_completed": 1,
+    "registered_from_user_provided_metadata": true
+  },
+  "training_metrics": {
+    "experiment_id": "LIP-H0-003",
+    "device": "cpu",
+    "samples": 2,
+    "batch_size": 2,
+    "epochs_requested": 1,
+    "max_steps": 2,
+    "steps_completed": 1,
+    "best_loss": 1.301304578781128,
+    "final_loss": 1.301304578781128,
+    "final_accuracy": 0.5,
+    "train_log": [
+      {
+        "step": 1,
+        "epoch": 1,
+        "batch": 1,
+        "loss": 1.301304578781128,
+        "nce_loss": 0.6829674243927002,
+        "mse_loss": 6.183371543884277,
+        "accuracy": 0.5
+      }
+    ]
+  },
+  "known_limitations": [
+    "The artifact is temporary and expires at 2026-06-26T15:00:16Z unless backed up externally.",
+    "The input bundle contains only two samples.",
+    "The run validates remote ingestion and CPU training infrastructure only.",
+    "The run does not establish semantic transfer or model-to-model alignment.",
+    "The run does not establish production readiness."
+  ],
+  "scientific_claim_status": "This registry entry records the first successful real-latent remote infrastructure run. It does not claim semantic transfer, latent communication fidelity, model-to-model alignment, or production readiness."
+}
