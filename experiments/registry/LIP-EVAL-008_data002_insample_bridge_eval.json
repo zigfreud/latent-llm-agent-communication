@@ -1,0 +1,67 @@
+{
+  "trace_id": "LIP-EVAL-008",
+  "title": "LIP-DATA-002 train-set in-sample bridge evaluation",
+  "recorded_at": "2026-06-23",
+  "evaluation_type": "train_set_in_sample_latent_space",
+  "relationship_to_LIP_EVAL_007": "Same checkpoint as LIP-EVAL-007, evaluated on LIP-DATA-002-TRAIN instead of held-out eval.",
+  "training": {
+    "experiment_id": "LIP-TRAIN-004-data002-train16-steps64-lambda025",
+    "run_id": 28015568225,
+    "artifact_id": 7816492548,
+    "artifact_digest": "sha256:2463c3e7b30176fb1870af8973da53833c7e4b85cd39b83b97224b36781a5c93"
+  },
+  "evaluation_artifact": {
+    "eval_zip_sha256": "591c192c849053476399d090b9e97f57ac7977b168e1b00496fd2abe66d36554"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-002-TRAIN",
+    "dataset_origin": "LIP-DATA-002 curated 16-prompt train code task set",
+    "num_samples": 16,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "3ee2950e73b7ddf920667aad8a7cb590586b538c377e1afe8e480acfd076efc4"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 16,
+    "latent_mse_mean": 1.1561908721923828,
+    "latent_rmse_mean": 1.067488431930542,
+    "cosine_diag_mean": 0.8997008800506592,
+    "cosine_diag_std": 0.02634170837700367,
+    "prediction_norm_mean": 137.71466064453125,
+    "target_norm_mean": 156.91961669921875,
+    "norm_ratio_mean": 0.8774809837341309,
+    "energy_drift_mean": 19.204971313476562,
+    "retrieval_top1": 0.4375,
+    "retrieval_topk": {
+      "1": 0.4375,
+      "5": 0.9375
+    },
+    "offdiag_cosine_mean": 0.828340470790863,
+    "diagonal_margin_mean": 0.00045713409781455994,
+    "cosine_diag_minus_offdiag": 0.07136040925979614
+  },
+  "comparison_context": {
+    "chance_retrieval_top1_for_16_candidates": 0.0625,
+    "chance_retrieval_top5_for_16_candidates": 0.3125,
+    "held_out_reference": "LIP-EVAL-007"
+  },
+  "interpretation": [
+    "The checkpoint performs better on the train bundle than on held-out eval, but train-set top-1 remains weak.",
+    "This indicates the issue is not only held-out generalization; pair-level contrastive separation is still insufficient even in-sample.",
+    "Several wrong predictions are attracted to target 4.",
+    "This is a latent-space in-sample diagnostic only."
+  ],
+  "known_limitations": [
+    "The evaluation uses the training bundle and is in-sample.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The result does not establish semantic transfer, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space in-sample diagnostic only. No semantic transfer or generalization claim."
+}
