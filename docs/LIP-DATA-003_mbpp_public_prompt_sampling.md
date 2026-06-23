@@ -30,6 +30,11 @@ bundle configs.
 Generated configs include sampled prompt IDs for traceability. They are written
 under `datasets/LIP-DATA-003/generated_configs`, which is ignored by git.
 
+The sampler also supports config-defined trace IDs, generated config filenames,
+bundle directories, and output zip paths. This keeps the LIP-DATA-003 32/16
+defaults intact while allowing larger follow-up configs such as LIP-DATA-004
+64/32 to reuse the same script.
+
 ## Materialize Prompt Configs
 
 Install the Hugging Face `datasets` package in the local or Colab environment
@@ -46,11 +51,25 @@ datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_train_mbpp_32.yaml
 datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_eval_mbpp_16.yaml
 ```
 
+For the LIP-DATA-004 64/32 scale-up, use:
+
+```bash
+python -m src.scripts.materialize_mbpp_prompt_configs --config config/LIP-DATA-004_mbpp64_sampling.yaml
+```
+
+This writes:
+
+```text
+datasets/LIP-DATA-004/generated_configs/LIP-DATA-004_train_mbpp_64.yaml
+datasets/LIP-DATA-004/generated_configs/LIP-DATA-004_eval_mbpp_32.yaml
+```
+
 For offline repo validation without loading Hugging Face datasets, use mock
 prompt rows:
 
 ```bash
 python -m src.scripts.materialize_mbpp_prompt_configs --config config/LIP-DATA-003_mbpp_sampling.yaml --mock-data
+python -m src.scripts.materialize_mbpp_prompt_configs --config config/LIP-DATA-004_mbpp64_sampling.yaml --mock-data
 ```
 
 ## Dry-Run Bundles
@@ -61,6 +80,8 @@ model. It produces deterministic mock vectors and validates bundle structure.
 ```bash
 python -m src.scripts.build_real_tiny_latent_bundle --config datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_train_mbpp_32.yaml --dry-run
 python -m src.scripts.build_real_tiny_latent_bundle --config datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_eval_mbpp_16.yaml --dry-run
+python -m src.scripts.build_real_tiny_latent_bundle --config datasets/LIP-DATA-004/generated_configs/LIP-DATA-004_train_mbpp_64.yaml --dry-run
+python -m src.scripts.build_real_tiny_latent_bundle --config datasets/LIP-DATA-004/generated_configs/LIP-DATA-004_eval_mbpp_32.yaml --dry-run
 ```
 
 Validate the generated dry-run bundles:
@@ -68,6 +89,8 @@ Validate the generated dry-run bundles:
 ```bash
 python -m src.scripts.validate_latent_bundle --bundle-dir datasets/LIP-DATA-003/mbpp_train_bundle_32
 python -m src.scripts.validate_latent_bundle --bundle-dir datasets/LIP-DATA-003/mbpp_eval_bundle_16
+python -m src.scripts.validate_latent_bundle --bundle-dir datasets/LIP-DATA-004/mbpp_train_bundle_64
+python -m src.scripts.validate_latent_bundle --bundle-dir datasets/LIP-DATA-004/mbpp_eval_bundle_32
 ```
 
 ## Real Extraction In Colab
@@ -79,6 +102,8 @@ target model requires access.
 ```bash
 python -m src.scripts.build_real_tiny_latent_bundle --config datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_train_mbpp_32.yaml --device cuda --max-samples 32
 python -m src.scripts.build_real_tiny_latent_bundle --config datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_eval_mbpp_16.yaml --device cuda --max-samples 16
+python -m src.scripts.build_real_tiny_latent_bundle --config datasets/LIP-DATA-004/generated_configs/LIP-DATA-004_train_mbpp_64.yaml --device cuda --max-samples 64
+python -m src.scripts.build_real_tiny_latent_bundle --config datasets/LIP-DATA-004/generated_configs/LIP-DATA-004_eval_mbpp_32.yaml --device cuda --max-samples 32
 ```
 
 Expected zip outputs:
@@ -86,6 +111,8 @@ Expected zip outputs:
 ```text
 datasets/LIP-DATA-003/LIP-DATA-003_mbpp_train_latent_bundle_32.zip
 datasets/LIP-DATA-003/LIP-DATA-003_mbpp_eval_latent_bundle_16.zip
+datasets/LIP-DATA-004/LIP-DATA-004_mbpp_train_latent_bundle_64.zip
+datasets/LIP-DATA-004/LIP-DATA-004_mbpp_eval_latent_bundle_32.zip
 ```
 
 ## Training With LIP-TRAIN-001

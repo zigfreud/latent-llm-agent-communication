@@ -6,8 +6,29 @@ import yaml
 
 
 DEFAULT_CONFIG = Path("config/LIP-DATA-003_mbpp_sampling.yaml")
-TRAIN_CONFIG_NAME = "LIP-DATA-003_train_mbpp_32.yaml"
-EVAL_CONFIG_NAME = "LIP-DATA-003_eval_mbpp_16.yaml"
+DEFAULT_TRAIN_TRACE_ID = "LIP-DATA-003-MBPP-TRAIN"
+DEFAULT_EVAL_TRACE_ID = "LIP-DATA-003-MBPP-EVAL"
+DEFAULT_TRAIN_CONFIG_NAME = "LIP-DATA-003_train_mbpp_32.yaml"
+DEFAULT_EVAL_CONFIG_NAME = "LIP-DATA-003_eval_mbpp_16.yaml"
+DEFAULT_TRAIN_BUNDLE_DIR = "datasets/LIP-DATA-003/mbpp_train_bundle_32"
+DEFAULT_EVAL_BUNDLE_DIR = "datasets/LIP-DATA-003/mbpp_eval_bundle_16"
+DEFAULT_TRAIN_OUTPUT_ZIP = (
+    "datasets/LIP-DATA-003/LIP-DATA-003_mbpp_train_latent_bundle_32.zip"
+)
+DEFAULT_EVAL_OUTPUT_ZIP = (
+    "datasets/LIP-DATA-003/LIP-DATA-003_mbpp_eval_latent_bundle_16.zip"
+)
+DEFAULT_TRAIN_DATASET_ORIGIN = "LIP-DATA-003 MBPP train prompt sample"
+DEFAULT_EVAL_DATASET_ORIGIN = "LIP-DATA-003 MBPP held-out validation prompt sample"
+DEFAULT_TRAIN_PROMPT_POLICY = (
+    "Thirty-two public MBPP train split natural-language prompts; "
+    "code, tests, and completions are not included."
+)
+DEFAULT_EVAL_PROMPT_POLICY = (
+    "Sixteen public MBPP validation split natural-language prompts held "
+    "out from the train prompt sample; code, tests, and completions are "
+    "not included."
+)
 
 
 def parse_args():
@@ -41,6 +62,22 @@ def required_string(config, key):
     value = config.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{key} must be a non-empty string")
+    return value
+
+
+def optional_string(config, key, default):
+    value = config.get(key, default)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{key} must be a non-empty string")
+    return value
+
+
+def config_filename(config, key, default):
+    value = optional_string(config, key, default)
+    if "/" in value or "\\" in value:
+        raise ValueError(f"{key} must be a direct filename")
+    if not value.endswith((".yaml", ".yml")):
+        raise ValueError(f"{key} must be a YAML filename")
     return value
 
 
@@ -180,6 +217,77 @@ def build_bundle_config(
     }
 
 
+def resolve_output_settings(config):
+    settings = {
+        "train_trace_id": optional_string(
+            config,
+            "train_trace_id",
+            DEFAULT_TRAIN_TRACE_ID,
+        ),
+        "eval_trace_id": optional_string(
+            config,
+            "eval_trace_id",
+            DEFAULT_EVAL_TRACE_ID,
+        ),
+        "train_config_name": config_filename(
+            config,
+            "train_config_name",
+            DEFAULT_TRAIN_CONFIG_NAME,
+        ),
+        "eval_config_name": config_filename(
+            config,
+            "eval_config_name",
+            DEFAULT_EVAL_CONFIG_NAME,
+        ),
+        "train_bundle_dir": optional_string(
+            config,
+            "train_bundle_dir",
+            DEFAULT_TRAIN_BUNDLE_DIR,
+        ),
+        "eval_bundle_dir": optional_string(
+            config,
+            "eval_bundle_dir",
+            DEFAULT_EVAL_BUNDLE_DIR,
+        ),
+        "train_output_zip": optional_string(
+            config,
+            "train_output_zip",
+            DEFAULT_TRAIN_OUTPUT_ZIP,
+        ),
+        "eval_output_zip": optional_string(
+            config,
+            "eval_output_zip",
+            DEFAULT_EVAL_OUTPUT_ZIP,
+        ),
+    }
+    if settings["train_trace_id"] == DEFAULT_TRAIN_TRACE_ID:
+        settings["train_dataset_origin"] = DEFAULT_TRAIN_DATASET_ORIGIN
+        settings["train_prompt_policy"] = DEFAULT_TRAIN_PROMPT_POLICY
+    else:
+        settings["train_dataset_origin"] = (
+            f"{settings['train_trace_id']} MBPP train prompt sample"
+        )
+        settings["train_prompt_policy"] = (
+            f"{positive_int(config, 'train_count')} public MBPP train split "
+            "natural-language prompts; code, tests, and completions are not included."
+        )
+
+    if settings["eval_trace_id"] == DEFAULT_EVAL_TRACE_ID:
+        settings["eval_dataset_origin"] = DEFAULT_EVAL_DATASET_ORIGIN
+        settings["eval_prompt_policy"] = DEFAULT_EVAL_PROMPT_POLICY
+    else:
+        settings["eval_dataset_origin"] = (
+            f"{settings['eval_trace_id']} MBPP held-out validation prompt sample"
+        )
+        settings["eval_prompt_policy"] = (
+            f"{positive_int(config, 'eval_count')} public MBPP validation split "
+            "natural-language prompts held out from the train prompt sample; "
+            "code, tests, and completions are not included."
+        )
+
+    return settings
+
+
 def write_yaml(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
@@ -196,6 +304,7 @@ def materialize_configs(config_path, output_dir_override=None, mock_data=False):
     seed = positive_int(config, "seed")
     max_prompt_chars = positive_int(config, "max_prompt_chars")
     output_dir = output_dir_override or Path(required_string(config, "output_dir"))
+    output_settings = resolve_output_settings(config)
 
     train_rows = load_split_rows(config, train_split, mock_data)
     eval_rows = load_split_rows(config, eval_split, mock_data)
@@ -224,35 +333,28 @@ def materialize_configs(config_path, output_dir_override=None, mock_data=False):
         )
 
     train_config = build_bundle_config(
-        trace_id="LIP-DATA-003-MBPP-TRAIN",
-        dataset_origin="LIP-DATA-003 MBPP train prompt sample",
-        prompt_policy=(
-            "Thirty-two public MBPP train split natural-language prompts; "
-            "code, tests, and completions are not included."
-        ),
+        trace_id=output_settings["train_trace_id"],
+        dataset_origin=output_settings["train_dataset_origin"],
+        prompt_policy=output_settings["train_prompt_policy"],
         selected=train_selected,
-        output_bundle_dir="datasets/LIP-DATA-003/mbpp_train_bundle_32",
-        output_zip="datasets/LIP-DATA-003/LIP-DATA-003_mbpp_train_latent_bundle_32.zip",
+        output_bundle_dir=output_settings["train_bundle_dir"],
+        output_zip=output_settings["train_output_zip"],
         source_split=train_split,
         sampling_config=config,
     )
     eval_config = build_bundle_config(
-        trace_id="LIP-DATA-003-MBPP-EVAL",
-        dataset_origin="LIP-DATA-003 MBPP held-out validation prompt sample",
-        prompt_policy=(
-            "Sixteen public MBPP validation split natural-language prompts held "
-            "out from the train prompt sample; code, tests, and completions are "
-            "not included."
-        ),
+        trace_id=output_settings["eval_trace_id"],
+        dataset_origin=output_settings["eval_dataset_origin"],
+        prompt_policy=output_settings["eval_prompt_policy"],
         selected=eval_selected,
-        output_bundle_dir="datasets/LIP-DATA-003/mbpp_eval_bundle_16",
-        output_zip="datasets/LIP-DATA-003/LIP-DATA-003_mbpp_eval_latent_bundle_16.zip",
+        output_bundle_dir=output_settings["eval_bundle_dir"],
+        output_zip=output_settings["eval_output_zip"],
         source_split=eval_split,
         sampling_config=config,
     )
 
-    train_path = output_dir / TRAIN_CONFIG_NAME
-    eval_path = output_dir / EVAL_CONFIG_NAME
+    train_path = output_dir / output_settings["train_config_name"]
+    eval_path = output_dir / output_settings["eval_config_name"]
     write_yaml(train_path, train_config)
     write_yaml(eval_path, eval_config)
 
