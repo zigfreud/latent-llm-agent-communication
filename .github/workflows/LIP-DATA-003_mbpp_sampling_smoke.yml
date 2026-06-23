@@ -1,0 +1,126 @@
+name: LIP-DATA-003 MBPP Sampling Smoke
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/LIP-DATA-003_mbpp_sampling_smoke.yml"
+      - "src/scripts/materialize_mbpp_prompt_configs.py"
+      - "src/scripts/build_real_tiny_latent_bundle.py"
+      - "src/scripts/validate_latent_bundle.py"
+      - "src/scripts/package_latent_bundle.py"
+      - "config/LIP-DATA-003_mbpp_sampling.yaml"
+      - "docs/LIP-DATA-003_mbpp_public_prompt_sampling.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mbpp-sampling-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+          python -m pip install PyYAML numpy pytest
+
+      - name: Compile scripts
+        run: |
+          python -m compileall \
+            src/scripts/materialize_mbpp_prompt_configs.py \
+            src/scripts/build_real_tiny_latent_bundle.py \
+            src/scripts/validate_latent_bundle.py \
+            src/scripts/package_latent_bundle.py
+
+      - name: Parse sampling config
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          path = Path("config/LIP-DATA-003_mbpp_sampling.yaml")
+          with path.open("r", encoding="utf-8") as handle:
+              config = yaml.safe_load(handle)
+
+          assert config["dataset_name"] == "google-research-datasets/mbpp"
+          assert config["dataset_config"] == "full"
+          assert config["train_split"] == "train"
+          assert config["eval_split"] == "validation"
+          assert config["prompt_field"] == "text"
+          assert config["train_count"] == 32
+          assert config["eval_count"] == 16
+          assert config["seed"] == 42
+          print("sampling config parsed")
+          PY
+
+      - name: Materialize configs with mock data
+        run: |
+          python -m src.scripts.materialize_mbpp_prompt_configs \
+            --config config/LIP-DATA-003_mbpp_sampling.yaml \
+            --mock-data
+
+      - name: Verify generated configs
+        run: |
+          test -f datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_train_mbpp_32.yaml
+          test -f datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_eval_mbpp_16.yaml
+
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          train_path = Path("datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_train_mbpp_32.yaml")
+          eval_path = Path("datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_eval_mbpp_16.yaml")
+          with train_path.open("r", encoding="utf-8") as handle:
+              train_config = yaml.safe_load(handle)
+          with eval_path.open("r", encoding="utf-8") as handle:
+              eval_config = yaml.safe_load(handle)
+
+          train_prompts = train_config["data"]["prompts"]
+          eval_prompts = eval_config["data"]["prompts"]
+          train_ids = set(train_config["data"]["sampled_ids"])
+          eval_ids = set(eval_config["data"]["sampled_ids"])
+
+          assert len(train_prompts) == 32, len(train_prompts)
+          assert len(eval_prompts) == 16, len(eval_prompts)
+          assert train_ids.isdisjoint(eval_ids), train_ids & eval_ids
+          print("generated config counts and sampled ID split verified")
+          PY
+
+      - name: Build dry-run bundles
+        run: |
+          python -m src.scripts.build_real_tiny_latent_bundle \
+            --config datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_train_mbpp_32.yaml \
+            --dry-run
+
+          python -m src.scripts.build_real_tiny_latent_bundle \
+            --config datasets/LIP-DATA-003/generated_configs/LIP-DATA-003_eval_mbpp_16.yaml \
+            --dry-run
+
+      - name: Validate dry-run bundles
+        run: |
+          python -m src.scripts.validate_latent_bundle \
+            --bundle-dir datasets/LIP-DATA-003/mbpp_train_bundle_32
+
+          python -m src.scripts.validate_latent_bundle \
+            --bundle-dir datasets/LIP-DATA-003/mbpp_eval_bundle_16
+
+      - name: Verify no tracked generated outputs
+        run: |
+          git status --short --untracked-files=all
+          if [ -n "$(git status --short --untracked-files=all)" ]; then
+            echo "Tracked or unignored generated outputs were detected."
+            exit 1
+          fi
