@@ -1,0 +1,10 @@
+dataset_name: "google-research-datasets/mbpp"
+dataset_config: "full"
+train_split: "train"
+eval_split: "validation"
+prompt_field: "text"
+train_count: 32
+eval_count: 16
+seed: 42
+max_prompt_chars: 512
+output_dir: "datasets/LIP-DATA-003/generated_configs"
