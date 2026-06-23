@@ -1,0 +1,170 @@
+{
+  "trace_id": "LIP-EVAL-006",
+  "title": "lambda_mse 0.25 bridge evaluation",
+  "recorded_at": "2026-06-23",
+  "evaluator": {
+    "trace_id": "LIP-EVAL-001",
+    "script": "src/scripts/evaluate_bridge.py",
+    "config": "config/LIP-EVAL-001_bridge_eval.yaml"
+  },
+  "checkpoint": {
+    "source": "LIP-TRAIN-003 configurable remote training run",
+    "experiment_id": "LIP-TRAIN-003-data001-steps32-lambda025",
+    "run_id": 28010180058,
+    "artifact_id": 7814359573,
+    "artifact_digest": "sha256:2be644900eea715c9baa39682f916df5bb316f04fe01685178b50bdbfc4a664e",
+    "checkpoint_used": "best_model.pth"
+  },
+  "evaluation_artifact": {
+    "eval_zip_sha256": "b86fdbbb00a2d3063f87483ace9c2328f1d355026498e1b09fa78f6fb242f9b8"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-001",
+    "source_model": "deepseek-ai/deepseek-coder-1.3b-base",
+    "target_model": "NousResearch/Meta-Llama-3-8B-Instruct",
+    "dataset_origin": "LIP-DATA-001 curated 8-prompt code task set",
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "num_samples": 8,
+    "source_layer": -1,
+    "target_layer": -1,
+    "validation_status": "passed",
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "015d0bec1889f3aeb2b92356def0c5a9abaca83fbee9f8f2a6081619bd1ea0d6"
+      }
+    ]
+  },
+  "training_metadata": {
+    "experiment_id": "LIP-TRAIN-003-data001-steps32-lambda025",
+    "max_steps": 32,
+    "lambda_mse": 0.25
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 8,
+    "input_dim": 2048,
+    "hidden_dim": 1024,
+    "output_dim": 4096,
+    "device": "cpu",
+    "validation_status": "passed",
+    "latent_mse_mean": 0.9348428249359131,
+    "latent_rmse_mean": 0.9603360295295715,
+    "cosine_diag_mean": 0.9219813942909241,
+    "cosine_diag_std": 0.01689634472131729,
+    "prediction_norm_mean": 138.89547729492188,
+    "target_norm_mean": 157.0719757080078,
+    "norm_ratio_mean": 0.8842504620552063,
+    "energy_drift_mean": 18.17650032043457,
+    "retrieval_top1": 0.625,
+    "retrieval_topk": {
+      "1": 0.625,
+      "5": 1.0
+    },
+    "offdiag_cosine_mean": 0.8649646639823914,
+    "diagonal_margin_mean": 0.019980110228061676,
+    "cosine_diag_minus_offdiag": 0.057016730308532715
+  },
+  "comparison": {
+    "against_lambda_mse_0_1": {
+      "trace_id": "LIP-EVAL-004",
+      "latent_mse_mean": {
+        "from": 1.9026975631713867,
+        "to": 0.9348428249359131,
+        "direction": "improved"
+      },
+      "latent_rmse_mean": {
+        "from": 1.3739054203033447,
+        "to": 0.9603360295295715,
+        "direction": "improved"
+      },
+      "cosine_diag_mean": {
+        "from": 0.8337277770042419,
+        "to": 0.9219813942909241,
+        "direction": "improved"
+      },
+      "norm_ratio_mean": {
+        "from": 0.7536500096321106,
+        "to": 0.8842504620552063,
+        "direction": "improved"
+      },
+      "energy_drift_mean": {
+        "from": 38.70719909667969,
+        "to": 18.17650032043457,
+        "direction": "improved"
+      },
+      "retrieval_top1": {
+        "from": 0.625,
+        "to": 0.625,
+        "direction": "preserved"
+      },
+      "retrieval_top5": {
+        "from": 1.0,
+        "to": 1.0,
+        "direction": "preserved"
+      },
+      "diagonal_margin_mean": {
+        "from": 0.013561271131038666,
+        "to": 0.019980110228061676,
+        "direction": "improved"
+      }
+    },
+    "against_lambda_mse_0_5": {
+      "trace_id": "LIP-EVAL-005",
+      "latent_mse_mean": {
+        "from": 0.7958155870437622,
+        "to": 0.9348428249359131,
+        "direction": "worse"
+      },
+      "latent_rmse_mean": {
+        "from": 0.887549877166748,
+        "to": 0.9603360295295715,
+        "direction": "worse"
+      },
+      "norm_ratio_mean": {
+        "from": 0.9254684448242188,
+        "to": 0.8842504620552063,
+        "direction": "worse"
+      },
+      "energy_drift_mean": {
+        "from": 11.702067375183105,
+        "to": 18.17650032043457,
+        "direction": "worse"
+      },
+      "retrieval_top1": {
+        "from": 0.5,
+        "to": 0.625,
+        "direction": "improved"
+      },
+      "retrieval_top5": {
+        "from": 0.875,
+        "to": 1.0,
+        "direction": "improved"
+      },
+      "diagonal_margin_mean": {
+        "from": 0.001561969518661499,
+        "to": 0.019980110228061676,
+        "direction": "improved"
+      },
+      "cosine_diag_minus_offdiag": {
+        "from_approx": 0.03242,
+        "to_approx": 0.05702,
+        "direction": "improved"
+      }
+    }
+  },
+  "interpretation": [
+    "lambda_mse=0.25 is the best current compromise between reconstruction/energy calibration and pair-level discrimination.",
+    "It preserves retrieval_top1 from lambda_mse=0.1, improves energy/norm substantially, and avoids the discrimination drop observed at lambda_mse=0.5.",
+    "This remains in-sample, tiny-scale, latent-only evaluation."
+  ],
+  "known_limitations": [
+    "The evaluation uses only eight real latent pairs.",
+    "The evaluation is in-sample against the bundle used for training.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The result does not establish semantic transfer, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space, in-sample, tiny-scale evaluation only. No semantic transfer or generalization claim."
+}
