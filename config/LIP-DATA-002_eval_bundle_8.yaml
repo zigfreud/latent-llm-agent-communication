@@ -1,0 +1,45 @@
+trace_id: "LIP-DATA-002-EVAL"
+bundle_format: "lip_latent_bundle"
+schema_version: 1
+
+models:
+  source_model: "deepseek-ai/deepseek-coder-1.3b-base"
+  target_model: "NousResearch/Meta-Llama-3-8B-Instruct"
+
+extraction:
+  device: "auto"
+  source_layer: -1
+  target_layer: -1
+  token_position: "last"
+  max_length: 256
+  batch_size: 1
+  dtype: "auto"
+  trust_remote_code: true
+  sequential_model_loading: true
+  low_cpu_mem_usage: true
+  device_map: "auto"
+  load_in_4bit: true
+  cache_dir: null
+  local_files_only: false
+
+vectors:
+  input_dim: 2048
+  output_dim: 4096
+
+data:
+  dataset_origin: "LIP-DATA-002 curated 8-prompt held-out code task set"
+  prompt_policy: "Eight small, non-sensitive, self-contained programming prompts held out from the train bundle for latent-space evaluation."
+  prompts:
+    - "Write a Python function that checks whether two strings are anagrams."
+    - "Write a Python function that splits a list into chunks of size n."
+    - "Write a Python function that finds common elements between two lists."
+    - "Write a Python function that normalizes repeated whitespace in a string."
+    - "Write a Python function that computes a moving average over a numeric list."
+    - "Write a Python function that inverts a dictionary, grouping keys by value."
+    - "Write a Python function that returns the top-k most frequent items in a list."
+    - "Write a Python function that merges overlapping intervals."
+
+output:
+  bundle_dir: "datasets/LIP-DATA-002/eval_bundle_8"
+  output_zip: "datasets/LIP-DATA-002/LIP-DATA-002_eval_latent_bundle_8.zip"
+  shard_name: "shard_0.pt"
