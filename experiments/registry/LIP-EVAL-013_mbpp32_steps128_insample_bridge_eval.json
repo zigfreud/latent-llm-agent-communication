@@ -1,0 +1,71 @@
+{
+  "trace_id": "LIP-EVAL-013",
+  "title": "MBPP32 128-step train-set in-sample bridge evaluation",
+  "recorded_at": "2026-06-23",
+  "evaluation_type": "train_set_in_sample_latent_space",
+  "training": {
+    "experiment_id": "LIP-TRAIN-007-mbpp32-batch8-steps128-lambda025",
+    "run_id": 28024709060,
+    "artifact_id": 7820197833,
+    "artifact_digest": "sha256:708953416f86020f287df6c1d8166f40cd5cee9cc87091e95abd2b474eef6d52"
+  },
+  "evaluation_artifact": {
+    "eval_zip_sha256": "d69035ae7d67dd5978749be50777b6b7ba09c3a27aa366991155418a78e70113"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-003-MBPP-TRAIN",
+    "dataset_origin": "LIP-DATA-003 MBPP train prompt sample",
+    "source_dataset": "google-research-datasets/mbpp",
+    "source_dataset_config": "full",
+    "source_split": "train",
+    "prompt_field": "text",
+    "num_samples": 32,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "c0e3eb2c8832be89f61e8033407853e48d402f761d3918b75c3a0291b02373a5"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 32,
+    "latent_mse_mean": 0.8109225630760193,
+    "latent_rmse_mean": 0.8954616189002991,
+    "cosine_diag_mean": 0.9310228824615479,
+    "cosine_diag_std": 0.0140335438773036,
+    "prediction_norm_mean": 146.5041961669922,
+    "target_norm_mean": 157.84262084960938,
+    "norm_ratio_mean": 0.9281337261199951,
+    "energy_drift_mean": 11.338427543640137,
+    "retrieval_top1": 1.0,
+    "retrieval_topk": {
+      "1": 1.0,
+      "5": 1.0
+    },
+    "offdiag_cosine_mean": 0.6541506052017212,
+    "diagonal_margin_mean": 0.1489599645137787,
+    "cosine_diag_minus_offdiag": 0.27687227725982666
+  },
+  "comparison_context": {
+    "paired_held_out_record": "LIP-EVAL-014",
+    "steps64_in_sample_reference": "LIP-EVAL-011",
+    "chance_retrieval_top1_for_32_candidates": 0.03125,
+    "chance_retrieval_top5_for_32_candidates": 0.15625
+  },
+  "interpretation": [
+    "Doubling steps from 64 to 128 improved in-sample reconstruction, margin, and calibration.",
+    "In-sample retrieval_top1 remained perfect while diagonal margin increased substantially relative to LIP-EVAL-011.",
+    "The result suggests training time helps the MBPP32 train-set latent fit.",
+    "This remains latent-space diagnostic evaluation only."
+  ],
+  "known_limitations": [
+    "The evaluation uses the training bundle and is in-sample.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The result does not establish semantic transfer, model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space diagnostic evaluation only. No semantic transfer, text-level fidelity, model-to-model alignment, or production readiness claim."
+}
