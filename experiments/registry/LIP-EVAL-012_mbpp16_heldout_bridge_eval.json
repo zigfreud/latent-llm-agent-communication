@@ -1,0 +1,68 @@
+{
+  "trace_id": "LIP-EVAL-012",
+  "title": "MBPP16 held-out bridge evaluation",
+  "recorded_at": "2026-06-23",
+  "evaluation_type": "held_out_latent_space",
+  "training": {
+    "experiment_id": "LIP-TRAIN-006-mbpp32-batch8-steps64-lambda025",
+    "run_id": 28023800921,
+    "artifact_id": 7819833905,
+    "artifact_digest": "sha256:3333875c0e54a21a63fc805413269c663c3a8d4c60938b3293f3eed1232f585c"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-003-MBPP-EVAL",
+    "dataset_origin": "LIP-DATA-003 MBPP held-out validation prompt sample",
+    "source_dataset": "google-research-datasets/mbpp",
+    "source_dataset_config": "full",
+    "source_split": "validation",
+    "prompt_field": "text",
+    "num_samples": 16,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "0cac44ff2645160b9799ec56e8834e91a020db1b21f295dcf0e1d2ebabab6d12"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 16,
+    "latent_mse_mean": 2.3398611545562744,
+    "latent_rmse_mean": 1.5068036317825317,
+    "cosine_diag_mean": 0.7847334146499634,
+    "cosine_diag_std": 0.08326608687639236,
+    "prediction_norm_mean": 134.0918731689453,
+    "target_norm_mean": 158.0408477783203,
+    "norm_ratio_mean": 0.8483860492706299,
+    "energy_drift_mean": 23.948955535888672,
+    "retrieval_top1": 0.3125,
+    "retrieval_topk": {
+      "1": 0.3125,
+      "5": 0.6875
+    },
+    "offdiag_cosine_mean": 0.7324801087379456,
+    "diagonal_margin_mean": -0.035292334854602814,
+    "cosine_diag_minus_offdiag": 0.05225330591201782
+  },
+  "comparison_context": {
+    "paired_in_sample_record": "LIP-EVAL-011",
+    "curated_batch8_held_out_reference": "LIP-EVAL-010",
+    "chance_retrieval_top1_for_16_candidates": 0.0625,
+    "chance_retrieval_top5_for_16_candidates": 0.3125
+  },
+  "interpretation": [
+    "Held-out retrieval_top1 is above chance but margin is negative, indicating partial latent generalization but weak pair-level separation.",
+    "Several held-out errors are attracted to target 8.",
+    "The next diagnostic step is to rerun the same MBPP32 setup with 128 steps to distinguish undertraining from generalization limits.",
+    "This remains latent-space diagnostic evaluation only."
+  ],
+  "known_limitations": [
+    "The held-out evaluation contains only sixteen latent pairs.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The result does not establish semantic transfer, model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space diagnostic evaluation only. No semantic transfer, text-level fidelity, model-to-model alignment, or production readiness claim."
+}
