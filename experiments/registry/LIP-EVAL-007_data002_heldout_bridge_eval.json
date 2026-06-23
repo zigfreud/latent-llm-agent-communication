@@ -1,0 +1,67 @@
+{
+  "trace_id": "LIP-EVAL-007",
+  "title": "Held-out LIP-DATA-002 bridge evaluation",
+  "recorded_at": "2026-06-23",
+  "evaluation_type": "held_out_latent_space",
+  "training": {
+    "experiment_id": "LIP-TRAIN-004-data002-train16-steps64-lambda025",
+    "run_id": 28015568225,
+    "artifact_id": 7816492548,
+    "artifact_digest": "sha256:2463c3e7b30176fb1870af8973da53833c7e4b85cd39b83b97224b36781a5c93",
+    "train_bundle_sha256": "670c826ca7f83b8785ae157bc9b56232f0ed444ee8181526f11aa5b6c0dde4e6"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-002-EVAL",
+    "dataset_origin": "LIP-DATA-002 curated 8-prompt held-out code task set",
+    "num_samples": 8,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "eval_bundle_sha256": "964acecf6dd4e801261f2133215334d65a103400a78c2077d503482e2ff011f2",
+    "eval_zip_sha256": "a79f11ff2d7a526b580face75f7f7959aba6983e058a5fcdac9f9acf18c56850",
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "8b18416d37312e9fbfde53b6b0404c3e69836b3d15fea7ec4807b565661e9fbd"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 8,
+    "latent_mse_mean": 1.6045767068862915,
+    "latent_rmse_mean": 1.254853367805481,
+    "cosine_diag_mean": 0.858284592628479,
+    "cosine_diag_std": 0.03810800611972809,
+    "prediction_norm_mean": 141.57965087890625,
+    "target_norm_mean": 157.0806427001953,
+    "norm_ratio_mean": 0.9013491868972778,
+    "energy_drift_mean": 15.501007080078125,
+    "retrieval_top1": 0.125,
+    "retrieval_topk": {
+      "1": 0.125,
+      "5": 0.875
+    },
+    "offdiag_cosine_mean": 0.8459532856941223,
+    "diagonal_margin_mean": -0.014098398387432098,
+    "cosine_diag_minus_offdiag": 0.01233130693435669
+  },
+  "comparison_context": {
+    "chance_retrieval_top1_for_8_candidates": 0.125,
+    "chance_retrieval_top5_for_8_candidates": 0.625,
+    "in_sample_reference": "LIP-EVAL-006"
+  },
+  "interpretation": [
+    "This is the first held-out latent-space evaluation.",
+    "The bridge preserves target-space geometry and norm calibration better than early baselines, but pair-level generalization is not established.",
+    "retrieval_top1 is at chance, diagonal margin is negative, and most predictions are attracted to target 2.",
+    "The result supports continuing held-out evaluation before making any semantic or generalization claim."
+  ],
+  "known_limitations": [
+    "The held-out evaluation contains only eight latent pairs.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "retrieval_top1 is at random chance for eight candidates.",
+    "The result does not establish semantic transfer, text-level fidelity, model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Held-out latent-space evaluation only. No semantic transfer, text-level fidelity, or production readiness claim."
+}
