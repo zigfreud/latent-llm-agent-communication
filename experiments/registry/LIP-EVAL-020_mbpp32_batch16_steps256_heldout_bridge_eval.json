@@ -1,0 +1,71 @@
+{
+  "trace_id": "LIP-EVAL-020",
+  "title": "MBPP32 batch16 256-step held-out bridge evaluation",
+  "recorded_at": "2026-07-02",
+  "evaluation_type": "held_out_latent_space",
+  "training": {
+    "experiment_id": "LIP-TRAIN-010-mbpp64-batch16-steps256-lambda025",
+    "run_id": 28601028796,
+    "artifact_id": 8043328665,
+    "artifact_digest": "sha256:50822147964e3527fbf2abe56b3c6b9811239dcd9bc5a58ee5dc02c423f13d3a"
+  },
+  "evaluation_artifact": {
+    "eval_zip_sha256": "f7ae83ef1e812ae8a591da5f2e4c74abc7cbbda9387cc97a1521db5fa8aca328"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-004-MBPP-EVAL",
+    "dataset_origin": "LIP-DATA-004-MBPP-EVAL MBPP held-out validation prompt sample",
+    "source_dataset": "google-research-datasets/mbpp",
+    "source_dataset_config": "full",
+    "source_split": "validation",
+    "prompt_field": "text",
+    "num_samples": 32,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "7e58a9afcb2733ee3a7110eff757b3ffd47ae0391c526639f13f30714d60ce8e"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 32,
+    "latent_mse_mean": 2.3901524543762207,
+    "latent_rmse_mean": 1.5336017608642578,
+    "cosine_diag_mean": 0.7872247695922852,
+    "cosine_diag_std": 0.05290355160832405,
+    "prediction_norm_mean": 141.07305908203125,
+    "target_norm_mean": 158.02142333984375,
+    "norm_ratio_mean": 0.8927412629127502,
+    "energy_drift_mean": 16.948368072509766,
+    "retrieval_top1": 0.34375,
+    "retrieval_topk": {
+      "1": 0.34375,
+      "5": 0.71875
+    },
+    "offdiag_cosine_mean": 0.6915251016616821,
+    "diagonal_margin_mean": -0.007311269640922546,
+    "cosine_diag_minus_offdiag": 0.09569966793060303
+  },
+  "comparison_context": {
+    "paired_in_sample_record": "LIP-EVAL-019",
+    "batch16_steps128_held_out_reference": "LIP-EVAL-018",
+    "chance_retrieval_top1_for_32_candidates": 0.03125,
+    "chance_retrieval_top5_for_32_candidates": 0.15625
+  },
+  "interpretation": [
+    "On held-out evaluation, top5 and diagonal margin improved relative to batch16 steps128.",
+    "Top1 decreased slightly from 0.375 to 0.34375 and reconstruction/norm calibration worsened.",
+    "Additional optimizer updates improve train fit and move correct held-out targets closer to the top, but do not yet produce robust top1 held-out ranking.",
+    "This remains latent-space diagnostic evaluation only."
+  ],
+  "known_limitations": [
+    "The held-out evaluation contains only thirty-two latent pairs.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The result does not establish semantic transfer, model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space diagnostic evaluation only. No semantic transfer, text-level fidelity, model-to-model alignment, or production readiness claim."
+}
