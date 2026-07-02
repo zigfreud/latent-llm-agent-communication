@@ -1,0 +1,510 @@
+name: LIP-LOSS-001 Configurable Remote Bundle Training
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/LIP-LOSS-001_configurable_remote_bundle_training.yml"
+      - "src/**/*.py"
+      - "config/LIP-LOSS-001_remote_bundle_cpu.yaml"
+      - "docs/LIP-LOSS-001_margin_symmetric_loss.md"
+  workflow_dispatch:
+    inputs:
+      experiment_id:
+        description: Experiment identifier.
+        required: true
+        default: LIP-LOSS-001
+        type: string
+      latent_bundle_url:
+        description: Optional URL to latent bundle zip. Mutually exclusive with google_drive_file_id.
+        required: false
+        default: ""
+        type: string
+      google_drive_file_id:
+        description: Optional Google Drive file ID for latent bundle zip. Mutually exclusive with latent_bundle_url.
+        required: false
+        default: ""
+        type: string
+      latent_bundle_sha256:
+        description: SHA256 digest required for external bundle input.
+        required: false
+        default: ""
+        type: string
+      max_steps:
+        description: Maximum trainer steps.
+        required: true
+        default: "8"
+        type: string
+      epochs:
+        description: Number of training epochs.
+        required: true
+        default: "2"
+        type: string
+      batch_size:
+        description: Training batch size.
+        required: true
+        default: "8"
+        type: string
+      learning_rate:
+        description: Learning rate.
+        required: true
+        default: "0.0001"
+        type: string
+      lambda_mse:
+        description: MSE loss weight.
+        required: true
+        default: "0.35"
+        type: string
+      lambda_reverse_nce:
+        description: Reverse/symmetric NCE loss weight.
+        required: true
+        default: "1.0"
+        type: string
+      lambda_margin:
+        description: Hard-negative margin loss weight.
+        required: true
+        default: "0.1"
+        type: string
+      margin_target:
+        description: Target cosine margin over hardest incorrect target.
+        required: true
+        default: "0.05"
+        type: string
+      lambda_norm:
+        description: Norm calibration loss weight.
+        required: true
+        default: "0.05"
+        type: string
+      device:
+        description: Training device.
+        required: true
+        default: "cpu"
+        type: choice
+        options:
+          - cpu
+
+permissions:
+  contents: read
+
+env:
+  BASE_CONFIG_PATH: config/LIP-LOSS-001_remote_bundle_cpu.yaml
+  BUNDLE_DIR: datasets/LIP-LOSS-001/latent_bundle
+  SYNTHETIC_NUM_SAMPLES: "16"
+  INPUT_DIM: "2048"
+  OUTPUT_DIM: "4096"
+  EXPERIMENT_ID: ${{ github.event.inputs.experiment_id || 'LIP-LOSS-001' }}
+  RUN_OUTPUT_DIR: runs/${{ github.event.inputs.experiment_id || 'LIP-LOSS-001' }}
+  EFFECTIVE_CONFIG_PATH: runs/${{ github.event.inputs.experiment_id || 'LIP-LOSS-001' }}/effective_config.yaml
+  LATENT_BUNDLE_URL: ${{ github.event.inputs.latent_bundle_url || '' }}
+  GOOGLE_DRIVE_FILE_ID: ${{ github.event.inputs.google_drive_file_id || '' }}
+  LATENT_BUNDLE_SHA256: ${{ github.event.inputs.latent_bundle_sha256 || '' }}
+  MAX_STEPS: ${{ github.event.inputs.max_steps || '8' }}
+  EPOCHS: ${{ github.event.inputs.epochs || '2' }}
+  BATCH_SIZE: ${{ github.event.inputs.batch_size || '8' }}
+  LEARNING_RATE: ${{ github.event.inputs.learning_rate || '0.0001' }}
+  LAMBDA_MSE: ${{ github.event.inputs.lambda_mse || '0.35' }}
+  LAMBDA_REVERSE_NCE: ${{ github.event.inputs.lambda_reverse_nce || '1.0' }}
+  LAMBDA_MARGIN: ${{ github.event.inputs.lambda_margin || '0.1' }}
+  MARGIN_TARGET: ${{ github.event.inputs.margin_target || '0.05' }}
+  LAMBDA_NORM: ${{ github.event.inputs.lambda_norm || '0.05' }}
+  DEVICE: ${{ github.event.inputs.device || 'cpu' }}
+
+jobs:
+  configurable-remote-bundle-training:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU-compatible dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+          python -m pip install PyYAML numpy
+
+      - name: Compile Python sources
+        run: python -m compileall src
+
+      - name: Validate workflow inputs
+        run: |
+          python - <<'PY'
+          import os
+          import re
+
+          experiment_id = os.environ["EXPERIMENT_ID"]
+          if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", experiment_id):
+              raise SystemExit(
+                  "experiment_id must contain only letters, numbers, '.', '_', or '-' "
+                  "and must not be empty"
+              )
+
+          if os.environ["DEVICE"] != "cpu":
+              raise SystemExit("LIP-LOSS-001 currently supports only device=cpu")
+
+          for name in ("MAX_STEPS", "EPOCHS", "BATCH_SIZE"):
+              try:
+                  parsed = int(os.environ[name])
+              except ValueError as exc:
+                  raise SystemExit(f"{name} must be a positive integer") from exc
+              if parsed <= 0:
+                  raise SystemExit(f"{name} must be a positive integer")
+
+          for name in (
+              "LEARNING_RATE",
+              "LAMBDA_MSE",
+              "LAMBDA_REVERSE_NCE",
+              "LAMBDA_MARGIN",
+              "MARGIN_TARGET",
+              "LAMBDA_NORM",
+          ):
+              try:
+                  parsed = float(os.environ[name])
+              except ValueError as exc:
+                  raise SystemExit(f"{name} must be a non-negative number") from exc
+              if parsed < 0:
+                  raise SystemExit(f"{name} must be a non-negative number")
+          PY
+
+      - name: Prepare latent bundle
+        run: |
+          set -euo pipefail
+          rm -rf "$BUNDLE_DIR"
+          mkdir -p "$BUNDLE_DIR"
+
+          external_sources=0
+          if [ -n "$LATENT_BUNDLE_URL" ]; then
+            external_sources=$((external_sources + 1))
+          fi
+          if [ -n "$GOOGLE_DRIVE_FILE_ID" ]; then
+            external_sources=$((external_sources + 1))
+          fi
+
+          if [ "$external_sources" -gt 1 ]; then
+            echo "latent_bundle_url and google_drive_file_id are mutually exclusive" >&2
+            exit 1
+          fi
+
+          if [ "$external_sources" -eq 0 ]; then
+            synthetic_dir="$RUNNER_TEMP/LIP-LOSS-001-synthetic"
+            rm -rf "$synthetic_dir"
+            mkdir -p "$synthetic_dir"
+
+            python -m src.scripts.make_toy_shards \
+              --output-dir "$synthetic_dir/shards" \
+              --num-samples "$SYNTHETIC_NUM_SAMPLES" \
+              --input-dim "$INPUT_DIM" \
+              --output-dim "$OUTPUT_DIM"
+
+            python - <<'PY'
+          import datetime as dt
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          synthetic_dir = Path(os.environ["RUNNER_TEMP"]) / "LIP-LOSS-001-synthetic"
+          shard_path = synthetic_dir / "shards" / "shard_0.pt"
+          digest = hashlib.sha256(shard_path.read_bytes()).hexdigest()
+          manifest = {
+              "bundle_format": "lip_latent_bundle",
+              "schema_version": 1,
+              "trace_id": os.environ["EXPERIMENT_ID"],
+              "source_model": "synthetic-source",
+              "target_model": "synthetic-target",
+              "dataset_origin": "synthetic-pr-validation",
+              "input_dim": int(os.environ["INPUT_DIM"]),
+              "output_dim": int(os.environ["OUTPUT_DIM"]),
+              "num_samples": int(os.environ["SYNTHETIC_NUM_SAMPLES"]),
+              "created_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+              "license_notes": "Synthetic generated data for CI validation.",
+              "extraction_notes": "Generated by src.scripts.make_toy_shards for LIP-LOSS-001 PR validation.",
+              "shards": [
+                  {
+                      "path": "shards/shard_0.pt",
+                      "records": int(os.environ["SYNTHETIC_NUM_SAMPLES"]),
+                      "sha256": digest,
+                  }
+              ],
+          }
+          with open(synthetic_dir / "manifest.json", "w", encoding="utf-8") as handle:
+              json.dump(manifest, handle, indent=2)
+          PY
+
+            python -m src.scripts.package_latent_bundle \
+              --shards-dir "$synthetic_dir/shards" \
+              --manifest "$synthetic_dir/manifest.json" \
+              --output-zip "$synthetic_dir/latent_bundle.zip"
+
+            bundle_zip="$synthetic_dir/latent_bundle.zip"
+          else
+            if [ -z "$LATENT_BUNDLE_SHA256" ]; then
+              echo "latent_bundle_sha256 is required when latent_bundle_url or google_drive_file_id is provided" >&2
+              exit 1
+            fi
+
+            download_path="$RUNNER_TEMP/LIP-LOSS-001_latent_bundle.zip"
+            if [ -n "$LATENT_BUNDLE_URL" ]; then
+              curl --fail --location --show-error "$LATENT_BUNDLE_URL" --output "$download_path"
+            else
+              python -m pip install gdown
+              gdown "https://drive.google.com/uc?id=${GOOGLE_DRIVE_FILE_ID}" -O "$download_path"
+            fi
+            echo "${LATENT_BUNDLE_SHA256}  ${download_path}" | sha256sum --check -
+            bundle_zip="$download_path"
+          fi
+
+          export BUNDLE_ZIP="$bundle_zip"
+          python - <<'PY'
+          import json
+          import os
+          import shutil
+          import zipfile
+          from pathlib import Path, PurePosixPath
+
+          bundle_zip = Path(os.environ["BUNDLE_ZIP"])
+          bundle_dir = Path(os.environ["BUNDLE_DIR"])
+          max_uncompressed_bytes = 512 * 1024 * 1024
+          allowed_names = set()
+          zip_shard_names = set()
+          total_size = 0
+
+          with zipfile.ZipFile(bundle_zip) as archive:
+              for info in archive.infolist():
+                  name = info.filename
+                  if info.is_dir():
+                      raise SystemExit(f"Zip directory entries are not allowed: {name}")
+                  if "\\" in name:
+                      raise SystemExit(f"Zip entry must not contain backslashes: {name}")
+
+                  path = PurePosixPath(name)
+                  if path.is_absolute() or ".." in path.parts:
+                      raise SystemExit(f"Unsafe zip path: {name}")
+
+                  is_manifest = path.as_posix() == "manifest.json"
+                  is_shard = len(path.parts) == 2 and path.parts[0] == "shards" and path.suffix == ".pt"
+                  if not (is_manifest or is_shard):
+                      raise SystemExit(f"Unexpected zip entry: {name}")
+                  if path.as_posix() in allowed_names:
+                      raise SystemExit(f"Duplicate zip entry: {name}")
+
+                  allowed_names.add(path.as_posix())
+                  if is_shard:
+                      zip_shard_names.add(path.as_posix())
+                  total_size += info.file_size
+                  if total_size > max_uncompressed_bytes:
+                      raise SystemExit("Latent bundle exceeds 512 MB uncompressed size limit")
+
+              if "manifest.json" not in allowed_names:
+                  raise SystemExit("Latent bundle is missing manifest.json")
+              if "shards/shard_0.pt" not in allowed_names:
+                  raise SystemExit("Latent bundle is missing shards/shard_0.pt")
+
+              with archive.open("manifest.json") as manifest_file:
+                  manifest = json.load(manifest_file)
+
+              manifest_shards = manifest.get("shards")
+              if not isinstance(manifest_shards, list) or not manifest_shards:
+                  raise SystemExit("manifest.json must include a non-empty shards list")
+
+              listed_shard_names = set()
+              for shard in manifest_shards:
+                  if not isinstance(shard, dict):
+                      raise SystemExit("each manifest shard entry must be an object")
+                  shard_name = shard.get("path")
+                  if not isinstance(shard_name, str) or not shard_name:
+                      raise SystemExit("each manifest shard entry must include a path")
+                  if "\\" in shard_name:
+                      raise SystemExit(f"Manifest shard path must not contain backslashes: {shard_name}")
+                  shard_path = PurePosixPath(shard_name)
+                  if shard_path.is_absolute() or ".." in shard_path.parts:
+                      raise SystemExit(f"Unsafe manifest shard path: {shard_name}")
+                  if len(shard_path.parts) != 2 or shard_path.parts[0] != "shards" or shard_path.suffix != ".pt":
+                      raise SystemExit(f"Manifest shard path must be a direct shards/*.pt file: {shard_name}")
+                  if shard_path.as_posix() in listed_shard_names:
+                      raise SystemExit(f"Duplicate manifest shard path: {shard_name}")
+                  listed_shard_names.add(shard_path.as_posix())
+
+              if "shards/shard_0.pt" not in listed_shard_names:
+                  raise SystemExit("manifest.json must list shards/shard_0.pt")
+
+              unlisted_shards = sorted(zip_shard_names - listed_shard_names)
+              if unlisted_shards:
+                  raise SystemExit(
+                      "Zip contains shard file(s) not listed in manifest.json: "
+                      + ", ".join(unlisted_shards)
+                  )
+
+              missing_shards = sorted(listed_shard_names - zip_shard_names)
+              if missing_shards:
+                  raise SystemExit(
+                      "manifest.json lists shard file(s) missing from zip: "
+                      + ", ".join(missing_shards)
+                  )
+
+              for info in archive.infolist():
+                  path = PurePosixPath(info.filename)
+                  target = bundle_dir.joinpath(*path.parts)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  with archive.open(info) as src, open(target, "wb") as dst:
+                      shutil.copyfileobj(src, dst)
+          PY
+
+      - name: Validate latent bundle
+        run: |
+          mkdir -p "$RUN_OUTPUT_DIR"
+          cp "$BUNDLE_DIR/manifest.json" "$RUN_OUTPUT_DIR/latent_bundle_manifest.json"
+          python -m src.scripts.validate_latent_bundle \
+            --bundle-dir "$BUNDLE_DIR" \
+            --report-json "$RUN_OUTPUT_DIR/latent_bundle_validation_report.json"
+
+      - name: Generate effective training config
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          import yaml
+
+          base_config_path = Path(os.environ["BASE_CONFIG_PATH"])
+          output_dir = Path(os.environ["RUN_OUTPUT_DIR"])
+          effective_config_path = Path(os.environ["EFFECTIVE_CONFIG_PATH"])
+
+          with open(base_config_path, "r", encoding="utf-8") as handle:
+              config = yaml.safe_load(handle)
+
+          config["experiment_id"] = os.environ["EXPERIMENT_ID"]
+          config["experiment_name"] = os.environ["EXPERIMENT_ID"]
+          config["device"] = "cpu"
+          config["output_dir"] = os.environ["RUN_OUTPUT_DIR"]
+          config.setdefault("data", {})["dataset_path"] = str(Path(os.environ["BUNDLE_DIR"]) / "shards")
+          config["data"]["batch_size"] = int(os.environ["BATCH_SIZE"])
+          config["data"]["num_workers"] = 0
+          config["data"]["drop_last"] = True
+          config.setdefault("training", {})["epochs"] = int(os.environ["EPOCHS"])
+          config["training"]["max_steps"] = int(os.environ["MAX_STEPS"])
+          config["training"]["learning_rate"] = float(os.environ["LEARNING_RATE"])
+          config["training"]["weight_decay"] = float(config["training"].get("weight_decay", 0.0))
+          config["training"]["resume"] = False
+          config.setdefault("loss", {})["lambda_mse"] = float(os.environ["LAMBDA_MSE"])
+          config["loss"]["lambda_reverse_nce"] = float(os.environ["LAMBDA_REVERSE_NCE"])
+          config["loss"]["lambda_margin"] = float(os.environ["LAMBDA_MARGIN"])
+          config["loss"]["margin_target"] = float(os.environ["MARGIN_TARGET"])
+          config["loss"]["lambda_norm"] = float(os.environ["LAMBDA_NORM"])
+
+          output_dir.mkdir(parents=True, exist_ok=True)
+          with open(effective_config_path, "w", encoding="utf-8") as handle:
+              yaml.safe_dump(config, handle, sort_keys=False)
+          print(f"Wrote {effective_config_path}")
+          PY
+
+      - name: Run configurable CPU trainer
+        run: |
+          python -m src.pipelines.trainer \
+            --config "$EFFECTIVE_CONFIG_PATH" \
+            --experiment-id "$EXPERIMENT_ID" \
+            --output-dir "$RUN_OUTPUT_DIR" \
+            --max-steps "$MAX_STEPS" \
+            --device cpu
+
+      - name: Validate training outputs
+        run: |
+          python - <<'PY'
+          import csv
+          import json
+          import os
+          from pathlib import Path
+
+          output_dir = Path(os.environ["RUN_OUTPUT_DIR"])
+          required_files = [
+              "latent_bundle_manifest.json",
+              "latent_bundle_validation_report.json",
+              "effective_config.yaml",
+              "metrics.json",
+              "train_log.csv",
+              "run_summary.md",
+              "last_checkpoint.pth",
+              "best_model.pth",
+          ]
+          missing = [name for name in required_files if not (output_dir / name).is_file()]
+          if missing:
+              raise SystemExit(f"Missing expected output files: {', '.join(missing)}")
+
+          with open(output_dir / "metrics.json", "r", encoding="utf-8") as handle:
+              metrics = json.load(handle)
+
+          expected_experiment = os.environ["EXPERIMENT_ID"]
+          if metrics.get("experiment_id") != expected_experiment:
+              raise SystemExit(
+                  f"Expected experiment_id={expected_experiment}, got {metrics.get('experiment_id')}"
+              )
+
+          for key in (
+              "final_reverse_nce_loss",
+              "final_margin_loss",
+              "final_norm_loss",
+              "final_diagonal_margin_mean",
+              "final_hard_negative_cosine_mean",
+              "final_norm_ratio_mean",
+          ):
+              if key not in metrics:
+                  raise SystemExit(f"metrics.json missing {key}")
+
+          max_steps = int(os.environ["MAX_STEPS"])
+          steps_completed = int(metrics.get("steps_completed", 0))
+          if steps_completed <= 0:
+              raise SystemExit("Trainer completed zero steps")
+          if steps_completed > max_steps:
+              raise SystemExit(
+                  f"Trainer completed {steps_completed} steps, exceeding max_steps={max_steps}"
+              )
+
+          with open(output_dir / "train_log.csv", "r", encoding="utf-8") as handle:
+              rows = list(csv.DictReader(handle))
+          if len(rows) != steps_completed:
+              raise SystemExit(
+                  f"train_log.csv has {len(rows)} rows, expected {steps_completed}"
+              )
+
+          for column in (
+              "reverse_nce_loss",
+              "margin_loss",
+              "norm_loss",
+              "diagonal_margin_mean",
+              "hard_negative_cosine_mean",
+              "norm_ratio_mean",
+          ):
+              if column not in rows[0]:
+                  raise SystemExit(f"train_log.csv missing {column}")
+
+          print(f"Validated {steps_completed} training step(s) in {output_dir}")
+          PY
+
+      - name: Append run summary
+        if: always()
+        run: |
+          if [ -f "$RUN_OUTPUT_DIR/run_summary.md" ]; then
+            cat "$RUN_OUTPUT_DIR/run_summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "# ${EXPERIMENT_ID} Configurable Remote Bundle Training"
+              echo
+              echo "run_summary.md was not produced."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload training artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LIP-LOSS-001-${{ github.run_id }}-${{ env.EXPERIMENT_ID }}
+          path: ${{ env.RUN_OUTPUT_DIR }}
+          if-no-files-found: error
+          retention-days: 7
