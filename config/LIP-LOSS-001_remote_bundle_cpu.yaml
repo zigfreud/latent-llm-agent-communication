@@ -1,0 +1,31 @@
+experiment_id: "LIP-LOSS-001"
+experiment_name: "LIP-LOSS-001 Configurable Remote Bundle Training"
+device: "cpu"
+output_dir: "runs/LIP-LOSS-001"
+seed: 42
+
+data:
+  dataset_path: "datasets/LIP-LOSS-001/latent_bundle/shards"
+  batch_size: 8
+  num_workers: 0
+  drop_last: true
+
+model:
+  input_dim: 2048
+  hidden_dim: 1024
+  output_dim: 4096
+
+training:
+  epochs: 2
+  max_steps: 8
+  learning_rate: 0.0001
+  weight_decay: 0.0
+  resume: false
+
+loss:
+  temperature: 0.1
+  lambda_mse: 0.35
+  lambda_reverse_nce: 1.0
+  lambda_margin: 0.1
+  margin_target: 0.05
+  lambda_norm: 0.05

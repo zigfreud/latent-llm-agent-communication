@@ -82,20 +82,68 @@ def apply_overrides(cfg, experiment_id=None, output_dir=None, max_steps=None, de
     return cfg
 
 
+LOSS_METRIC_FIELDS = [
+    "loss",
+    "nce_loss",
+    "forward_nce_loss",
+    "reverse_nce_loss",
+    "mse_loss",
+    "margin_loss",
+    "norm_loss",
+    "cosine_diag_mean",
+    "offdiag_cosine_mean",
+    "diagonal_margin_mean",
+    "hard_negative_cosine_mean",
+    "norm_ratio_mean",
+    "accuracy",
+]
+
+
 def unpack_loss_result(loss_result):
+    if isinstance(loss_result, dict):
+        loss = loss_result.get("total_loss", loss_result.get("loss"))
+        if loss is None:
+            raise ValueError("Loss result dictionary must include total_loss or loss")
+
+        metrics = {
+            "loss": loss,
+            "nce_loss": loss_result.get("nce_loss", loss_result.get("forward_nce_loss")),
+            "forward_nce_loss": loss_result.get("forward_nce_loss", loss_result.get("nce_loss")),
+            "reverse_nce_loss": loss_result.get("reverse_nce_loss"),
+            "mse_loss": loss_result.get("mse_loss"),
+            "margin_loss": loss_result.get("margin_loss"),
+            "norm_loss": loss_result.get("norm_loss"),
+            "cosine_diag_mean": loss_result.get("cosine_diag_mean"),
+            "offdiag_cosine_mean": loss_result.get("offdiag_cosine_mean"),
+            "diagonal_margin_mean": loss_result.get("diagonal_margin_mean"),
+            "hard_negative_cosine_mean": loss_result.get("hard_negative_cosine_mean"),
+            "norm_ratio_mean": loss_result.get("norm_ratio_mean"),
+            "accuracy": loss_result.get("accuracy", loss_result.get("acc")),
+        }
+        return loss, metrics
+
     if not isinstance(loss_result, tuple):
-        raise TypeError("Loss function must return a tuple")
+        raise TypeError("Loss function must return a tuple or dictionary")
 
     if len(loss_result) == 4:
         loss, nce, mse, acc = loss_result
-        return loss, nce, mse, acc
+        return loss, {
+            "loss": loss,
+            "nce_loss": nce,
+            "forward_nce_loss": nce,
+            "mse_loss": mse,
+            "accuracy": acc,
+        }
 
     if len(loss_result) == 2:
         loss, acc = loss_result
-        return loss, None, None, acc
+        return loss, {
+            "loss": loss,
+            "accuracy": acc,
+        }
 
     raise ValueError(
-        "Loss function must return either (loss, acc) or "
+        "Loss function must return a metrics dictionary, (loss, acc), or "
         "(total_loss, loss_nce, loss_mse, acc)"
     )
 
@@ -106,10 +154,6 @@ def tensor_item(value):
     return value.item() if hasattr(value, "item") else float(value)
 
 
-def add_optional_metric(total, value):
-    return total + (tensor_item(value) or 0.0)
-
-
 def write_run_artifacts(output_dir, cfg, metrics, rows):
     metrics_path = os.path.join(output_dir, "metrics.json")
     log_path = os.path.join(output_dir, "train_log.csv")
@@ -118,15 +162,7 @@ def write_run_artifacts(output_dir, cfg, metrics, rows):
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
 
-    fieldnames = [
-        "step",
-        "epoch",
-        "batch",
-        "loss",
-        "nce_loss",
-        "mse_loss",
-        "accuracy",
-    ]
+    fieldnames = ["step", "epoch", "batch"] + LOSS_METRIC_FIELDS
     with open(log_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -149,6 +185,19 @@ def write_run_artifacts(output_dir, cfg, metrics, rows):
         f"- Final accuracy: {final_accuracy:.6f}" if final_accuracy is not None else "- Final accuracy: n/a",
         "",
     ]
+    optional_summary_fields = [
+        ("Final reverse NCE loss", "final_reverse_nce_loss"),
+        ("Final margin loss", "final_margin_loss"),
+        ("Final norm loss", "final_norm_loss"),
+        ("Final diagonal margin mean", "final_diagonal_margin_mean"),
+        ("Final hard negative cosine mean", "final_hard_negative_cosine_mean"),
+        ("Final norm ratio mean", "final_norm_ratio_mean"),
+    ]
+    for label, key in optional_summary_fields:
+        value = metrics.get(key)
+        if value is not None:
+            lines.insert(-1, f"- {label}: {value:.6f}")
+
     with open(summary_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
@@ -156,8 +205,16 @@ def write_run_artifacts(output_dir, cfg, metrics, rows):
 def build_loss(cfg):
     loss_cfg = cfg.get("loss", {})
     kwargs = {"temperature": loss_cfg.get("temperature", 0.07)}
-    if "lambda_mse" in loss_cfg:
-        kwargs["lambda_mse"] = loss_cfg["lambda_mse"]
+    for key in (
+        "lambda_mse",
+        "lambda_reverse_nce",
+        "reverse_nce_weight",
+        "lambda_margin",
+        "margin_target",
+        "lambda_norm",
+    ):
+        if key in loss_cfg:
+            kwargs[key] = loss_cfg[key]
     return HybridContrastiveLoss(**kwargs)
 
 
@@ -223,12 +280,8 @@ def train(config_path, experiment_id=None, output_dir=None, max_steps=None, devi
     last_epoch_metrics = None
 
     for epoch in range(start_epoch, cfg["training"]["epochs"]):
-        epoch_loss = 0.0
-        epoch_acc = 0.0
-        epoch_nce = 0.0
-        epoch_mse = 0.0
-        nce_count = 0
-        mse_count = 0
+        epoch_sums = {field: 0.0 for field in LOSS_METRIC_FIELDS}
+        epoch_counts = {field: 0 for field in LOSS_METRIC_FIELDS}
         steps = 0
 
         for batch_idx, (src, tgt) in enumerate(loader):
@@ -239,53 +292,49 @@ def train(config_path, experiment_id=None, output_dir=None, max_steps=None, devi
 
             optimizer.zero_grad()
             output = model(src)
-            loss, nce, mse, acc = unpack_loss_result(criterion(output, tgt))
+            loss, batch_metrics = unpack_loss_result(criterion(output, tgt))
             loss.backward()
             optimizer.step()
 
-            loss_value = tensor_item(loss)
-            nce_value = tensor_item(nce)
-            mse_value = tensor_item(mse)
-            acc_value = tensor_item(acc)
+            metric_values = {
+                field: tensor_item(batch_metrics.get(field))
+                for field in LOSS_METRIC_FIELDS
+            }
+            metric_values["loss"] = tensor_item(loss)
 
-            epoch_loss += loss_value
-            epoch_nce = add_optional_metric(epoch_nce, nce)
-            epoch_mse = add_optional_metric(epoch_mse, mse)
-            nce_count += int(nce is not None)
-            mse_count += int(mse is not None)
-            epoch_acc += acc_value
+            for field, value in metric_values.items():
+                if value is not None:
+                    epoch_sums[field] += value
+                    epoch_counts[field] += 1
+
             steps += 1
             global_step += 1
 
-            train_rows.append(
-                {
-                    "step": global_step,
-                    "epoch": epoch + 1,
-                    "batch": batch_idx + 1,
-                    "loss": loss_value,
-                    "nce_loss": nce_value,
-                    "mse_loss": mse_value,
-                    "accuracy": acc_value,
-                }
-            )
+            row = {
+                "step": global_step,
+                "epoch": epoch + 1,
+                "batch": batch_idx + 1,
+            }
+            row.update(metric_values)
+            train_rows.append(row)
 
         if steps == 0:
             if max_steps is not None and global_step >= max_steps:
                 break
             continue
 
-        avg_loss = epoch_loss / steps
-        avg_nce = epoch_nce / nce_count if nce_count else None
-        avg_mse = epoch_mse / mse_count if mse_count else None
-        avg_acc = epoch_acc / steps
+        avg_metrics = {
+            field: (epoch_sums[field] / epoch_counts[field] if epoch_counts[field] else None)
+            for field in LOSS_METRIC_FIELDS
+        }
+        avg_loss = avg_metrics["loss"]
+        avg_acc = avg_metrics["accuracy"]
         last_epoch_metrics = {
             "epoch": epoch + 1,
-            "loss": avg_loss,
-            "nce_loss": avg_nce,
-            "mse_loss": avg_mse,
-            "accuracy": avg_acc,
+            **avg_metrics,
         }
-        logger.info(f"Ep {epoch+1:03d} | Loss: {avg_loss:.4f} | Acc: {avg_acc*100:.2f}%")
+        acc_pct = (avg_acc * 100.0) if avg_acc is not None else 0.0
+        logger.info(f"Ep {epoch+1:03d} | Loss: {avg_loss:.4f} | Acc: {acc_pct:.2f}%")
 
         if avg_loss < best_loss:
             best_loss = avg_loss
@@ -327,6 +376,10 @@ def train(config_path, experiment_id=None, output_dir=None, max_steps=None, devi
         "final_loss": final_loss,
         "final_accuracy": final_accuracy,
     }
+    if last_epoch_metrics:
+        for field in LOSS_METRIC_FIELDS:
+            metrics[f"final_{field}"] = last_epoch_metrics.get(field)
+
     write_run_artifacts(cfg["output_dir"], cfg, metrics, train_rows)
 
     logger.info("Process completed.")
