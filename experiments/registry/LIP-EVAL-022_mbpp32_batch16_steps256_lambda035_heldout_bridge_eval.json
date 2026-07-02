@@ -1,0 +1,97 @@
+{
+  "trace_id": "LIP-EVAL-022",
+  "title": "MBPP32 batch16 256-step lambda_mse 0.35 held-out bridge evaluation",
+  "recorded_at": "2026-07-02",
+  "evaluation_type": "held_out_latent_space",
+  "training": {
+    "experiment_id": "LIP-TRAIN-011-mbpp64-batch16-steps256-lambda035",
+    "run_id": 28603839197,
+    "artifact_id": 8044498853,
+    "artifact_digest": "sha256:a64b273dbce6ed364e920a976c32336120e84d59c047456597443f1f61557ba0"
+  },
+  "evaluation_artifact": {
+    "eval_zip_sha256": "b1a4c0ff0ec4c7fde3cc1d62b3258f9a7ebc0952c0478f9b9e48d2cb31165c2f"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-004-MBPP-EVAL",
+    "dataset_origin": "LIP-DATA-004-MBPP-EVAL MBPP validation prompt sample",
+    "source_dataset": "google-research-datasets/mbpp",
+    "source_dataset_config": "full",
+    "source_split": "validation",
+    "prompt_field": "text",
+    "num_samples": 32,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "7e58a9afcb2733ee3a7110eff757b3ffd47ae0391c526639f13f30714d60ce8e"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 32,
+    "latent_mse_mean": 2.0937340259552,
+    "latent_rmse_mean": 1.4308502674102783,
+    "cosine_diag_mean": 0.8178914785385132,
+    "cosine_diag_std": 0.05285530164837837,
+    "prediction_norm_mean": 146.65748596191406,
+    "target_norm_mean": 158.02142333984375,
+    "norm_ratio_mean": 0.9280939102172852,
+    "energy_drift_mean": 11.363945007324219,
+    "retrieval_top1": 0.375,
+    "retrieval_topk": {
+      "1": 0.375,
+      "5": 0.75
+    },
+    "offdiag_cosine_mean": 0.728355884552002,
+    "diagonal_margin_mean": -0.006803490221500397,
+    "cosine_diag_minus_offdiag": 0.08953559398651123
+  },
+  "comparison_context": {
+    "lambda025_held_out_reference": "LIP-EVAL-020",
+    "paired_in_sample_record": "LIP-EVAL-021",
+    "chance_retrieval_top1_for_32_candidates": 0.03125,
+    "chance_retrieval_top5_for_32_candidates": 0.15625
+  },
+  "comparison_against_lip_eval_020": {
+    "latent_mse_mean": {
+      "from": 2.3901524543762207,
+      "to": 2.0937340259552
+    },
+    "norm_ratio_mean": {
+      "from": 0.8927412629127502,
+      "to": 0.9280939102172852
+    },
+    "energy_drift_mean": {
+      "from": 16.948368072509766,
+      "to": 11.363945007324219
+    },
+    "retrieval_top1": {
+      "from": 0.34375,
+      "to": 0.375
+    },
+    "retrieval_top5": {
+      "from": 0.71875,
+      "to": 0.75
+    },
+    "diagonal_margin_mean": {
+      "from": -0.007311269640922546,
+      "to": -0.006803490221500397
+    }
+  },
+  "interpretation": [
+    "Increasing lambda_mse from 0.25 to 0.35 in the MBPP64 batch16 steps256 regime improved reconstruction, norm/energy calibration, and held-out retrieval.",
+    "Held-out diagonal margin improved slightly relative to LIP-EVAL-020 but remains negative.",
+    "Pair-level held-out ranking is improved but still not robust.",
+    "This remains latent-space diagnostic evaluation only."
+  ],
+  "known_limitations": [
+    "The held-out evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The diagonal margin remains negative, so pair-level held-out ranking is not robust.",
+    "The result does not establish semantic transfer, model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space diagnostic evaluation only. No semantic transfer, text-level fidelity, model-to-model alignment, or production readiness claim."
+}
