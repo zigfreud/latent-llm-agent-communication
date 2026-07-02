@@ -1,0 +1,71 @@
+{
+  "trace_id": "LIP-EVAL-019",
+  "title": "MBPP64 batch16 256-step train-set in-sample bridge evaluation",
+  "recorded_at": "2026-07-02",
+  "evaluation_type": "train_set_in_sample_latent_space",
+  "training": {
+    "experiment_id": "LIP-TRAIN-010-mbpp64-batch16-steps256-lambda025",
+    "run_id": 28601028796,
+    "artifact_id": 8043328665,
+    "artifact_digest": "sha256:50822147964e3527fbf2abe56b3c6b9811239dcd9bc5a58ee5dc02c423f13d3a"
+  },
+  "evaluation_artifact": {
+    "eval_zip_sha256": "a5e664f7d7c2050d8bb6bcf40263cb1337edb7b3dac304780850c516ada2a762"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-004-MBPP-TRAIN",
+    "dataset_origin": "LIP-DATA-004-MBPP-TRAIN MBPP train prompt sample",
+    "source_dataset": "google-research-datasets/mbpp",
+    "source_dataset_config": "full",
+    "source_split": "train",
+    "prompt_field": "text",
+    "num_samples": 64,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "f1dd527799ad2dd0e99edc253ac71213c9db4db36d9cf6b702e3a6ffc126e811"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 64,
+    "latent_mse_mean": 0.957990825176239,
+    "latent_rmse_mean": 0.9728941917419434,
+    "cosine_diag_mean": 0.9182648062705994,
+    "cosine_diag_std": 0.016101522371172905,
+    "prediction_norm_mean": 149.13897705078125,
+    "target_norm_mean": 157.84063720703125,
+    "norm_ratio_mean": 0.9449038505554199,
+    "energy_drift_mean": 8.823211669921875,
+    "retrieval_top1": 0.96875,
+    "retrieval_topk": {
+      "1": 0.96875,
+      "5": 1.0
+    },
+    "offdiag_cosine_mean": 0.5994787216186523,
+    "diagonal_margin_mean": 0.167476087808609,
+    "cosine_diag_minus_offdiag": 0.318786084651947
+  },
+  "comparison_context": {
+    "paired_held_out_record": "LIP-EVAL-020",
+    "batch16_steps128_in_sample_reference": "LIP-EVAL-017",
+    "chance_retrieval_top1_for_64_candidates": 0.015625,
+    "chance_retrieval_top5_for_64_candidates": 0.078125
+  },
+  "interpretation": [
+    "Batch16 steps256 improved in-sample reconstruction, margin, norm ratio, and energy calibration relative to batch16 steps128.",
+    "In-sample retrieval_top1 remained 0.96875.",
+    "Additional optimizer updates improved train fit.",
+    "This remains latent-space diagnostic evaluation only."
+  ],
+  "known_limitations": [
+    "The evaluation uses the training bundle and is in-sample.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The result does not establish semantic transfer, model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space diagnostic evaluation only. No semantic transfer, text-level fidelity, model-to-model alignment, or production readiness claim."
+}
