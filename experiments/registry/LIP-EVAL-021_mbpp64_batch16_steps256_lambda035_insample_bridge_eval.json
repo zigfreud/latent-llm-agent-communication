@@ -1,0 +1,71 @@
+{
+  "trace_id": "LIP-EVAL-021",
+  "title": "MBPP64 batch16 256-step lambda_mse 0.35 train-set in-sample bridge evaluation",
+  "recorded_at": "2026-07-02",
+  "evaluation_type": "train_set_in_sample_latent_space",
+  "training": {
+    "experiment_id": "LIP-TRAIN-011-mbpp64-batch16-steps256-lambda035",
+    "run_id": 28603839197,
+    "artifact_id": 8044498853,
+    "artifact_digest": "sha256:a64b273dbce6ed364e920a976c32336120e84d59c047456597443f1f61557ba0"
+  },
+  "evaluation_artifact": {
+    "eval_zip_sha256": "9f9b91a56bbc48afb25f2c0d8504f31f82480c9285fb7415bd8cecbbb4dfd92f"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-004-MBPP-TRAIN",
+    "dataset_origin": "LIP-DATA-004-MBPP-TRAIN MBPP train prompt sample",
+    "source_dataset": "google-research-datasets/mbpp",
+    "source_dataset_config": "full",
+    "source_split": "train",
+    "prompt_field": "text",
+    "num_samples": 64,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "f1dd527799ad2dd0e99edc253ac71213c9db4db36d9cf6b702e3a6ffc126e811"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 64,
+    "latent_mse_mean": 0.6976713538169861,
+    "latent_rmse_mean": 0.8309321403503418,
+    "cosine_diag_mean": 0.9411893486976624,
+    "cosine_diag_std": 0.010752093978226185,
+    "prediction_norm_mean": 151.78021240234375,
+    "target_norm_mean": 157.84063720703125,
+    "norm_ratio_mean": 0.9616261720657349,
+    "energy_drift_mean": 6.247280597686768,
+    "retrieval_top1": 0.96875,
+    "retrieval_topk": {
+      "1": 0.96875,
+      "5": 1.0
+    },
+    "offdiag_cosine_mean": 0.6405885219573975,
+    "diagonal_margin_mean": 0.15557986497879028,
+    "cosine_diag_minus_offdiag": 0.3006008267402649
+  },
+  "comparison_context": {
+    "lambda025_in_sample_reference": "LIP-EVAL-019",
+    "paired_held_out_record": "LIP-EVAL-022",
+    "chance_retrieval_top1_for_64_candidates": 0.015625,
+    "chance_retrieval_top5_for_64_candidates": 0.078125
+  },
+  "interpretation": [
+    "Increasing lambda_mse from 0.25 to 0.35 improved in-sample MSE, cosine, norm ratio, and energy drift relative to LIP-EVAL-019.",
+    "In-sample retrieval_top1 remained 0.96875.",
+    "The result improves reconstruction and calibration while preserving strong train-set retrieval.",
+    "This remains latent-space diagnostic evaluation only."
+  ],
+  "known_limitations": [
+    "The evaluation uses the training bundle and is in-sample.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The result does not establish semantic transfer, model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space diagnostic evaluation only. No semantic transfer, text-level fidelity, model-to-model alignment, or production readiness claim."
+}
