@@ -1,0 +1,33 @@
+experiment_id: "LIP-PROTO-001-MULTISEED"
+experiment_name: "LIP-PROTO-001 independent adapter replicas"
+device: "auto"
+output_dir: "runs/LIP-PROTO-001/training/base"
+seed: 42
+
+data:
+  dataset_path: "datasets/LIP-PROTO-001/mbpp_train_bundle_64/shards"
+  require_bundle_manifest: true
+  expected_trace_id: "LIP-PROTO-001-DATA-TRAIN"
+  expected_extraction_mode: "real"
+  batch_size: 16
+  num_workers: 0
+  drop_last: true
+
+model:
+  input_dim: 2048
+  hidden_dim: 1024
+  output_dim: 4096
+
+training:
+  epochs: 64
+  max_steps: 256
+  learning_rate: 0.0001
+  weight_decay: 0.0
+  resume: false
+
+loss:
+  temperature: 0.1
+  lambda_mse: 0.35
+  lambda_reverse_nce: 0.0
+  lambda_margin: 0.0
+  lambda_norm: 0.0

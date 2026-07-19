@@ -8,11 +8,24 @@ import argparse
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
+from src.core.hidden_states import select_hidden_vectors
+from src.core.prompt_protocol import format_prompts, tokenizer_add_special_tokens
+
 try:
     import torch_directml
     HAS_DML = True
-except:
+except ImportError:
     HAS_DML = False
+
+
+def dataset_prompt(item):
+    """Build model-agnostic prompt text before applying the shared protocol."""
+
+    parts = [str(item.get(key, "")).strip() for key in ("input", "instruction")]
+    prompt = "\n".join(part for part in parts if part)
+    if not prompt:
+        raise ValueError("dataset row must contain input or instruction text")
+    return prompt
 
 def get_device(device_str):
     if device_str == "dml" and HAS_DML: 
@@ -66,6 +79,14 @@ def get_model(model_id, device):
 def run_extraction(config_path, demo=False):
     cfg = load_config(config_path)
     device = get_device(cfg['device'])
+    prompt_protocol = cfg.get("prompt_protocol")
+    token_position = cfg.get("extraction", {}).get(
+        "token_position",
+        "last_non_padding",
+    )
+    source_layer = int(cfg.get("extraction", {}).get("source_layer", -1))
+    target_layer = int(cfg.get("extraction", {}).get("target_layer", -1))
+    add_special_tokens = tokenizer_add_special_tokens(prompt_protocol)
     
     print(f"⚙️  Pipeline configurado para: {device}")
     
@@ -101,18 +122,30 @@ def run_extraction(config_path, demo=False):
             print(f"⛏️  Mining Shard {shard_idx}...")
             batch_data = []
             subset = ds.select(range(start, end))
-            prompts = [f"<|user|>\n{item['input']}\n{item['instruction']}</s>\n<|assistant|>\n" for item in subset]
+            raw_prompts = [dataset_prompt(item) for item in subset]
+            prompts = format_prompts(raw_prompts, tok_src, prompt_protocol)
             
             infer_batch = 1 if demo else 7
 
             for i in tqdm.tqdm(range(0, len(prompts), infer_batch)):
                 p_batch = prompts[i:i+infer_batch]
-                inputs = tok_src(p_batch, return_tensors="pt", padding=True, truncation=True, max_length=512)
+                inputs = tok_src(
+                    p_batch,
+                    return_tensors="pt",
+                    padding=True,
+                    truncation=True,
+                    max_length=512,
+                    add_special_tokens=add_special_tokens,
+                )
                 inputs = {k: v.to(device) for k, v in inputs.items()}
                 
                 with torch.no_grad():
                     out = model_src(**inputs, output_hidden_states=True)
-                    vecs = out.hidden_states[-1][:, -1, :].cpu().float()
+                    vecs = select_hidden_vectors(
+                        out.hidden_states[source_layer],
+                        inputs.get("attention_mask"),
+                        token_position=token_position,
+                    ).cpu().float()
                     batch_data.append(vecs)
                 
                 del inputs, out
@@ -141,21 +174,33 @@ def run_extraction(config_path, demo=False):
         if os.path.exists(final_shard_file): continue
 
         print(f"🎯 Target Processing Shard {shard_idx}...")
-        src_tensor = torch.load(shard_file_src)
+        src_tensor = torch.load(shard_file_src, map_location="cpu", weights_only=True)
         subset = ds.select(range(start, end))
-        prompts = [f"<|user|>\n{item['input']}\n{item['instruction']}</s>\n<|assistant|>\n" for item in subset]
+        raw_prompts = [dataset_prompt(item) for item in subset]
+        prompts = format_prompts(raw_prompts, tok_tgt, prompt_protocol)
         
         tgt_list = []
         infer_batch = 1
 
         for i in tqdm.tqdm(range(0, len(prompts), infer_batch)):
             p_batch = prompts[i:i+infer_batch]
-            inputs = tok_tgt(p_batch, return_tensors="pt", padding=True, truncation=True, max_length=512)
+            inputs = tok_tgt(
+                p_batch,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=512,
+                add_special_tokens=add_special_tokens,
+            )
             inputs = {k: v.to(device) for k, v in inputs.items()}
 
             with torch.no_grad():
                 out = model_tgt(**inputs, output_hidden_states=True)
-                vecs = out.hidden_states[-1][:, -1, :].cpu().float()
+                vecs = select_hidden_vectors(
+                    out.hidden_states[target_layer],
+                    inputs.get("attention_mask"),
+                    token_position=token_position,
+                ).cpu().float()
                 tgt_list.append(vecs)
             
             del inputs, out

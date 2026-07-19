@@ -1,5 +1,4 @@
 import os
-import re
 import ast
 import sys
 import csv
@@ -12,10 +11,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 
 from datasets import load_dataset
 
+from src.evaluation.semantics import extract_code
 from src.pipelines.infer import (
     build_vec_injected,
     extract_thoughts,
-    format_prompt_like_dataset,
+    load_adapter_checkpoint_safely,
     load_source,
     load_target,
     run_ab,
@@ -36,16 +36,6 @@ def pick_prompt(example: dict) -> str:
     return str(example)
 
 
-def extract_code(text: str) -> str:
-    code_match = re.search(r"```python\\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
-    if code_match:
-        return code_match.group(1).strip()
-    generic = re.search(r"```\\s*(.*?)```", text, re.DOTALL)
-    if generic:
-        return generic.group(1).strip()
-    return text.strip()
-
-
 def load_eval_samples(n_samples: int = 50):
     try:
         ds = load_dataset("flytech/python-codes-25k", split=f"test[:{n_samples}]")
@@ -64,14 +54,26 @@ def main():
     prompts = load_eval_samples(n_samples=50)
 
     # Load models
-    src_model, src_tok = load_source(cfg["source_model"], cfg.get("runtime", {}).get("device_src", "cuda"))
+    src_model, src_tok = load_source(
+        cfg["source_model"],
+        cfg.get("runtime", {}).get("device_src", "cuda"),
+        bool(cfg.get("runtime", {}).get("source_load_4bit", False)),
+        cfg.get("source_revision"),
+    )
     tgt_model, tgt_tok = load_target(
         cfg["target_model"],
         cfg.get("runtime", {}).get("device_tgt", "auto"),
         cfg.get("runtime", {}).get("load_4bit", True),
+        cfg.get("target_revision"),
     )
-    adapter = LIPAdapter().to("cuda")
-    state = __import__("torch").load(cfg["adapter_ckpt"], map_location="cuda", weights_only=False)
+    adapter_config = cfg.get("adapter", {})
+    adapter_device = cfg.get("runtime", {}).get("device_adapter", "cuda")
+    adapter = LIPAdapter(
+        input_dim=int(adapter_config.get("input_dim", 2048)),
+        hidden_dim=int(adapter_config.get("hidden_dim", 1024)),
+        output_dim=int(adapter_config.get("output_dim", 4096)),
+    ).to(adapter_device)
+    state = load_adapter_checkpoint_safely(cfg["adapter_ckpt"], adapter_device)
     adapter.load_state_dict(state)
     adapter.eval()
 
@@ -85,7 +87,18 @@ def main():
 
     # Extract source vectors
     print("Extracting thought vectors from source...")
-    thought_vectors = extract_thoughts(prompts, src_model, src_tok, cfg.get("runtime", {}).get("device_src", "cuda"))
+    extraction_config = cfg.get("extraction", {})
+    thought_vectors = extract_thoughts(
+        prompts,
+        src_model,
+        src_tok,
+        cfg.get("runtime", {}).get("device_src", "cuda"),
+        protocol_config=cfg.get("prompt_protocol"),
+        layer_idx=int(extraction_config.get("source_layer", -1)),
+        token_position=str(
+            extraction_config.get("token_position", "last_non_padding")
+        ),
+    )
 
     results = []
     success = 0
@@ -106,6 +119,8 @@ def main():
             layer_idx=int(cfg.get("lip", {}).get("layer_idx", -2)),
             inject_pos_mode=str(cfg.get("lip", {}).get("inject_pos_mode", "last")),
             gen_kwargs=gen_kwargs,
+            protocol_config=cfg.get("prompt_protocol"),
+            injection_mode=str(cfg.get("lip", {}).get("injection_mode", "add")),
         )
 
         generated = ab[True]

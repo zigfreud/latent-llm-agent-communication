@@ -6,11 +6,17 @@ models:
   source_model: "deepseek-ai/deepseek-coder-1.3b-base"
   target_model: "NousResearch/Meta-Llama-3-8B-Instruct"
 
+prompt_protocol:
+  version: "lip-prompt-v1"
+  mode: "raw"
+  add_generation_prompt: false
+  system_prompt: null
+
 extraction:
   device: "auto"
   source_layer: -1
   target_layer: -1
-  token_position: "last"
+  token_position: "last_non_padding"
   max_length: 256
   batch_size: 1
   dtype: "auto"
