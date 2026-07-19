@@ -1,8 +1,9 @@
 """Run the controlled LIP source-only generation experiment.
 
-The primary ``source_latent`` condition extracts the task prompt only with the
-source model.  The target receives a fixed neutral prompt plus the translated
-latent vector.  Text-visible and vector controls are emitted in the same JSONL.
+The primary ``source_latent`` condition uses task vectors extracted only by the
+source model into a validated held-out bundle.  The target receives a fixed
+neutral prompt plus the translated latent vector.  Text-visible and vector
+controls are emitted in the same JSONL.
 """
 
 from __future__ import annotations
@@ -29,14 +30,12 @@ from src.evaluation.source_only import (
     validate_conditions,
 )
 from src.pipelines.infer import (
-    extract_prompt_vectors,
     generate_with_optional_injection,
     load_adapter_checkpoint_safely,
-    load_source,
     load_target,
     translate_source_vector,
 )
-from src.scripts.validate_latent_bundle import validate_bundle
+from src.scripts.validate_latent_bundle import load_shard, validate_bundle
 
 
 DEFAULT_CONFIG = Path("config/LIP-PROTO-001_source_only_eval.yaml")
@@ -279,6 +278,17 @@ def verify_training_bundle(config: Mapping[str, Any]) -> dict:
         raise ValueError(
             "training bundle must record immutable 40-character model revisions"
         )
+    sampled_ids = manifest.get("sampled_ids")
+    prompt_hashes = manifest.get("sampled_prompt_sha256")
+    if (
+        not isinstance(sampled_ids, list)
+        or not isinstance(prompt_hashes, list)
+        or len(sampled_ids) != report["total_records"]
+        or len(prompt_hashes) != report["total_records"]
+    ):
+        raise ValueError(
+            "training bundle must record every sampled task ID and prompt digest"
+        )
     return {
         "path": str(manifest_path),
         "sha256": sha256_path(manifest_path),
@@ -287,7 +297,140 @@ def verify_training_bundle(config: Mapping[str, Any]) -> dict:
         "shard_validation": report["validation_status"],
         "source_model_revision": revisions["source"],
         "target_model_revision": revisions["target"],
+        "sampled_ids": sampled_ids,
+        "sampled_prompt_sha256": prompt_hashes,
     }
+
+
+def verify_heldout_bundle(
+    config: Mapping[str, Any],
+    tasks: list[dict],
+    training_bundle: Mapping[str, Any],
+) -> dict:
+    data_config = config.get("data", {})
+    manifest_value = data_config.get("heldout_bundle_manifest")
+    if not manifest_value:
+        raise ValueError("data.heldout_bundle_manifest is required")
+    manifest_path = Path(manifest_value)
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"held-out bundle manifest not found: {manifest_path}")
+
+    report = validate_bundle(manifest_path.parent)
+    manifest = read_json_object(manifest_path)
+    extraction = config.get("extraction", {})
+    models = config.get("models", {})
+    adapter_dims = config.get("adapter", {})
+    runtime = config.get("runtime", {})
+    expected = {
+        "trace_id": data_config.get("heldout_bundle_trace_id"),
+        "extraction_mode": "real",
+        "source_quantization": (
+            "bitsandbytes-4bit" if runtime.get("source_load_4bit", False) else "none"
+        ),
+        "target_quantization": (
+            "bitsandbytes-4bit" if runtime.get("load_4bit", True) else "none"
+        ),
+        "quantization_compute_dtype": runtime.get(
+            "quantization_compute_dtype",
+            "float16",
+        ),
+        "use_safetensors": True,
+        "max_length": int(extraction.get("max_length", 512)),
+        "source_model": models.get("source_model"),
+        "target_model": models.get("target_model"),
+        "source_layer": str(int(extraction.get("source_layer", -1))),
+        "target_layer": str(int(extraction.get("target_layer", -1))),
+        "token_position": str(extraction.get("token_position", "last_non_padding")),
+        "prompt_protocol": protocol_metadata(config.get("prompt_protocol")),
+        "input_dim": int(adapter_dims.get("input_dim", 2048)),
+        "output_dim": int(adapter_dims.get("output_dim", 4096)),
+        "source_dataset": data_config.get("dataset_name"),
+        "source_dataset_config": data_config.get("dataset_config"),
+        "source_split": data_config.get("split"),
+        "prompt_field": data_config.get("prompt_field", "text"),
+        "sampling_seed": int(data_config.get("sampling_seed", 42)),
+    }
+    if not expected["trace_id"]:
+        raise ValueError("data.heldout_bundle_trace_id is required")
+    mismatches = [
+        f"{field}: manifest={manifest.get(field)!r}, expected={value!r}"
+        for field, value in expected.items()
+        if manifest.get(field) != value
+    ]
+    if mismatches:
+        raise ValueError("held-out bundle protocol mismatch: " + "; ".join(mismatches))
+
+    sampled_ids = manifest.get("sampled_ids")
+    prompt_hashes = manifest.get("sampled_prompt_sha256")
+    expected_count = int(data_config.get("task_count", len(tasks)))
+    if (
+        not isinstance(sampled_ids, list)
+        or not isinstance(prompt_hashes, list)
+        or len(sampled_ids) != expected_count
+        or len(prompt_hashes) != expected_count
+    ):
+        raise ValueError("held-out bundle must record every configured task ID and prompt digest")
+    task_index = {task_id: index for index, task_id in enumerate(sampled_ids)}
+    for task in tasks:
+        task_id = str(task["task_id"])
+        if task_id not in task_index:
+            raise ValueError(f"task {task_id} is absent from the held-out bundle")
+        expected_prompt_sha = hashlib.sha256(task["prompt"].encode("utf-8")).hexdigest()
+        if prompt_hashes[task_index[task_id]] != expected_prompt_sha:
+            raise ValueError(f"task {task_id} prompt does not match the held-out bundle")
+
+    training_ids = set(training_bundle.get("sampled_ids", []))
+    overlap = sorted(training_ids.intersection(sampled_ids))
+    if overlap:
+        raise ValueError(
+            "training and held-out bundle IDs overlap: " + ", ".join(overlap[:10])
+        )
+    revisions = {
+        role: manifest.get(f"{role}_model_revision")
+        for role in ("source", "target")
+    }
+    for role, revision in revisions.items():
+        if revision != training_bundle.get(f"{role}_model_revision"):
+            raise ValueError(
+                f"held-out {role} model revision differs from the training bundle"
+            )
+
+    return {
+        "path": str(manifest_path),
+        "sha256": sha256_path(manifest_path),
+        "trace_id": report["trace_id"],
+        "records": report["total_records"],
+        "shard_validation": report["validation_status"],
+        "source_model_revision": revisions["source"],
+        "target_model_revision": revisions["target"],
+        "sampled_ids": sampled_ids,
+        "sampled_prompt_sha256": prompt_hashes,
+    }
+
+
+def load_heldout_vectors(
+    heldout_bundle: Mapping[str, Any],
+    tasks: list[dict],
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+    manifest_path = Path(str(heldout_bundle["path"]))
+    manifest = read_json_object(manifest_path)
+    records = []
+    for shard_entry in manifest["shards"]:
+        records.extend(load_shard(manifest_path.parent / shard_entry["path"]))
+    sampled_ids = list(manifest["sampled_ids"])
+    if len(records) != len(sampled_ids):
+        raise ValueError("held-out bundle vector count does not match sampled_ids")
+    records_by_id = dict(zip(sampled_ids, records))
+    selected = [records_by_id[str(task["task_id"])] for task in tasks]
+    source_vectors = [
+        record["src_vector"].detach().cpu().float().reshape(1, -1)
+        for record in selected
+    ]
+    target_vectors = [
+        record["tgt_vector"].detach().cpu().float().reshape(1, -1)
+        for record in selected
+    ]
+    return source_vectors, target_vectors
 
 
 def verify_checkpoint_run(
@@ -430,7 +573,6 @@ def run_probe(
                 f"results already exist: {output_path}; use --resume or --overwrite"
             )
 
-    source_prompts = [task["prompt"] for task in tasks]
     task_ids = [task["task_id"] for task in tasks]
     models = config.get("models", {})
     allowed_keys = {
@@ -459,11 +601,18 @@ def run_probe(
         raise ValueError("existing results contain a different task specification")
 
     training_bundle = verify_training_bundle(config)
+    heldout_bundle = verify_heldout_bundle(config, tasks, training_bundle)
+    source_vectors, target_vectors = load_heldout_vectors(heldout_bundle, tasks)
     if any(
         row.get("training_bundle_manifest_sha256") != training_bundle["sha256"]
         for row in existing_rows
     ):
         raise ValueError("existing results used a different training bundle manifest")
+    if any(
+        row.get("heldout_bundle_manifest_sha256") != heldout_bundle["sha256"]
+        for row in existing_rows
+    ):
+        raise ValueError("existing results used a different held-out bundle manifest")
     training_manifest_path = Path(training_bundle["path"])
     checkpoint_provenance_by_seed = {}
     for checkpoint_spec in checkpoints:
@@ -485,48 +634,14 @@ def run_probe(
     ):
         raise ValueError("existing results were generated with different checkpoints")
 
-    print("Loading source model and extracting source-only task vectors...")
-    source_model, source_tokenizer = load_source(
-        models["source_model"],
-        runtime.get("device_src", "cuda"),
-        bool(runtime.get("source_load_4bit", False)),
-        training_bundle["source_model_revision"],
-    )
-    source_vectors = extract_prompt_vectors(
-        source_prompts,
-        source_model,
-        source_tokenizer,
-        runtime.get("device_src", "cuda"),
-        protocol_config=protocol,
-        layer_idx=int(extraction.get("source_layer", -1)),
-        token_position=str(extraction.get("token_position", "last_non_padding")),
-        max_length=int(extraction.get("max_length", 512)),
-    )
-    del source_model, source_tokenizer
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-
-    print("Loading target model...")
+    print("Using validated held-out source/oracle vectors from the latent bundle...")
+    print("Loading target model for controlled generation...")
     target_model, target_tokenizer = load_target(
         models["target_model"],
         runtime.get("device_tgt", "auto"),
         bool(runtime.get("load_4bit", True)),
-        training_bundle["target_model_revision"],
+        heldout_bundle["target_model_revision"],
     )
-    target_vectors = None
-    if "oracle_target_latent" in conditions:
-        print("Extracting target-hidden oracle control vectors...")
-        target_vectors = extract_prompt_vectors(
-            source_prompts,
-            target_model,
-            target_tokenizer,
-            None,
-            protocol_config=protocol,
-            layer_idx=int(extraction.get("target_layer", -1)),
-            token_position=str(extraction.get("token_position", "last_non_padding")),
-            max_length=int(extraction.get("max_length", 512)),
-        )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     total_records = len(existing_rows)
@@ -683,6 +798,7 @@ def run_probe(
                             "checkpoint_sha256"
                         ],
                         "training_bundle_manifest_sha256": training_bundle["sha256"],
+                        "heldout_bundle_manifest_sha256": heldout_bundle["sha256"],
                         "output_text": output_text,
                         "generation_reused_across_adapter_seeds": generation_reused,
                         "task_spec": task,
@@ -718,6 +834,7 @@ def run_probe(
         "generation_seeds": normalized_generation_seeds,
         "adapter_runs": adapter_runs,
         "training_bundle": training_bundle,
+        "heldout_bundle": heldout_bundle,
         "records": total_records,
         "expected_records": len(allowed_keys),
         "complete": existing_keys == allowed_keys,

@@ -22,6 +22,14 @@ Real bundle construction records the resolved immutable Hugging Face commit for
 each model. The probe reloads those exact revisions and rejects manifests that
 contain only a mutable branch name or no revision.
 
+The materializer also writes the exact held-out task specifications to
+`datasets/LIP-PROTO-001/mbpp_validation_tasks.jsonl`. Bundle manifests record
+the sampled public task IDs and SHA-256 digests of their prompts. The probe
+loads source and oracle vectors from the validated held-out bundle by task ID,
+checks those prompt digests, and records both training- and held-out-manifest
+digests in every generation row. It therefore does not perform a second,
+untracked source-vector extraction during generation.
+
 Changing prompt mode, layers, tokenizer special-token behavior, or token
 position requires rebuilding both train and held-out bundles and retraining all
 adapters. Earlier checkpoints and bundles are not interchangeable with that new
@@ -63,6 +71,35 @@ which provides common random numbers for paired comparisons.
 
 ## Rebuild and train independent replicas
 
+Install the portable protocol environment. This requirement set works with
+CPU PyTorch in a local/current runtime and with the CUDA-enabled PyTorch already
+present in Colab. DirectML remains a Windows-only optional dependency in the
+general requirements and is not installed into Linux or Colab environments.
+
+```bash
+python -m pip install -r requirements-protocol.txt
+```
+
+Only when attempting 4-bit model loading on CPU, install the separate CPU
+kernel extra. Do not install this extra in CUDA/Colab runtimes:
+
+```bash
+python -m pip install -r requirements-protocol-cpu.txt
+```
+
+The intended execution split is:
+
+| Stage | Current CPU runtime | Colab/CUDA |
+|---|---:|---:|
+| Mock materialization, tests, validation | Yes | Yes |
+| Real DeepSeek/Llama bundle extraction | Only if models/hardware are available | Preferred |
+| Three-seed adapter training from downloaded shards | Yes | Yes |
+| Llama-3 controlled generation | Impractically slow here | Preferred |
+| Syntax/statistical scoring | Yes | Yes |
+
+All scripts use `device=auto`; CUDA is selected when available and CPU remains
+a supported path for the lightweight stages.
+
 Materialize the MBPP train/eval prompt selections and build new bundles under
 the current protocol:
 
@@ -72,11 +109,11 @@ python -m src.scripts.materialize_mbpp_prompt_configs \
 
 python -m src.scripts.build_real_tiny_latent_bundle \
   --config datasets/LIP-PROTO-001/generated_configs/LIP-PROTO-001_train_mbpp_64.yaml \
-  --device cuda
+  --device auto
 
 python -m src.scripts.build_real_tiny_latent_bundle \
   --config datasets/LIP-PROTO-001/generated_configs/LIP-PROTO-001_eval_mbpp_32.yaml \
-  --device cuda
+  --device auto
 ```
 
 Train three replicas whose only intended difference is the training seed:
@@ -86,7 +123,7 @@ python -m src.scripts.run_multiseed_training \
   --config config/LIP-PROTO-001_multiseed_training.yaml \
   --seeds 41 42 43 \
   --output-root runs/LIP-PROTO-001/training \
-  --device cuda
+  --device auto
 ```
 
 The source-only config points at the three resulting `best_model.pth` files.
@@ -94,9 +131,10 @@ Generated bundles, model weights, and run outputs remain untracked.
 The multi-seed runner refuses non-empty seed directories so an earlier replica
 cannot be silently resumed or overwritten under the same identity.
 
-Before loading any model, the probe validates the configured training bundle
-and checks its models, layers, token position, prompt protocol, dimensions, and
-shard hashes. Dry-run/mock bundles are explicitly rejected. It also requires each checkpoint's `metrics.json` and
+Before loading the target model, the probe validates the configured training
+and held-out bundles and checks their models, immutable revisions, layers,
+token position, prompt protocol, dimensions, sampled task IDs, prompt digests,
+and shard hashes. Dry-run/mock bundles are explicitly rejected. It also requires each checkpoint's `metrics.json` and
 `resolved_config.yaml`, verifies the training seed and dataset path, and records
 checkpoint/manifest SHA-256 digests in run metadata.
 

@@ -471,6 +471,26 @@ def write_bundle(
             }
         ],
     }
+    data_config = get_nested(config, "data")
+    for field in (
+        "source_dataset",
+        "source_dataset_config",
+        "source_split",
+        "prompt_field",
+        "sampling_seed",
+        "sampled_ids",
+    ):
+        value = data_config.get(field)
+        if field == "sampled_ids" and isinstance(value, list):
+            value = value[: len(records)]
+        if value is not None:
+            manifest[field] = value
+    sampled_prompts = data_config.get("prompts")
+    if sampled_prompts is not None and data_config.get("sampled_ids") is not None:
+        manifest["sampled_prompt_sha256"] = [
+            hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+            for prompt in sampled_prompts[: len(records)]
+        ]
     for field in ("source_model_revision", "target_model_revision"):
         value = (extraction_metadata or {}).get(field)
         if value:

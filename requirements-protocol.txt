@@ -1,0 +1,10 @@
+# Portable runtime for LIP-PROTO-001 on CPU, CUDA/Colab, or a compatible accelerator.
+# Keep legacy visualization and DirectML dependencies out of Linux environments.
+torch>=2.0.0
+transformers>=4.30.0,<6
+accelerate>=0.20.0
+datasets>=2.14.0,<6
+bitsandbytes>=0.41.0
+PyYAML>=6.0.0
+numpy>=1.24.0
+safetensors>=0.4.0

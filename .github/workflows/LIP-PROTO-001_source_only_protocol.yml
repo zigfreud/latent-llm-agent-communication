@@ -8,6 +8,9 @@ on:
       - ".github/workflows/LIP-PROTO-001_source_only_protocol.yml"
       - "config/LIP-PROTO-001_*.yaml"
       - "docs/LIP-PROTO-001_source_only_evaluation.md"
+      - "requirements.txt"
+      - "requirements-protocol.txt"
+      - "requirements-protocol-cpu.txt"
       - "src/core/hidden_states.py"
       - "src/core/prompt_protocol.py"
       - "src/core/utils.py"
@@ -86,25 +89,48 @@ jobs:
             --dry-run \
             --max-samples 2
 
+          python -m src.scripts.build_real_tiny_latent_bundle \
+            --config datasets/LIP-PROTO-001/generated_configs/LIP-PROTO-001_eval_mbpp_32.yaml \
+            --dry-run \
+            --max-samples 2
+
           python -m src.scripts.validate_latent_bundle \
             --bundle-dir datasets/LIP-PROTO-001/mbpp_train_bundle_64
+
+          python -m src.scripts.validate_latent_bundle \
+            --bundle-dir datasets/LIP-PROTO-001/mbpp_eval_bundle_32
 
           python - <<'PY'
           import json
           from pathlib import Path
 
-          manifest = json.loads(
+          train_manifest = json.loads(
               Path("datasets/LIP-PROTO-001/mbpp_train_bundle_64/manifest.json")
               .read_text(encoding="utf-8")
           )
-          assert manifest["trace_id"] == "LIP-PROTO-001-DATA-TRAIN"
-          assert manifest["target_layer"] == "-2"
-          assert manifest["token_position"] == "last_non_padding"
-          assert manifest["prompt_protocol"]["version"] == "lip-prompt-v1"
-          assert manifest["extraction_mode"] == "dry_run"
-          assert manifest["source_quantization"] == "bitsandbytes-4bit"
-          assert manifest["target_quantization"] == "bitsandbytes-4bit"
-          assert manifest["quantization_compute_dtype"] == "float16"
-          assert manifest["use_safetensors"] is True
-          assert manifest["max_length"] == 512
+          eval_manifest = json.loads(
+              Path("datasets/LIP-PROTO-001/mbpp_eval_bundle_32/manifest.json")
+              .read_text(encoding="utf-8")
+          )
+          tasks = [
+              json.loads(line)
+              for line in Path("datasets/LIP-PROTO-001/mbpp_validation_tasks.jsonl")
+              .read_text(encoding="utf-8")
+              .splitlines()
+          ]
+          assert train_manifest["trace_id"] == "LIP-PROTO-001-DATA-TRAIN"
+          assert eval_manifest["trace_id"] == "LIP-PROTO-001-DATA-EVAL"
+          for manifest in (train_manifest, eval_manifest):
+              assert manifest["target_layer"] == "-2"
+              assert manifest["token_position"] == "last_non_padding"
+              assert manifest["prompt_protocol"]["version"] == "lip-prompt-v1"
+              assert manifest["extraction_mode"] == "dry_run"
+              assert manifest["source_quantization"] == "bitsandbytes-4bit"
+              assert manifest["target_quantization"] == "bitsandbytes-4bit"
+              assert manifest["quantization_compute_dtype"] == "float16"
+              assert manifest["use_safetensors"] is True
+              assert manifest["max_length"] == 512
+              assert len(manifest["sampled_ids"]) == 2
+              assert len(manifest["sampled_prompt_sha256"]) == 2
+          assert len(tasks) == 32
           PY

@@ -57,6 +57,7 @@ def make_records(config):
                     "protocol_version": "lip-source-only-v1",
                     "design_sha256": fingerprint,
                     "training_bundle_manifest_sha256": "a" * 64,
+                    "heldout_bundle_manifest_sha256": "c" * 64,
                     "adapter_checkpoint_sha256": "b" * 64,
                     "task_id": task_id,
                     "condition": condition,

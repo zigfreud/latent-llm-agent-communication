@@ -47,9 +47,12 @@ lip:
 
 data:
   tasks_jsonl: "datasets/LIP-PROTO-001/mbpp_validation_tasks.jsonl"
+  heldout_bundle_manifest: "datasets/LIP-PROTO-001/mbpp_eval_bundle_32/manifest.json"
+  heldout_bundle_trace_id: "LIP-PROTO-001-DATA-EVAL"
   dataset_name: "google-research-datasets/mbpp"
   dataset_config: "full"
   split: "validation"
+  prompt_field: "text"
   task_count: 32
   sampling_seed: 42
   max_prompt_chars: 512

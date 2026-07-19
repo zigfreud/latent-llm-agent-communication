@@ -44,6 +44,10 @@ OPTIONAL_STRING_FIELDS = {
     "quantization_compute_dtype",
     "source_model_revision",
     "target_model_revision",
+    "source_dataset",
+    "source_dataset_config",
+    "source_split",
+    "prompt_field",
 }
 EXPECTED_BUNDLE_FORMAT = "lip_latent_bundle"
 EXPECTED_SCHEMA_VERSION = 1
@@ -131,6 +135,38 @@ def read_manifest(bundle_dir):
         not isinstance(manifest["max_length"], int) or manifest["max_length"] <= 0
     ):
         fail("max_length must be a positive integer when provided")
+
+    if "sampling_seed" in manifest and not isinstance(manifest["sampling_seed"], int):
+        fail("sampling_seed must be an integer when provided")
+
+    if "sampled_ids" in manifest:
+        sampled_ids = manifest["sampled_ids"]
+        if (
+            not isinstance(sampled_ids, list)
+            or any(not isinstance(item, str) or not item for item in sampled_ids)
+        ):
+            fail("sampled_ids must be a list of non-empty strings when provided")
+        if len(sampled_ids) != len(set(sampled_ids)):
+            fail("sampled_ids must not contain duplicates")
+        if len(sampled_ids) != manifest["num_samples"]:
+            fail("sampled_ids length must match num_samples")
+
+    if "sampled_prompt_sha256" in manifest:
+        prompt_hashes = manifest["sampled_prompt_sha256"]
+        if (
+            not isinstance(prompt_hashes, list)
+            or any(
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(character not in "0123456789abcdef" for character in value.lower())
+                for value in prompt_hashes
+            )
+        ):
+            fail("sampled_prompt_sha256 must contain SHA-256 hex digests")
+        if len(prompt_hashes) != manifest["num_samples"]:
+            fail("sampled_prompt_sha256 length must match num_samples")
+        if "sampled_ids" not in manifest:
+            fail("sampled_prompt_sha256 requires sampled_ids")
 
     for field in ("input_dim", "output_dim", "num_samples"):
         if not isinstance(manifest[field], int) or manifest[field] <= 0:

@@ -153,6 +153,7 @@ def validate_generation_records(
     tasks = {}
     design_hashes = set()
     training_bundle_hashes = set()
+    heldout_bundle_hashes = set()
     checkpoint_hashes = {}
     neutral_hash = hashlib.sha256(
         str(config.get("neutral_target_prompt", "")).strip().encode("utf-8")
@@ -185,6 +186,7 @@ def validate_generation_records(
             raise ValueError("generation record has the wrong protocol_version")
         design_hashes.add(row.get("design_sha256"))
         training_bundle_hashes.add(row.get("training_bundle_manifest_sha256"))
+        heldout_bundle_hashes.add(row.get("heldout_bundle_manifest_sha256"))
         checkpoint_hashes.setdefault(training_seed, set()).add(
             row.get("adapter_checkpoint_sha256")
         )
@@ -239,6 +241,10 @@ def validate_generation_records(
         is_sha256(value) for value in training_bundle_hashes
     ):
         raise ValueError("generation records do not share one training-bundle digest")
+    if len(heldout_bundle_hashes) != 1 or not all(
+        is_sha256(value) for value in heldout_bundle_hashes
+    ):
+        raise ValueError("generation records do not share one held-out-bundle digest")
     if any(
         len(values) != 1
         or not all(is_sha256(value) for value in values)
@@ -272,6 +278,7 @@ def validate_generation_records(
         "missing_record_count": len(missing),
         "design_sha256": next(iter(design_hashes)),
         "training_bundle_manifest_sha256": next(iter(training_bundle_hashes)),
+        "heldout_bundle_manifest_sha256": next(iter(heldout_bundle_hashes)),
     }
 
 
