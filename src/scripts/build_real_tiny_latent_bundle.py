@@ -8,6 +8,12 @@ from pathlib import Path
 import torch
 import yaml
 
+from src.core.hidden_states import SUPPORTED_TOKEN_POSITIONS, select_hidden_vectors
+from src.core.prompt_protocol import (
+    format_prompts,
+    protocol_metadata,
+    tokenizer_add_special_tokens,
+)
 from src.scripts.package_latent_bundle import package_bundle
 from src.scripts.validate_latent_bundle import BundleValidationError, validate_bundle
 
@@ -170,13 +176,14 @@ def make_dry_run_records(num_samples, input_dim, output_dim):
     return records
 
 
-def tokenize_batch(tokenizer, prompts, max_length, device):
+def tokenize_batch(tokenizer, prompts, max_length, device, add_special_tokens=True):
     encoded = tokenizer(
         prompts,
         return_tensors="pt",
         padding=True,
         truncation=True,
         max_length=max_length,
+        add_special_tokens=add_special_tokens,
     )
     return {key: value.to(device) for key, value in encoded.items()}
 
@@ -187,6 +194,7 @@ def build_model_load_kwargs(config, dtype):
     low_cpu_mem_usage = config_bool(extraction_config, "low_cpu_mem_usage", False)
     device_map = normalize_device_map(extraction_config.get("device_map"))
     load_in_4bit = config_bool(extraction_config, "load_in_4bit", False)
+    use_safetensors = config_bool(extraction_config, "use_safetensors", True)
     cache_dir = normalize_cache_dir(extraction_config.get("cache_dir"))
     local_files_only = config_bool(extraction_config, "local_files_only", False)
 
@@ -194,6 +202,7 @@ def build_model_load_kwargs(config, dtype):
         "trust_remote_code": trust_remote_code,
         "low_cpu_mem_usage": low_cpu_mem_usage,
         "local_files_only": local_files_only,
+        "use_safetensors": use_safetensors,
     }
     tokenizer_kwargs = {
         "trust_remote_code": trust_remote_code,
@@ -211,7 +220,10 @@ def build_model_load_kwargs(config, dtype):
         try:
             from transformers import BitsAndBytesConfig
 
-            kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True)
+            kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=dtype,
+            )
         except Exception as exc:
             raise RuntimeError(
                 "load_in_4bit=true requires a transformers version with "
@@ -223,7 +235,16 @@ def build_model_load_kwargs(config, dtype):
     return kwargs, tokenizer_kwargs, device_map, load_in_4bit
 
 
-def extract_hidden_vectors(model_name, prompts, layer_index, expected_dim, config, device, dtype):
+def extract_hidden_vectors(
+    model_name,
+    prompts,
+    layer_index,
+    expected_dim,
+    config,
+    device,
+    dtype,
+    revision=None,
+):
     try:
         from transformers import AutoModelForCausalLM, AutoTokenizer
     except Exception as exc:
@@ -235,17 +256,30 @@ def extract_hidden_vectors(model_name, prompts, layer_index, expected_dim, confi
     extraction_config = get_nested(config, "extraction")
     max_length = positive_int(extraction_config.get("max_length"), "extraction.max_length")
     batch_size = positive_int(extraction_config.get("batch_size"), "extraction.batch_size")
-    token_position = extraction_config.get("token_position", "last")
-    if token_position != "last":
-        raise ValueError("only token_position=last is supported")
+    token_position = extraction_config.get("token_position", "last_non_padding")
+    if token_position not in SUPPORTED_TOKEN_POSITIONS:
+        allowed = ", ".join(sorted(SUPPORTED_TOKEN_POSITIONS))
+        raise ValueError(f"extraction.token_position must be one of: {allowed}")
     model_kwargs, tokenizer_kwargs, device_map, load_in_4bit = build_model_load_kwargs(
         config,
         dtype,
     )
+    if revision is not None:
+        model_kwargs["revision"] = revision
+        tokenizer_kwargs["revision"] = revision
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, **tokenizer_kwargs)
+    tokenizer_revision = getattr(tokenizer, "init_kwargs", {}).get("_commit_hash")
+    if revision is None and tokenizer_revision:
+        model_kwargs["revision"] = tokenizer_revision
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    formatted_prompts = format_prompts(
+        prompts,
+        tokenizer,
+        config.get("prompt_protocol"),
+    )
+    add_special_tokens = tokenizer_add_special_tokens(config.get("prompt_protocol"))
 
     try:
         model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
@@ -258,15 +292,32 @@ def extract_hidden_vectors(model_name, prompts, layer_index, expected_dim, confi
             ) from exc
         raise
 
+    resolved_revision = (
+        getattr(getattr(model, "config", None), "_commit_hash", None)
+        or model_kwargs.get("revision")
+        or tokenizer_revision
+    )
+    if tokenizer_revision and resolved_revision and tokenizer_revision != resolved_revision:
+        raise RuntimeError(
+            f"{model_name} tokenizer/model revisions differ: "
+            f"{tokenizer_revision} != {resolved_revision}"
+        )
+
     if device_map is None:
         model.to(device)
     model.eval()
 
     vectors = []
     try:
-        for start in range(0, len(prompts), batch_size):
-            batch_prompts = prompts[start:start + batch_size]
-            inputs = tokenize_batch(tokenizer, batch_prompts, max_length, device)
+        for start in range(0, len(formatted_prompts), batch_size):
+            batch_prompts = formatted_prompts[start:start + batch_size]
+            inputs = tokenize_batch(
+                tokenizer,
+                batch_prompts,
+                max_length,
+                device,
+                add_special_tokens=add_special_tokens,
+            )
             with torch.no_grad():
                 outputs = model(**inputs, output_hidden_states=True, return_dict=True)
 
@@ -275,19 +326,11 @@ def extract_hidden_vectors(model_name, prompts, layer_index, expected_dim, confi
                 raise RuntimeError(f"{model_name} did not return hidden states")
 
             selected = hidden_states[layer_index]
-            attention_mask = inputs.get("attention_mask")
-            if attention_mask is None:
-                token_indices = torch.full(
-                    (selected.shape[0],),
-                    selected.shape[1] - 1,
-                    dtype=torch.long,
-                    device=selected.device,
-                )
-            else:
-                token_indices = attention_mask.sum(dim=1).sub(1).clamp(min=0).long()
-
-            batch_indices = torch.arange(selected.shape[0], device=selected.device)
-            batch_vectors = selected[batch_indices, token_indices].detach().cpu().float()
+            batch_vectors = select_hidden_vectors(
+                selected,
+                inputs.get("attention_mask"),
+                token_position=token_position,
+            ).detach().cpu().float()
             for vector in batch_vectors:
                 squeezed = vector.squeeze()
                 if tuple(squeezed.shape) != (expected_dim,):
@@ -303,18 +346,20 @@ def extract_hidden_vectors(model_name, prompts, layer_index, expected_dim, confi
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    return vectors
+    return vectors, resolved_revision
 
 
 def make_real_records(prompts, input_dim, output_dim, config, device):
     models_config = get_nested(config, "models")
     source_model = get_nested(models_config, "source_model")
     target_model = get_nested(models_config, "target_model")
+    source_revision = models_config.get("source_revision")
+    target_revision = models_config.get("target_revision")
     source_layer = get_nested(config, "extraction", "source_layer")
     target_layer = get_nested(config, "extraction", "target_layer")
     dtype = resolve_dtype(config, device)
 
-    src_vectors = extract_hidden_vectors(
+    src_vectors, resolved_source_revision = extract_hidden_vectors(
         source_model,
         prompts,
         source_layer,
@@ -322,8 +367,9 @@ def make_real_records(prompts, input_dim, output_dim, config, device):
         config,
         device,
         dtype,
+        revision=source_revision,
     )
-    tgt_vectors = extract_hidden_vectors(
+    tgt_vectors, resolved_target_revision = extract_hidden_vectors(
         target_model,
         prompts,
         target_layer,
@@ -331,6 +377,7 @@ def make_real_records(prompts, input_dim, output_dim, config, device):
         config,
         device,
         dtype,
+        revision=target_revision,
     )
     if len(src_vectors) != len(tgt_vectors):
         raise RuntimeError(
@@ -338,10 +385,16 @@ def make_real_records(prompts, input_dim, output_dim, config, device):
             f"target extracted {len(tgt_vectors)} vectors"
         )
 
-    return [
-        {"src_vector": src_vector, "tgt_vector": tgt_vector}
-        for src_vector, tgt_vector in zip(src_vectors, tgt_vectors)
-    ]
+    return (
+        [
+            {"src_vector": src_vector, "tgt_vector": tgt_vector}
+            for src_vector, tgt_vector in zip(src_vectors, tgt_vectors)
+        ],
+        {
+            "source_model_revision": resolved_source_revision,
+            "target_model_revision": resolved_target_revision,
+        },
+    )
 
 
 def write_json(path, payload):
@@ -350,7 +403,15 @@ def write_json(path, payload):
         json.dump(payload, handle, indent=2)
 
 
-def write_bundle(config, records, bundle_dir, output_zip, shard_name, dry_run):
+def write_bundle(
+    config,
+    records,
+    bundle_dir,
+    output_zip,
+    shard_name,
+    dry_run,
+    extraction_metadata=None,
+):
     input_dim = positive_int(get_nested(config, "vectors", "input_dim"), "vectors.input_dim")
     output_dim = positive_int(get_nested(config, "vectors", "output_dim"), "vectors.output_dim")
     if not records:
@@ -378,11 +439,29 @@ def write_bundle(config, records, bundle_dir, output_zip, shard_name, dry_run):
         "license_notes": DEFAULT_LICENSE_NOTES,
         "source_layer": str(source_layer),
         "target_layer": str(target_layer),
+        "token_position": get_nested(config, "extraction", "token_position"),
+        "prompt_protocol": protocol_metadata(config.get("prompt_protocol")),
+        "extraction_mode": "dry_run" if dry_run else "real",
+        "source_quantization": (
+            "bitsandbytes-4bit"
+            if get_nested(config, "extraction", "load_in_4bit")
+            else "none"
+        ),
+        "target_quantization": (
+            "bitsandbytes-4bit"
+            if get_nested(config, "extraction", "load_in_4bit")
+            else "none"
+        ),
+        "quantization_compute_dtype": get_nested(config, "extraction", "dtype"),
+        "use_safetensors": bool(
+            get_nested(config, "extraction").get("use_safetensors", True)
+        ),
+        "max_length": get_nested(config, "extraction", "max_length"),
         "prompt_policy": get_nested(config, "data", "prompt_policy"),
         "extraction_notes": (
             "Dry-run deterministic mock tensors; no Hugging Face models were loaded."
             if dry_run
-            else "Real hidden-state extraction; raw prompts and model text outputs are not stored in shards."
+            else "Real hidden-state extraction under the recorded prompt protocol; prompt text and model outputs are not stored in shards."
         ),
         "shards": [
             {
@@ -392,6 +471,30 @@ def write_bundle(config, records, bundle_dir, output_zip, shard_name, dry_run):
             }
         ],
     }
+    data_config = get_nested(config, "data")
+    for field in (
+        "source_dataset",
+        "source_dataset_config",
+        "source_split",
+        "prompt_field",
+        "sampling_seed",
+        "sampled_ids",
+    ):
+        value = data_config.get(field)
+        if field == "sampled_ids" and isinstance(value, list):
+            value = value[: len(records)]
+        if value is not None:
+            manifest[field] = value
+    sampled_prompts = data_config.get("prompts")
+    if sampled_prompts is not None and data_config.get("sampled_ids") is not None:
+        manifest["sampled_prompt_sha256"] = [
+            hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+            for prompt in sampled_prompts[: len(records)]
+        ]
+    for field in ("source_model_revision", "target_model_revision"):
+        value = (extraction_metadata or {}).get(field)
+        if value:
+            manifest[field] = value
     write_json(bundle_dir / "manifest.json", manifest)
     return bundle_dir / "manifest.json", shard_path
 
@@ -409,9 +512,16 @@ def build_bundle(args):
 
     if args.dry_run:
         records = make_dry_run_records(len(prompts), input_dim, output_dim)
+        extraction_metadata = {}
     else:
         device = resolve_device(config, args.device)
-        records = make_real_records(prompts, input_dim, output_dim, config, device)
+        records, extraction_metadata = make_real_records(
+            prompts,
+            input_dim,
+            output_dim,
+            config,
+            device,
+        )
 
     manifest_path, shard_path = write_bundle(
         config,
@@ -420,6 +530,7 @@ def build_bundle(args):
         output_zip,
         shard_name,
         args.dry_run,
+        extraction_metadata=extraction_metadata,
     )
     package_bundle(bundle_dir / "shards", manifest_path, output_zip)
 

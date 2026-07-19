@@ -1,12 +1,19 @@
 import os
 import sys
-import json
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
-from lip_protocol import LIPPacket
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from src.core.hidden_states import select_hidden_vectors
+from src.core.prompt_protocol import format_prompt, tokenizer_add_special_tokens
+from src.lip_protocol import LIPPacket
 
 DEVICE = "cpu"
+PROMPT_PROTOCOL = {
+    "version": "lip-prompt-v1",
+    "mode": "chat_template",
+    "add_generation_prompt": True,
+    "system_prompt": None,
+}
 ADAPTER_PATH = os.path.join("experiments", "experiments_log", r"20251123_1819_Gen4_Code_Specialist", "final_adapter_gen5.pth")
 
 print(f"🔧 [LIP Integration] Starting Universal Protocol Demo...")
@@ -31,12 +38,12 @@ class LIPSender:
         ).to(DEVICE)
 
         try:
-            state = torch.load(adapter_path, map_location=DEVICE)
+            state = torch.load(adapter_path, map_location=DEVICE, weights_only=True)
             # Mapping HeteroAdapter (named layers) to Sequential (indexed layers) if necessary
             # Ideally, define the class structure identically.
             try:
                 self.adapter.load_state_dict(state)
-            except:
+            except RuntimeError:
                 # Quick fix for structure mismatch between class and sequential
                 from collections import OrderedDict
                 new_state = OrderedDict()
@@ -52,15 +59,24 @@ class LIPSender:
 
             print("✅ Adapter Loaded on Client.")
         except Exception as e:
-            print(f"❌ Error loading adapter: {e}")
-            print("⚠️ Using random weights (Demo flow check only).")
+            raise RuntimeError(f"could not safely load demo adapter: {e}") from e
 
 
     def create_packet(self, prompt):
         print(f"   Thinking: '{prompt}'...")
         with torch.no_grad():
-            inp = self.tokenizer(prompt, return_tensors="pt").to(DEVICE)
-            vec_src = self.model(**inp, output_hidden_states=True).hidden_states[-1][:, -1, :].to(torch.float32)
+            formatted = format_prompt(prompt, self.tokenizer, PROMPT_PROTOCOL)
+            inp = self.tokenizer(
+                formatted,
+                return_tensors="pt",
+                add_special_tokens=tokenizer_add_special_tokens(PROMPT_PROTOCOL),
+            ).to(DEVICE)
+            outputs = self.model(**inp, output_hidden_states=True)
+            vec_src = select_hidden_vectors(
+                outputs.hidden_states[-1],
+                inp.get("attention_mask"),
+                token_position="last_non_padding",
+            ).to(torch.float32)
             vec_trans = self.adapter(vec_src)
             packet = LIPPacket(vec_trans, source_model="TinyLlama+AdapterV1", intent="code")
             return packet.to_json()

@@ -5,6 +5,9 @@ from pathlib import Path, PurePosixPath
 
 import torch
 
+from src.core.hidden_states import SUPPORTED_TOKEN_POSITIONS
+from src.core.prompt_protocol import parse_prompt_protocol
+
 
 REQUIRED_MANIFEST_FIELDS = {
     "bundle_format",
@@ -34,6 +37,17 @@ OPTIONAL_STRING_FIELDS = {
     "source_layer",
     "target_layer",
     "prompt_policy",
+    "token_position",
+    "extraction_mode",
+    "source_quantization",
+    "target_quantization",
+    "quantization_compute_dtype",
+    "source_model_revision",
+    "target_model_revision",
+    "source_dataset",
+    "source_dataset_config",
+    "source_split",
+    "prompt_field",
 }
 EXPECTED_BUNDLE_FORMAT = "lip_latent_bundle"
 EXPECTED_SCHEMA_VERSION = 1
@@ -78,6 +92,81 @@ def read_manifest(bundle_dir):
     for field in OPTIONAL_STRING_FIELDS:
         if field in manifest and not isinstance(manifest[field], str):
             fail(f"{field} must be a string when provided")
+
+    prompt_protocol = manifest.get("prompt_protocol")
+    if prompt_protocol is not None:
+        try:
+            parse_prompt_protocol(prompt_protocol)
+        except (TypeError, ValueError) as exc:
+            fail(f"invalid prompt_protocol: {exc}")
+
+    token_position = manifest.get("token_position")
+    if token_position is not None and token_position not in SUPPORTED_TOKEN_POSITIONS:
+        fail(
+            "token_position must be one of: "
+            + ", ".join(sorted(SUPPORTED_TOKEN_POSITIONS))
+        )
+
+    extraction_mode = manifest.get("extraction_mode")
+    if extraction_mode is not None and extraction_mode not in {"real", "dry_run"}:
+        fail("extraction_mode must be real or dry_run when provided")
+
+    for field in ("source_quantization", "target_quantization"):
+        value = manifest.get(field)
+        if value is not None and value not in {"none", "bitsandbytes-4bit"}:
+            fail(f"{field} must be none or bitsandbytes-4bit when provided")
+
+    compute_dtype = manifest.get("quantization_compute_dtype")
+    if compute_dtype is not None and compute_dtype not in {
+        "auto",
+        "float16",
+        "bfloat16",
+        "float32",
+    }:
+        fail("quantization_compute_dtype is invalid")
+
+    if "use_safetensors" in manifest and not isinstance(
+        manifest["use_safetensors"],
+        bool,
+    ):
+        fail("use_safetensors must be a boolean when provided")
+
+    if "max_length" in manifest and (
+        not isinstance(manifest["max_length"], int) or manifest["max_length"] <= 0
+    ):
+        fail("max_length must be a positive integer when provided")
+
+    if "sampling_seed" in manifest and not isinstance(manifest["sampling_seed"], int):
+        fail("sampling_seed must be an integer when provided")
+
+    if "sampled_ids" in manifest:
+        sampled_ids = manifest["sampled_ids"]
+        if (
+            not isinstance(sampled_ids, list)
+            or any(not isinstance(item, str) or not item for item in sampled_ids)
+        ):
+            fail("sampled_ids must be a list of non-empty strings when provided")
+        if len(sampled_ids) != len(set(sampled_ids)):
+            fail("sampled_ids must not contain duplicates")
+        if len(sampled_ids) != manifest["num_samples"]:
+            fail("sampled_ids length must match num_samples")
+
+    if "sampled_prompt_sha256" in manifest:
+        prompt_hashes = manifest["sampled_prompt_sha256"]
+        if (
+            not isinstance(prompt_hashes, list)
+            or any(
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(character not in "0123456789abcdef" for character in value.lower())
+                for value in prompt_hashes
+            )
+        ):
+            fail("sampled_prompt_sha256 must contain SHA-256 hex digests")
+        if len(prompt_hashes) != manifest["num_samples"]:
+            fail("sampled_prompt_sha256 length must match num_samples")
+        if "sampled_ids" not in manifest:
+            fail("sampled_prompt_sha256 requires sampled_ids")
 
     for field in ("input_dim", "output_dim", "num_samples"):
         if not isinstance(manifest[field], int) or manifest[field] <= 0:

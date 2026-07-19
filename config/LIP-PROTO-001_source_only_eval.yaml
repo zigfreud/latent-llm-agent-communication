@@ -1,0 +1,93 @@
+experiment_id: "LIP-PROTO-001"
+
+models:
+  source_model: "deepseek-ai/deepseek-coder-1.3b-base"
+  target_model: "NousResearch/Meta-Llama-3-8B-Instruct"
+
+prompt_protocol:
+  version: "lip-prompt-v1"
+  mode: "raw"
+  add_generation_prompt: false
+  system_prompt: null
+
+extraction:
+  source_layer: -1
+  target_layer: -2
+  token_position: "last_non_padding"
+  max_length: 512
+
+runtime:
+  device_src: "auto"
+  device_tgt: "auto"
+  device_adapter: "auto"
+  source_load_4bit: true
+  load_4bit: true
+  quantization_compute_dtype: "float16"
+
+adapter:
+  input_dim: 2048
+  hidden_dim: 1024
+  output_dim: 4096
+  training_bundle_manifest: "datasets/LIP-PROTO-001/mbpp_train_bundle_64/manifest.json"
+  training_bundle_trace_id: "LIP-PROTO-001-DATA-TRAIN"
+  checkpoints:
+    - training_seed: 41
+      path: "runs/LIP-PROTO-001/training/seed-41/best_model.pth"
+    - training_seed: 42
+      path: "runs/LIP-PROTO-001/training/seed-42/best_model.pth"
+    - training_seed: 43
+      path: "runs/LIP-PROTO-001/training/seed-43/best_model.pth"
+
+lip:
+  layer_idx: -2
+  inject_pos_mode: "last_non_padding"
+  injection_mode: "replace"
+  vector_scaling: "none"
+  gain: 1.0
+
+data:
+  tasks_jsonl: "datasets/LIP-PROTO-001/mbpp_validation_tasks.jsonl"
+  heldout_bundle_manifest: "datasets/LIP-PROTO-001/mbpp_eval_bundle_32/manifest.json"
+  heldout_bundle_trace_id: "LIP-PROTO-001-DATA-EVAL"
+  dataset_name: "google-research-datasets/mbpp"
+  dataset_config: "full"
+  split: "validation"
+  prompt_field: "text"
+  task_count: 32
+  sampling_seed: 42
+  max_prompt_chars: 512
+
+neutral_target_prompt: "Implement the requested Python function. Return only Python code."
+
+conditions:
+  - "neutral_no_lip"
+  - "text_only_no_lip"
+  - "source_latent"
+  - "shuffled_source_latent"
+  - "random_norm_matched"
+  - "oracle_target_latent"
+
+generation:
+  seeds: [101, 202, 303]
+  max_new_tokens: 256
+  do_sample: true
+  temperature: 0.2
+  top_p: 0.95
+  repetition_penalty: 1.0
+
+evaluation:
+  timeout_seconds: 5.0
+  memory_mb: 512
+  confidence: 0.95
+  bootstrap_iterations: 10000
+  statistics_seed: 1729
+  comparisons:
+    - ["text_only_no_lip", "neutral_no_lip"]
+    - ["oracle_target_latent", "neutral_no_lip"]
+    - ["source_latent", "neutral_no_lip"]
+    - ["source_latent", "shuffled_source_latent"]
+    - ["source_latent", "random_norm_matched"]
+
+output:
+  generations_jsonl: "runs/LIP-PROTO-001/generations.jsonl"
+  evaluation_dir: "runs/LIP-PROTO-001/evaluation"

@@ -1,0 +1,136 @@
+name: LIP-PROTO-001 Source-Only Protocol
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/LIP-PROTO-001_source_only_protocol.yml"
+      - "config/LIP-PROTO-001_*.yaml"
+      - "docs/LIP-PROTO-001_source_only_evaluation.md"
+      - "requirements.txt"
+      - "requirements-protocol.txt"
+      - "requirements-protocol-cpu.txt"
+      - "src/core/hidden_states.py"
+      - "src/core/prompt_protocol.py"
+      - "src/core/utils.py"
+      - "src/evaluation/**"
+      - "src/pipelines/data_factory.py"
+      - "src/pipelines/infer.py"
+      - "src/pipelines/trainer.py"
+      - "src/integrations/hooks.py"
+      - "src/lip_integration.py"
+      - "src/scripts/build_real_tiny_latent_bundle.py"
+      - "src/scripts/evaluate_source_only_semantics.py"
+      - "src/scripts/eval_syntax_pass1.py"
+      - "src/scripts/materialize_mbpp_prompt_configs.py"
+      - "src/scripts/run_multiseed_training.py"
+      - "src/scripts/run_source_only_probe.py"
+      - "src/scripts/validate_latent_bundle.py"
+      - "tests/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+          python -m pip install PyYAML numpy pytest transformers
+
+      - name: Compile source and tests
+        run: python -m compileall -q src tests
+
+      - name: Import experiment entry points
+        run: |
+          python -c "import src.scripts.run_source_only_probe"
+          python -c "import src.scripts.evaluate_source_only_semantics"
+          python -c "import src.scripts.run_multiseed_training"
+
+      - name: Run protocol and integration tests
+        run: |
+          python -m pytest -q \
+            tests/test_prompt_protocol.py \
+            tests/test_hidden_states.py \
+            tests/test_hooks.py \
+            tests/test_source_only_protocol.py \
+            tests/test_source_only_runtime.py \
+            tests/test_statistics.py \
+            tests/test_semantics.py \
+            tests/test_source_only_config.py \
+            tests/test_source_only_evaluator_protocol.py \
+            tests/test_multiseed_training.py \
+            tests/test_integration.py \
+            tests/test_loss.py
+
+      - name: Materialize and validate protocol bundle metadata
+        run: |
+          python -m src.scripts.materialize_mbpp_prompt_configs \
+            --config config/LIP-PROTO-001_mbpp_sampling.yaml \
+            --mock-data
+
+          python -m src.scripts.build_real_tiny_latent_bundle \
+            --config datasets/LIP-PROTO-001/generated_configs/LIP-PROTO-001_train_mbpp_64.yaml \
+            --dry-run \
+            --max-samples 2
+
+          python -m src.scripts.build_real_tiny_latent_bundle \
+            --config datasets/LIP-PROTO-001/generated_configs/LIP-PROTO-001_eval_mbpp_32.yaml \
+            --dry-run \
+            --max-samples 2
+
+          python -m src.scripts.validate_latent_bundle \
+            --bundle-dir datasets/LIP-PROTO-001/mbpp_train_bundle_64
+
+          python -m src.scripts.validate_latent_bundle \
+            --bundle-dir datasets/LIP-PROTO-001/mbpp_eval_bundle_32
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          train_manifest = json.loads(
+              Path("datasets/LIP-PROTO-001/mbpp_train_bundle_64/manifest.json")
+              .read_text(encoding="utf-8")
+          )
+          eval_manifest = json.loads(
+              Path("datasets/LIP-PROTO-001/mbpp_eval_bundle_32/manifest.json")
+              .read_text(encoding="utf-8")
+          )
+          tasks = [
+              json.loads(line)
+              for line in Path("datasets/LIP-PROTO-001/mbpp_validation_tasks.jsonl")
+              .read_text(encoding="utf-8")
+              .splitlines()
+          ]
+          assert train_manifest["trace_id"] == "LIP-PROTO-001-DATA-TRAIN"
+          assert eval_manifest["trace_id"] == "LIP-PROTO-001-DATA-EVAL"
+          for manifest in (train_manifest, eval_manifest):
+              assert manifest["target_layer"] == "-2"
+              assert manifest["token_position"] == "last_non_padding"
+              assert manifest["prompt_protocol"]["version"] == "lip-prompt-v1"
+              assert manifest["extraction_mode"] == "dry_run"
+              assert manifest["source_quantization"] == "bitsandbytes-4bit"
+              assert manifest["target_quantization"] == "bitsandbytes-4bit"
+              assert manifest["quantization_compute_dtype"] == "float16"
+              assert manifest["use_safetensors"] is True
+              assert manifest["max_length"] == 512
+              assert len(manifest["sampled_ids"]) == 2
+              assert len(manifest["sampled_prompt_sha256"]) == 2
+          assert len(tasks) == 32
+          PY

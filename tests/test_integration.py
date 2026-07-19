@@ -10,7 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
-from src.pipelines.trainer import ShardDataset, load_sharded_dataset
+from src.pipelines.trainer import ShardDataset, apply_overrides, load_sharded_dataset
 from src.core.models import LIPAdapter
 from src.core.loss import HybridContrastiveLoss
 
@@ -84,3 +84,8 @@ def test_inference_output_shape_after_minimal_training(shard_dir):
     with torch.no_grad():
         inference_out = model(torch.randn(1, 2048))
     assert inference_out.shape == (1, 4096)
+
+
+def test_training_seed_override_is_explicit():
+    cfg = {"experiment_id": "test", "training": {}}
+    assert apply_overrides(cfg, seed=73)["seed"] == 73

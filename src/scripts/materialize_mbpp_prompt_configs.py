@@ -1,4 +1,5 @@
 import argparse
+import json
 import random
 from pathlib import Path
 
@@ -137,8 +138,26 @@ def normalize_row(row, prompt_field, max_prompt_chars, fallback_id):
     if len(prompt) > max_prompt_chars:
         return None
 
-    sample_id = row.get("task_id", fallback_id)
-    return {"id": str(sample_id), "prompt": prompt}
+    sample_id = str(row.get("task_id", fallback_id))
+    tests = row.get("test_list", row.get("tests", []))
+    if isinstance(tests, str):
+        tests = [tests]
+    if not isinstance(tests, list) or any(not isinstance(test, str) for test in tests):
+        raise ValueError(f"task {sample_id!r} tests must be text or a list of text")
+    entry_point = row.get("entry_point")
+    if entry_point is not None and not isinstance(entry_point, str):
+        entry_point = str(entry_point)
+    return {
+        "id": sample_id,
+        "prompt": prompt,
+        "task": {
+            "task_id": sample_id,
+            "prompt": prompt,
+            "test_list": tests,
+            "test_setup_code": str(row.get("test_setup_code", "") or ""),
+            "entry_point": entry_point,
+        },
+    }
 
 
 def sample_prompts(rows, count, seed, prompt_field, max_prompt_chars):
@@ -178,19 +197,26 @@ def build_bundle_config(
             "source_model": "deepseek-ai/deepseek-coder-1.3b-base",
             "target_model": "NousResearch/Meta-Llama-3-8B-Instruct",
         },
+        "prompt_protocol": {
+            "version": "lip-prompt-v1",
+            "mode": "raw",
+            "add_generation_prompt": False,
+            "system_prompt": None,
+        },
         "extraction": {
             "device": "auto",
             "source_layer": -1,
-            "target_layer": -1,
-            "token_position": "last",
-            "max_length": 256,
+            "target_layer": int(sampling_config.get("target_layer", -1)),
+            "token_position": "last_non_padding",
+            "max_length": int(sampling_config.get("max_length", 256)),
             "batch_size": 1,
-            "dtype": "auto",
+            "dtype": str(sampling_config.get("dtype", "auto")),
             "trust_remote_code": True,
             "sequential_model_loading": True,
             "low_cpu_mem_usage": True,
             "device_map": "auto",
             "load_in_4bit": True,
+            "use_safetensors": True,
             "cache_dir": None,
             "local_files_only": False,
         },
@@ -294,6 +320,13 @@ def write_yaml(path, payload):
         yaml.safe_dump(payload, handle, sort_keys=False, allow_unicode=False)
 
 
+def write_jsonl(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
 def materialize_configs(config_path, output_dir_override=None, mock_data=False):
     config = load_yaml(config_path)
     train_split = required_string(config, "train_split")
@@ -357,6 +390,13 @@ def materialize_configs(config_path, output_dir_override=None, mock_data=False):
     eval_path = output_dir / output_settings["eval_config_name"]
     write_yaml(train_path, train_config)
     write_yaml(eval_path, eval_config)
+    tasks_jsonl_value = config.get("tasks_jsonl")
+    tasks_jsonl = None
+    if tasks_jsonl_value is not None:
+        if not isinstance(tasks_jsonl_value, str) or not tasks_jsonl_value.strip():
+            raise ValueError("tasks_jsonl must be a non-empty string when provided")
+        tasks_jsonl = Path(tasks_jsonl_value)
+        write_jsonl(tasks_jsonl, [item["task"] for item in eval_selected])
 
     return {
         "train_config": train_path,
@@ -365,6 +405,7 @@ def materialize_configs(config_path, output_dir_override=None, mock_data=False):
         "eval_count": len(eval_selected),
         "train_ids": sorted(train_ids),
         "eval_ids": sorted(eval_ids),
+        "tasks_jsonl": tasks_jsonl,
         "mock_data": mock_data,
     }
 
@@ -378,6 +419,8 @@ def main():
     print(f"eval_config: {result['eval_config']}")
     print(f"train_prompts: {result['train_count']}")
     print(f"eval_prompts: {result['eval_count']}")
+    if result["tasks_jsonl"] is not None:
+        print(f"tasks_jsonl: {result['tasks_jsonl']}")
     print("train_eval_sampled_ids_disjoint: true")
 
 
