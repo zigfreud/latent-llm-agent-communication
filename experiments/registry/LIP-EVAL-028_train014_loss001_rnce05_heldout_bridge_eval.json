@@ -1,0 +1,127 @@
+{
+  "trace_id": "LIP-EVAL-028",
+  "title": "LIP-LOSS-001 reverse NCE 0.5 MBPP32 held-out bridge evaluation",
+  "recorded_at": "2026-07-02",
+  "evaluation_type": "held_out_latent_space",
+  "training": {
+    "experiment_id": "LIP-TRAIN-014-mbpp64-batch16-steps256-l035-rnce05-margin005-norm01",
+    "run_id": 28617086460,
+    "artifact_id": 8049893862,
+    "artifact_digest": "sha256:987dde166ce79ad3e340951cd0eb83ccbbe8fc6fa79f38eba740e6c2a2501dab"
+  },
+  "evaluation_artifact": {
+    "eval_zip_sha256": "8916c572ea5f5777108f219a1243a0e13ded219d41e96053a48fb71ee2f2294a"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-004-MBPP-EVAL",
+    "dataset_origin": "LIP-DATA-004-MBPP-EVAL MBPP validation prompt sample",
+    "source_dataset": "google-research-datasets/mbpp",
+    "source_dataset_config": "full",
+    "source_split": "validation",
+    "prompt_field": "text",
+    "num_samples": 32,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "7e58a9afcb2733ee3a7110eff757b3ffd47ae0391c526639f13f30714d60ce8e"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 32,
+    "latent_mse_mean": 2.4779837131500244,
+    "latent_rmse_mean": 1.5625848770141602,
+    "cosine_diag_mean": 0.7777100205421448,
+    "cosine_diag_std": 0.05358319729566574,
+    "prediction_norm_mean": 138.9424591064453,
+    "target_norm_mean": 158.02142333984375,
+    "norm_ratio_mean": 0.8792356252670288,
+    "energy_drift_mean": 19.07895851135254,
+    "retrieval_top1": 0.375,
+    "retrieval_topk": {
+      "1": 0.375,
+      "5": 0.71875
+    },
+    "offdiag_cosine_mean": 0.6773086786270142,
+    "diagonal_margin_mean": -0.007421704009175301,
+    "cosine_diag_minus_offdiag": 0.10040134191513062
+  },
+  "comparison_context": {
+    "adjusted_loss001_held_out_reference": "LIP-EVAL-026",
+    "lambda035_held_out_reference": "LIP-EVAL-022",
+    "paired_in_sample_record": "LIP-EVAL-027",
+    "chance_retrieval_top1_for_32_candidates": 0.03125,
+    "chance_retrieval_top5_for_32_candidates": 0.15625
+  },
+  "comparison_against_lip_eval_026": {
+    "latent_mse_mean": {
+      "from": 2.795985221862793,
+      "to": 2.4779837131500244
+    },
+    "cosine_diag_mean": {
+      "from": 0.7421365976333618,
+      "to": 0.7777100205421448
+    },
+    "norm_ratio_mean": {
+      "from": 0.8372302055358887,
+      "to": 0.8792356252670288
+    },
+    "energy_drift_mean": {
+      "from": 25.71828842163086,
+      "to": 19.07895851135254
+    },
+    "retrieval_top1": {
+      "from": 0.375,
+      "to": 0.375
+    },
+    "retrieval_top5": {
+      "from": 0.78125,
+      "to": 0.71875
+    },
+    "diagonal_margin_mean": {
+      "from": -0.007482936605811119,
+      "to": -0.007421704009175301
+    }
+  },
+  "comparison_against_lip_eval_022": {
+    "latent_mse_mean": {
+      "reference": 2.0937340259552,
+      "current": 2.4779837131500244
+    },
+    "norm_ratio_mean": {
+      "reference": 0.9280939102172852,
+      "current": 0.8792356252670288
+    },
+    "energy_drift_mean": {
+      "reference": 11.363945007324219,
+      "current": 19.07895851135254
+    },
+    "retrieval_top5": {
+      "reference": 0.75,
+      "current": 0.71875
+    },
+    "diagonal_margin_mean": {
+      "reference": -0.006803490221500397,
+      "current": -0.007421704009175301
+    }
+  },
+  "interpretation": [
+    "Reducing lambda_reverse_nce from 1.0 to 0.5 improved held-out MSE, cosine diagonal, norm ratio, and energy drift relative to LIP-EVAL-026.",
+    "Held-out retrieval_top1 remained 0.375.",
+    "Held-out top5 decreased from 0.78125 to 0.71875.",
+    "Held-out diagonal_margin_mean improved only slightly and remains negative.",
+    "Compared with the previous lambda_mse=0.35 baseline LIP-EVAL-022, this run still has worse held-out MSE, norm ratio, energy drift, top5, and diagonal margin.",
+    "The result suggests reverse NCE was too strong at 1.0, but the current margin/norm/reverse combination still weakens positive-target geometry.",
+    "This remains latent-space diagnostic evaluation only."
+  ],
+  "known_limitations": [
+    "The held-out evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The diagonal margin remains negative, so pair-level held-out ranking is not robust.",
+    "The result does not establish semantic transfer, model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space diagnostic evaluation only. No semantic transfer, text-level fidelity, model-to-model alignment, generalization, or production readiness claim."
+}
