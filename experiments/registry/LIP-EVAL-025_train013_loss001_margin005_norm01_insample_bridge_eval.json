@@ -1,0 +1,98 @@
+{
+  "trace_id": "LIP-EVAL-025",
+  "title": "LIP-LOSS-001 adjusted margin/norm MBPP64 train-set in-sample bridge evaluation",
+  "recorded_at": "2026-07-02",
+  "evaluation_type": "train_set_in_sample_latent_space",
+  "training": {
+    "experiment_id": "LIP-TRAIN-013-mbpp64-batch16-steps256-l035-rnce1-margin005-norm01",
+    "run_id": 28616101597,
+    "artifact_id": 8049502502,
+    "artifact_digest": "sha256:136313d110ab4103e89f731ad2c5636a5ae70bf6bf237a7895aeb1dd7cfbcff1"
+  },
+  "evaluation_artifact": {
+    "eval_zip_sha256": "a96616738c0304adfa4d9dc1ff91682704a6e833c5d85322aebedf352023ceaa"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-004-MBPP-TRAIN",
+    "dataset_origin": "LIP-DATA-004-MBPP-TRAIN MBPP train prompt sample",
+    "source_dataset": "google-research-datasets/mbpp",
+    "source_dataset_config": "full",
+    "source_split": "train",
+    "prompt_field": "text",
+    "num_samples": 64,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "f1dd527799ad2dd0e99edc253ac71213c9db4db36d9cf6b702e3a6ffc126e811"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 64,
+    "latent_mse_mean": 1.312156319618225,
+    "latent_rmse_mean": 1.138636827468872,
+    "cosine_diag_mean": 0.8860499262809753,
+    "cosine_diag_std": 0.0237271748483181,
+    "prediction_norm_mean": 144.80661010742188,
+    "target_norm_mean": 157.84063720703125,
+    "norm_ratio_mean": 0.9174784421920776,
+    "energy_drift_mean": 13.034022331237793,
+    "retrieval_top1": 0.96875,
+    "retrieval_topk": {
+      "1": 0.96875,
+      "5": 1.0
+    },
+    "offdiag_cosine_mean": 0.5471564531326294,
+    "diagonal_margin_mean": 0.18019123375415802,
+    "cosine_diag_minus_offdiag": 0.33889347314834595
+  },
+  "comparison_context": {
+    "first_loss001_in_sample_reference": "LIP-EVAL-023",
+    "lambda035_in_sample_reference": "LIP-EVAL-021",
+    "paired_held_out_record": "LIP-EVAL-026",
+    "chance_retrieval_top1_for_64_candidates": 0.015625,
+    "chance_retrieval_top5_for_64_candidates": 0.078125
+  },
+  "comparison_against_lip_eval_023": {
+    "latent_mse_mean": {
+      "from": 1.3141343593597412,
+      "to": 1.312156319618225
+    },
+    "cosine_diag_mean": {
+      "from": 0.8857991099357605,
+      "to": 0.8860499262809753
+    },
+    "norm_ratio_mean": {
+      "from": 0.9153322577476501,
+      "to": 0.9174784421920776
+    },
+    "energy_drift_mean": {
+      "from": 13.37309741973877,
+      "to": 13.034022331237793
+    },
+    "retrieval_top1": {
+      "from": 0.96875,
+      "to": 0.96875
+    },
+    "diagonal_margin_mean": {
+      "from": 0.18054300546646118,
+      "to": 0.18019123375415802
+    }
+  },
+  "interpretation": [
+    "Reducing lambda_margin from 0.10 to 0.05 and increasing lambda_norm from 0.05 to 0.10 slightly improved in-sample reconstruction, cosine diagonal, norm ratio, and energy drift relative to LIP-EVAL-023.",
+    "In-sample retrieval_top1 remained 0.96875 and retrieval_top5 remained 1.0.",
+    "In-sample diagonal margin changed only slightly and remained strongly positive.",
+    "The adjusted weighting is marginally better than the first LIP-LOSS-001 weighting on calibration, but remains a latent-space diagnostic only."
+  ],
+  "known_limitations": [
+    "The evaluation uses the training bundle and is in-sample.",
+    "The evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The result does not establish semantic transfer, model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space diagnostic evaluation only. No semantic transfer, text-level fidelity, model-to-model alignment, generalization, or production readiness claim."
+}

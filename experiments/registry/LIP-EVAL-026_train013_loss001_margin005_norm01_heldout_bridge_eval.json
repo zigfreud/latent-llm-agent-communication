@@ -1,0 +1,104 @@
+{
+  "trace_id": "LIP-EVAL-026",
+  "title": "LIP-LOSS-001 adjusted margin/norm MBPP32 held-out bridge evaluation",
+  "recorded_at": "2026-07-02",
+  "evaluation_type": "held_out_latent_space",
+  "training": {
+    "experiment_id": "LIP-TRAIN-013-mbpp64-batch16-steps256-l035-rnce1-margin005-norm01",
+    "run_id": 28616101597,
+    "artifact_id": 8049502502,
+    "artifact_digest": "sha256:136313d110ab4103e89f731ad2c5636a5ae70bf6bf237a7895aeb1dd7cfbcff1"
+  },
+  "evaluation_artifact": {
+    "eval_zip_sha256": "5ac0bcc00c0d7034bb2e67fd76a9560c27651020144355b695d3439bcfc1f448"
+  },
+  "input_bundle": {
+    "trace_id": "LIP-DATA-004-MBPP-EVAL",
+    "dataset_origin": "LIP-DATA-004-MBPP-EVAL MBPP validation prompt sample",
+    "source_dataset": "google-research-datasets/mbpp",
+    "source_dataset_config": "full",
+    "source_split": "validation",
+    "prompt_field": "text",
+    "num_samples": 32,
+    "input_dim": 2048,
+    "output_dim": 4096,
+    "shards": [
+      {
+        "path": "shards/shard_0.pt",
+        "sha256": "7e58a9afcb2733ee3a7110eff757b3ffd47ae0391c526639f13f30714d60ce8e"
+      }
+    ]
+  },
+  "validation_status": "passed",
+  "metrics": {
+    "sample_count": 32,
+    "latent_mse_mean": 2.795985221862793,
+    "latent_rmse_mean": 1.6627753973007202,
+    "cosine_diag_mean": 0.7421365976333618,
+    "cosine_diag_std": 0.05557094141840935,
+    "prediction_norm_mean": 132.30313110351562,
+    "target_norm_mean": 158.02142333984375,
+    "norm_ratio_mean": 0.8372302055358887,
+    "energy_drift_mean": 25.71828842163086,
+    "retrieval_top1": 0.375,
+    "retrieval_topk": {
+      "1": 0.375,
+      "5": 0.78125
+    },
+    "offdiag_cosine_mean": 0.6368019580841064,
+    "diagonal_margin_mean": -0.007482936605811119,
+    "cosine_diag_minus_offdiag": 0.10533463954925537
+  },
+  "comparison_context": {
+    "first_loss001_held_out_reference": "LIP-EVAL-024",
+    "lambda035_held_out_reference": "LIP-EVAL-022",
+    "paired_in_sample_record": "LIP-EVAL-025",
+    "chance_retrieval_top1_for_32_candidates": 0.03125,
+    "chance_retrieval_top5_for_32_candidates": 0.15625
+  },
+  "comparison_against_lip_eval_024": {
+    "retrieval_top1": {
+      "from": 0.34375,
+      "to": 0.375
+    },
+    "retrieval_top5": {
+      "from": 0.78125,
+      "to": 0.78125
+    },
+    "diagonal_margin_mean": {
+      "from": -0.0078982412815094,
+      "to": -0.007482936605811119
+    },
+    "norm_ratio_mean": {
+      "from": 0.8351871371269226,
+      "to": 0.8372302055358887
+    },
+    "energy_drift_mean": {
+      "from": 26.04084014892578,
+      "to": 25.71828842163086
+    },
+    "latent_mse_mean": {
+      "from": 2.776270627975464,
+      "to": 2.795985221862793
+    },
+    "cosine_diag_mean": {
+      "from": 0.7438757419586182,
+      "to": 0.7421365976333618
+    }
+  },
+  "interpretation": [
+    "Reducing lambda_margin from 0.10 to 0.05 and increasing lambda_norm from 0.05 to 0.10 improved held-out retrieval_top1 from 0.34375 to 0.375 relative to LIP-EVAL-024.",
+    "Held-out top5 remained 0.78125.",
+    "Held-out diagonal margin, norm ratio, and energy drift improved slightly, while held-out MSE and cosine diagonal worsened slightly.",
+    "The adjusted weighting is marginally better than the first LIP-LOSS-001 weighting, but still does not beat the lambda_mse=0.35 baseline on reconstruction or norm calibration.",
+    "Held-out diagonal margin remains negative, so pair-level held-out ranking is not robust.",
+    "This remains latent-space diagnostic evaluation only."
+  ],
+  "known_limitations": [
+    "The held-out evaluation is latent-space only and does not evaluate text-level semantic fidelity.",
+    "The diagonal margin remains negative, so pair-level held-out ranking is not robust.",
+    "The result does not establish semantic transfer, model-to-model alignment, generalization, or production readiness."
+  ],
+  "data_policy": "No generated eval outputs, checkpoints, shards, bundles, datasets, zips, caches, or run artifacts are committed.",
+  "scientific_claim_status": "Latent-space diagnostic evaluation only. No semantic transfer, text-level fidelity, model-to-model alignment, generalization, or production readiness claim."
+}
