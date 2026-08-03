@@ -7,7 +7,9 @@ on:
     paths:
       - ".github/workflows/LIP-PROTO-002_oracle_transport.yml"
       - "config/LIP-PROTO-002_oracle_transport.yaml"
+      - "config/LIP-PROTO-003_length_controlled_oracle.yaml"
       - "docs/LIP-PROTO-002_oracle_transport_audit.md"
+      - "docs/LIP-PROTO-003_length_controlled_oracle.md"
       - "requirements-protocol.txt"
       - "src/core/prompt_protocol.py"
       - "src/core/utils.py"
@@ -54,6 +56,7 @@ jobs:
       - name: Validate frozen audit configuration
         run: |
           python -c "import yaml; from src.scripts.run_oracle_transport_audit import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-002_oracle_transport.yaml')))"
+          python -c "import yaml; from src.scripts.run_oracle_transport_audit import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-003_length_controlled_oracle.yaml')))"
 
       - name: Run oracle transport tests
         run: python -m pytest -q tests/test_oracle_transport.py tests/test_hooks.py tests/test_prompt_protocol.py

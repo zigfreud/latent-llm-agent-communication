@@ -29,7 +29,10 @@ from src.pipelines.infer import load_target, model_input_device
 
 
 DEFAULT_CONFIG = Path("config/LIP-PROTO-002_oracle_transport.yaml")
-DEFAULT_PREFLIGHT_DIR = Path("runs/LIP-PROTO-002/preflight")
+EXPERIMENT_CARRIER_MODES = {
+    "LIP-PROTO-002": "native",
+    "LIP-PROTO-003": "left_pad_masked_to_task_length",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -101,14 +104,17 @@ def validate_config(config: Mapping[str, Any]) -> None:
         "runtime",
         "data",
         "neutral_target_prompt",
+        "carrier",
         "audit",
         "output",
     }
     unknown = sorted(set(config).difference(expected_top_level))
     if unknown:
         raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
-    if config.get("experiment_id") != "LIP-PROTO-002":
-        raise ValueError("experiment_id must be LIP-PROTO-002")
+    experiment_id = str(config.get("experiment_id", ""))
+    if experiment_id not in EXPERIMENT_CARRIER_MODES:
+        allowed = ", ".join(EXPERIMENT_CARRIER_MODES)
+        raise ValueError(f"experiment_id must be one of: {allowed}")
     if config.get("source_protocol_experiment") != "LIP-PROTO-001":
         raise ValueError("source_protocol_experiment must bind LIP-PROTO-001")
 
@@ -119,6 +125,14 @@ def validate_config(config: Mapping[str, Any]) -> None:
         )
     if not str(config.get("neutral_target_prompt", "")).strip():
         raise ValueError("neutral_target_prompt must be non-empty")
+    carrier = config.get("carrier", {"mode": "native"})
+    if not isinstance(carrier, Mapping):
+        raise ValueError("carrier must be a mapping")
+    expected_carrier = EXPERIMENT_CARRIER_MODES[experiment_id]
+    if carrier.get("mode", "native") != expected_carrier:
+        raise ValueError(
+            f"{experiment_id} requires carrier.mode={expected_carrier}"
+        )
 
     data = config.get("data", {})
     audit = config.get("audit", {})
@@ -236,6 +250,48 @@ def append_reference(inputs: Mapping[str, torch.Tensor], reference_ids: torch.Te
         dim=1,
     )
     return {"input_ids": input_ids, "attention_mask": attention_mask}
+
+
+def build_neutral_carrier(
+    neutral_inputs: Mapping[str, torch.Tensor],
+    *,
+    task_prompt_length: int,
+    pad_token_id: int,
+    mode: str,
+) -> dict[str, torch.Tensor]:
+    """Return the native neutral prompt or a masked, position-matched carrier."""
+
+    input_ids = neutral_inputs["input_ids"]
+    attention_mask = neutral_inputs.get("attention_mask", torch.ones_like(input_ids))
+    if input_ids.ndim != 2 or input_ids.shape[0] != 1:
+        raise ValueError("neutral carrier currently requires one prompt")
+    native_length = int(input_ids.shape[1])
+    if mode == "native":
+        return {"input_ids": input_ids, "attention_mask": attention_mask}
+    if mode != "left_pad_masked_to_task_length":
+        raise ValueError(f"unsupported neutral carrier mode: {mode}")
+    if task_prompt_length < native_length:
+        raise ValueError(
+            "task prompt is shorter than the native neutral prompt; cannot left-pad"
+        )
+    padding = task_prompt_length - native_length
+    if padding == 0:
+        return {"input_ids": input_ids, "attention_mask": attention_mask}
+    pad_ids = torch.full(
+        (1, padding),
+        int(pad_token_id),
+        dtype=input_ids.dtype,
+        device=input_ids.device,
+    )
+    pad_mask = torch.zeros(
+        (1, padding),
+        dtype=attention_mask.dtype,
+        device=attention_mask.device,
+    )
+    return {
+        "input_ids": torch.cat((pad_ids, input_ids), dim=1),
+        "attention_mask": torch.cat((pad_mask, attention_mask), dim=1),
+    }
 
 
 def forward_with_optional_replacement(
@@ -357,6 +413,7 @@ def run_audit(
 
     prepare_output_dir(output_dir, overwrite=overwrite)
     protocol = protocol_metadata(config.get("prompt_protocol"))
+    carrier_mode = str(config.get("carrier", {}).get("mode", "native"))
     runtime = config["runtime"]
     audit = config["audit"]
     target_revision = str(manifest["target_model_revision"])
@@ -389,7 +446,14 @@ def run_audit(
             task["prompt"], tokenizer, protocol, device
         )
         task_prompt_length = int(task_inputs["input_ids"].shape[1])
-        neutral_prompt_length = int(neutral_inputs["input_ids"].shape[1])
+        native_neutral_prompt_length = int(neutral_inputs["input_ids"].shape[1])
+        task_neutral_inputs = build_neutral_carrier(
+            neutral_inputs,
+            task_prompt_length=task_prompt_length,
+            pad_token_id=tokenizer.pad_token_id,
+            mode=carrier_mode,
+        )
+        neutral_prompt_length = int(task_neutral_inputs["input_ids"].shape[1])
         with torch.inference_mode():
             generated = model.generate(
                 **task_inputs,
@@ -416,7 +480,7 @@ def run_audit(
         )
 
         task_teacher_inputs = append_reference(task_inputs, reference_ids)
-        neutral_teacher_inputs = append_reference(neutral_inputs, reference_ids)
+        neutral_teacher_inputs = append_reference(task_neutral_inputs, reference_ids)
         task_outputs, oracle_vectors = forward_with_layer_capture(
             model,
             task_teacher_inputs,
@@ -488,8 +552,10 @@ def run_audit(
                     ),
                     "layer_idx": layer,
                     "injection_mode": "replace",
+                    "carrier_mode": carrier_mode,
                     "injection_position": "last_non_padding_generation_boundary",
                     "task_prompt_token_count": task_prompt_length,
+                    "native_neutral_prompt_token_count": native_neutral_prompt_length,
                     "neutral_prompt_token_count": neutral_prompt_length,
                     "reference_token_count": int(reference_ids.numel()),
                     "task_nll": task_metrics["nll"],
@@ -538,11 +604,18 @@ def run_audit(
             "target_model_revision": target_revision,
             "prompt_protocol": protocol,
             "injection_mode": "replace",
+            "carrier": {
+                "mode": carrier_mode,
+                "pad_token_id": tokenizer.pad_token_id,
+                "padding_attention": (
+                    "masked" if carrier_mode != "native" else "not_applicable"
+                ),
+            },
             "reference_generation": {
                 "do_sample": False,
                 "max_new_tokens": int(audit["reference_max_new_tokens"]),
             },
-            "position_confounded_by_prompt_length": True,
+            "position_confounded_by_prompt_length": carrier_mode == "native",
         }
     )
 
@@ -568,7 +641,7 @@ def main() -> None:
     if args.output_dir is not None:
         output_dir = args.output_dir
     elif args.preflight:
-        output_dir = DEFAULT_PREFLIGHT_DIR
+        output_dir = Path(str(config.get("output", {}).get("directory"))).parent / "preflight"
     else:
         output_dir = Path(str(config.get("output", {}).get("directory")))
     run_audit(

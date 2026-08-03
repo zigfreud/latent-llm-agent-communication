@@ -12,6 +12,7 @@ from src.evaluation.oracle_transport import (
 )
 from src.scripts.run_oracle_transport_audit import (
     bind_tasks_to_manifest,
+    build_neutral_carrier,
     forward_with_layer_capture,
     validate_config,
 )
@@ -227,3 +228,28 @@ def test_layer_capture_reads_module_output_before_model_postprocessing():
     assert captured[-2].item() == 4.0
     assert captured[-1].item() == 6.0
     assert outputs.logits[0, 2, 0].item() == 60.0
+
+
+def test_masked_left_padding_matches_task_length_without_visible_tokens():
+    neutral = {
+        "input_ids": torch.tensor([[7, 8, 9]]),
+        "attention_mask": torch.ones(1, 3, dtype=torch.long),
+    }
+    carrier = build_neutral_carrier(
+        neutral,
+        task_prompt_length=5,
+        pad_token_id=0,
+        mode="left_pad_masked_to_task_length",
+    )
+    assert carrier["input_ids"].tolist() == [[0, 0, 7, 8, 9]]
+    assert carrier["attention_mask"].tolist() == [[0, 0, 1, 1, 1]]
+
+
+def test_length_controlled_experiment_requires_masked_carrier():
+    config = protocol_config()
+    config["experiment_id"] = "LIP-PROTO-003"
+    config["carrier"] = {"mode": "left_pad_masked_to_task_length"}
+    validate_config(config)
+    config["carrier"]["mode"] = "native"
+    with pytest.raises(ValueError, match="requires carrier.mode"):
+        validate_config(config)
