@@ -56,6 +56,9 @@ def test_design_fingerprint_changes_with_generation_or_packet_contract():
     changed = copy.deepcopy(config)
     changed["generation"]["temperature"] = 0.3
     assert design_fingerprint(changed) != baseline
+    changed = copy.deepcopy(config)
+    changed["packet"]["layer_idx"] = -8
+    assert design_fingerprint(changed) != baseline
 
 
 def test_entry_point_metric_requires_an_actual_function_declaration():
@@ -65,9 +68,6 @@ def test_entry_point_metric_requires_an_actual_function_declaration():
     assert declares_entry_point("def solve(:\n    pass", "solve") is False
     with pytest.raises(ValueError, match="entry_point"):
         declares_entry_point("def solve():\n    pass", None)
-    changed = copy.deepcopy(config)
-    changed["packet"]["layer_idx"] = -8
-    assert design_fingerprint(changed) != baseline
 
 
 def test_generate_with_packet_replaces_prompt_prefill_once():
