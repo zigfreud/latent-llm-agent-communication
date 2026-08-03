@@ -11,6 +11,12 @@ def test_extract_code_handles_python_fence():
     assert check_syntax(extract_code(text))["syntax_pass"] is True
 
 
+def test_extract_code_handles_unclosed_python_fence():
+    text = "```\ndef add(a, b):\n    return a + b"
+    assert extract_code(text) == "def add(a, b):\n    return a + b"
+    assert check_syntax(extract_code(text))["syntax_pass"] is True
+
+
 def test_syntax_failure_is_recorded_without_execution():
     result = evaluate_generation(
         {"task_id": "x", "condition": "source_latent", "output_text": "def broken("},

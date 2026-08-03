@@ -14,6 +14,10 @@ FENCED_CODE = re.compile(
     r"```(?:python|py)?\s*\n?(.*?)```",
     re.DOTALL | re.IGNORECASE,
 )
+OPEN_FENCED_CODE = re.compile(
+    r"```(?:python|py)?[^\S\r\n]*\r?\n?(.*)\Z",
+    re.DOTALL | re.IGNORECASE,
+)
 
 
 SUBPROCESS_RUNNER = r"""
@@ -50,7 +54,14 @@ def extract_code(text: str) -> str:
     if not isinstance(text, str):
         raise TypeError("generated output must be text")
     match = FENCED_CODE.search(text)
-    return (match.group(1) if match else text).strip()
+    if match:
+        return match.group(1).strip()
+    # A model may hit max_new_tokens after opening a Markdown fence but before
+    # emitting the closing fence.  Treat the remainder as code so that
+    # presentation syntax does not turn an otherwise valid candidate into a
+    # Python SyntaxError.
+    open_match = OPEN_FENCED_CODE.search(text)
+    return (open_match.group(1) if open_match else text).strip()
 
 
 def check_syntax(code: str) -> dict[str, Any]:
