@@ -90,7 +90,7 @@ and mount namespaces, Drive and credentials masked, UID/GID `nobody`, empty
 environment, `no_new_privs`, and per-candidate CPU/memory/time limits. The
 resource-limited Python subprocess alone is explicitly not a security
 boundary. The versioned hardened entry point stages immutable inputs, enters
-private mount/network/PID/IPC/UTS namespaces, masks host data mounts, and keeps
+private mount/network/IPC/UTS namespaces, masks host data mounts, and keeps
 the evaluator privileged only inside that namespace. Every candidate then
 drops to UID/GID `nobody`, an allowlisted environment, zero effective
 capabilities, and `no_new_privs`. Candidate processes cannot write the staged

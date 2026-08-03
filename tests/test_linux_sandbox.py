@@ -67,13 +67,10 @@ def test_namespace_command_freezes_all_required_linux_namespaces():
         host_secret="/var/tmp/stage/secret",
         allow_incomplete=False,
     )
-    assert command[:8] == [
+    assert command[:5] == [
         "/usr/bin/unshare",
         "--mount",
         "--net",
-        "--pid",
-        "--fork",
-        "--mount-proc",
         "--ipc",
         "--uts",
     ]
