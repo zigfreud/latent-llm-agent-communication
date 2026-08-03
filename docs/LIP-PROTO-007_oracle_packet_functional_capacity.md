@@ -99,4 +99,55 @@ must pass before any generated program executes.
 
 ## Result
 
-Pending frozen execution.
+The complete hardened evaluation was claim-eligible, but the functional gate
+failed. The text control passed 20 of 48 task/seed observations across seven of
+16 tasks. Every latent and neutral condition passed 0 of 48 observations. This
+includes exact same-task target-oracle states at all three registered
+capacities; task shuffling therefore cannot explain the failure.
+
+| Condition | K | Functional passes | Task-clustered mean | 95% task-bootstrap CI |
+|---|---:|---:|---:|---:|
+| Neutral carrier | -- | 0/48 | 0.00% | [0.00%, 0.00%] |
+| Matched target oracle | 8 | 0/48 | 0.00% | [0.00%, 0.00%] |
+| Task-shuffled oracle | 8 | 0/48 | 0.00% | [0.00%, 0.00%] |
+| Matched target oracle | 16 | 0/48 | 0.00% | [0.00%, 0.00%] |
+| Task-shuffled oracle | 16 | 0/48 | 0.00% | [0.00%, 0.00%] |
+| Matched target oracle | 32 | 0/48 | 0.00% | [0.00%, 0.00%] |
+| Task-shuffled oracle | 32 | 0/48 | 0.00% | [0.00%, 0.00%] |
+| Task text | -- | 20/48 | 41.67% | [18.75%, 66.67%] |
+
+All eight registered latent contrasts had mean difference zero, exact
+two-sided `p=1`, and Holm-adjusted `p=1`. The task-text contrast against the
+neutral carrier had mean difference `0.4167`, interval `[0.1875, 0.6667]`,
+exact unadjusted `p=0.015625`, and Holm-adjusted `p=0.140625` across the nine
+registered comparisons. The conservative multiplicity correction affects the
+text-control inference but not the interface diagnosis: there was no latent
+success at the observation or task level.
+
+The failure mode was structural. All 288 matched/shuffled oracle generations
+raised `NameError` except for five `K=16` generations that instead had syntax
+errors. None declared the required entry point. Text generations declared the
+entry point in all 48 cases and passed hidden tests in 20. The syntax-only
+metric was therefore misleadingly high for the latent conditions while the
+callable program contract remained absent.
+
+This result rejects the registered hypothesis that increasing a residual
+suffix packet from `K=8` to `K=16` or `K=32` crosses the free-generation
+decision boundary. It does **not** reject latent communication in general.
+Together with `LIP-PROTO-006`, it identifies a predictive-to-functional gap:
+the exact target-model states recover 69--77% of the task-text advantage over
+the first eight reference tokens, yet this one-layer residual replacement does
+not reliably bootstrap the discrete function identity during autonomous
+decoding. The next oracle protocol should change the carrier to a learned soft
+prefix or a multi-layer KV-cache intervention before any new source-to-target
+bridge training.
+
+Generate the registered comparison figure from the two immutable summaries:
+
+```bash
+python -m src.scripts.plot_oracle_functional_capacity \
+  --position-summary runs/LIP-PROTO-006/oracle-token-position/summary.json \
+  --functional-summary runs/LIP-PROTO-007/functional-evaluation/summary.json
+```
+
+Immutable artifact hashes and the Drive path are recorded after archival.
