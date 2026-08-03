@@ -88,3 +88,12 @@ generation. The next experiment should test whether the missing information is
 outside the selected suffix (larger/full prompt packet) or outside this
 single-layer residual interface (soft prefix or KV-cache transport); it should
 not return directly to bridge training.
+
+Final immutable artifacts are stored at
+`lip-artifacts/LIP-H0-005/LIP-PROTO-005/v2-functional-full-gated` on Drive:
+
+- `generations.jsonl`: `83c55618cc3663dd0d12a57b4ff0c3b01a15b383f84238256f24e600dcbead3d`
+- `generations.metadata.json`: `a5c3fe37e49e016969960b5cbc95435a52af0708eb92e8e398e98454d44daf5f`
+- syntax `evaluation/summary.json`: `4999d3c99cbbdb706943ae02e928ee866be89e580ab49e18ae9ca58a168d6600`
+- functional `functional-evaluation/summary.json`: `bd382da9764a947fe2aecb9679ffa5a02b56d698b107b6ce88a4c0cd44c4c8e1`
+- functional scored records: `826809144508837afbbe318968d62b1473e0a752aad2834dda70f6ad23b7cfe8`
