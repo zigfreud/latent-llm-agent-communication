@@ -25,7 +25,8 @@ def get_device(device_str="auto"):
     try:
         import torch_directml
         if torch_directml.is_available(): return torch_directml.device()
-    except: pass
+    except ImportError:
+        pass
 
     return torch.device("cpu")
 
@@ -40,15 +41,26 @@ def set_seed(seed=42):
 
 
 def setup_logger(output_dir):
-    logging.basicConfig(
-        filename=os.path.join(output_dir, 'experiment.log'),
-        level=logging.INFO,
-        format='%(asctime)s - %(message)s',
-        datefmt='%d-%b-%y %H:%M:%S'
-    )
+    logger_name = f"lip.{os.path.abspath(output_dir)}"
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    if logger.handlers:
+        return logger
 
+    formatter = logging.Formatter(
+        fmt="%(asctime)s - %(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
+    )
+    file_handler = logging.FileHandler(
+        os.path.join(output_dir, "experiment.log"),
+        encoding="utf-8",
+    )
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(formatter)
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
-    logging.getLogger('').addHandler(console)
-
-    return logging.getLogger(__name__)
+    console.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    logger.addHandler(console)
+    return logger

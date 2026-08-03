@@ -7,6 +7,7 @@ sentence-transformers>=2.2.2
 matplotlib
 pandas
 numpy
+PyYAML>=6.0.0
 scipy
 tqdm
-torch-directml
+torch-directml; platform_system == "Windows"

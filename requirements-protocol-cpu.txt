@@ -1,0 +1,3 @@
+# Optional CPU 4-bit backend. Do not install this extra in CUDA/Colab runtimes.
+-r requirements-protocol.txt
+kernels>=0.11.1

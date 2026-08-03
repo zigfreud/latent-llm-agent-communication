@@ -1,10 +1,12 @@
 import argparse
 import csv
 import glob
+import hashlib
 import json
 import math
 import os
 import sys
+from pathlib import Path
 
 import torch
 import torch.optim as optim
@@ -15,6 +17,52 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 from src.core.loss import HybridContrastiveLoss
 from src.core.models import LIPAdapter
 from src.core.utils import get_device, set_seed, setup_logger
+from src.scripts.validate_latent_bundle import read_manifest, validate_bundle
+
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_training_bundle_provenance(cfg):
+    data_config = cfg.get("data", {})
+    if not data_config.get("require_bundle_manifest", False):
+        return None
+    shards_path = os.path.abspath(data_config["dataset_path"])
+    bundle_dir = os.path.dirname(shards_path)
+    manifest_path = os.path.join(bundle_dir, "manifest.json")
+    if not os.path.isfile(manifest_path):
+        raise FileNotFoundError(f"required training manifest not found: {manifest_path}")
+    report = validate_bundle(Path(bundle_dir))
+    manifest = read_manifest(Path(bundle_dir))
+    expected_trace_id = data_config.get("expected_trace_id")
+    if not expected_trace_id:
+        raise ValueError("data.expected_trace_id is required with bundle validation")
+    if report["trace_id"] != expected_trace_id:
+        raise ValueError(
+            f"training bundle trace_id={report['trace_id']} != {expected_trace_id}"
+        )
+    expected_mode = data_config.get("expected_extraction_mode")
+    if expected_mode and manifest.get("extraction_mode") != expected_mode:
+        raise ValueError(
+            f"training bundle extraction_mode={manifest.get('extraction_mode')} "
+            f"!= {expected_mode}"
+        )
+    if report["input_dim"] != int(cfg["model"]["input_dim"]):
+        raise ValueError("training bundle input_dim does not match model.input_dim")
+    if report["output_dim"] != int(cfg["model"]["output_dim"]):
+        raise ValueError("training bundle output_dim does not match model.output_dim")
+    return {
+        "path": manifest_path,
+        "sha256": sha256_file(manifest_path),
+        "trace_id": report["trace_id"],
+        "records": report["total_records"],
+        "extraction_mode": manifest.get("extraction_mode"),
+    }
 
 
 def load_pt_shard(filepath):
@@ -60,7 +108,14 @@ def load_sharded_dataset(directory):
     return ConcatDataset([ShardDataset(f) for f in valid_files])
 
 
-def apply_overrides(cfg, experiment_id=None, output_dir=None, max_steps=None, device=None):
+def apply_overrides(
+    cfg,
+    experiment_id=None,
+    output_dir=None,
+    max_steps=None,
+    device=None,
+    seed=None,
+):
     if experiment_id:
         cfg["experiment_id"] = experiment_id
         cfg["experiment_name"] = experiment_id
@@ -78,6 +133,9 @@ def apply_overrides(cfg, experiment_id=None, output_dir=None, max_steps=None, de
 
     if max_steps is not None:
         cfg.setdefault("training", {})["max_steps"] = max_steps
+
+    if seed is not None:
+        cfg["seed"] = int(seed)
 
     return cfg
 
@@ -158,6 +216,7 @@ def write_run_artifacts(output_dir, cfg, metrics, rows):
     metrics_path = os.path.join(output_dir, "metrics.json")
     log_path = os.path.join(output_dir, "train_log.csv")
     summary_path = os.path.join(output_dir, "run_summary.md")
+    resolved_config_path = os.path.join(output_dir, "resolved_config.yaml")
 
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
@@ -167,6 +226,9 @@ def write_run_artifacts(output_dir, cfg, metrics, rows):
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+    with open(resolved_config_path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(cfg, f, sort_keys=False)
 
     best_loss = metrics["best_loss"]
     final_loss = metrics["final_loss"]
@@ -218,15 +280,23 @@ def build_loss(cfg):
     return HybridContrastiveLoss(**kwargs)
 
 
-def train(config_path, experiment_id=None, output_dir=None, max_steps=None, device=None):
+def train(
+    config_path,
+    experiment_id=None,
+    output_dir=None,
+    max_steps=None,
+    device=None,
+    seed=None,
+):
     with open(config_path, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
-    cfg = apply_overrides(cfg, experiment_id, output_dir, max_steps, device)
+    cfg = apply_overrides(cfg, experiment_id, output_dir, max_steps, device, seed)
 
     os.makedirs(cfg["output_dir"], exist_ok=True)
     logger = setup_logger(cfg["output_dir"])
     device = get_device(cfg.get("device", "auto"))
     set_seed(cfg.get("seed", 42))
+    bundle_provenance = validate_training_bundle_provenance(cfg)
 
     logger.info(f"Starting training: {cfg['experiment_id']}")
     logger.info(f"Device: {device}")
@@ -268,7 +338,7 @@ def train(config_path, experiment_id=None, output_dir=None, max_steps=None, devi
 
     if cfg["training"].get("resume", True) and os.path.exists(ckpt_path):
         logger.info(f"Resuming from {ckpt_path}")
-        checkpoint = torch.load(ckpt_path, map_location=device)
+        checkpoint = torch.load(ckpt_path, map_location=device, weights_only=True)
         model.load_state_dict(checkpoint["model_state"])
         optimizer.load_state_dict(checkpoint["optimizer_state"])
         start_epoch = checkpoint["epoch"] + 1
@@ -366,6 +436,7 @@ def train(config_path, experiment_id=None, output_dir=None, max_steps=None, devi
         "experiment_id": cfg["experiment_id"],
         "output_dir": cfg["output_dir"],
         "device": str(device),
+        "seed": int(cfg.get("seed", 42)),
         "dataset_path": cfg["data"]["dataset_path"],
         "samples": len(dataset),
         "batch_size": cfg["data"]["batch_size"],
@@ -375,6 +446,7 @@ def train(config_path, experiment_id=None, output_dir=None, max_steps=None, devi
         "best_loss": best_loss if math.isfinite(best_loss) else None,
         "final_loss": final_loss,
         "final_accuracy": final_accuracy,
+        "dataset_manifest": bundle_provenance,
     }
     if last_epoch_metrics:
         for field in LOSS_METRIC_FIELDS:
@@ -393,6 +465,7 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--max-steps", type=int, default=None)
     parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args()
     train(
         args.config,
@@ -400,4 +473,5 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         max_steps=args.max_steps,
         device=args.device,
+        seed=args.seed,
     )

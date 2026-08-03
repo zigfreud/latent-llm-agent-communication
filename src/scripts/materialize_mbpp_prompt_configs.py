@@ -1,8 +1,15 @@
 import argparse
+import json
 import random
 from pathlib import Path
 
 import yaml
+
+from src.core.prompt_protocol import protocol_contract_metadata
+from src.evaluation.source_only import (
+    infer_entry_point_from_tests,
+    task_prompt_with_entry_point,
+)
 
 
 DEFAULT_CONFIG = Path("config/LIP-DATA-003_mbpp_sampling.yaml")
@@ -118,12 +125,19 @@ def make_mock_rows(split_name, prompt_field, count):
                     "Write a Python function for mock MBPP prompt "
                     f"{split_slug}-{index:03d}."
                 ),
+                "entry_point": f"mock_{split_slug}_{index:03d}",
             }
         )
     return rows
 
 
-def normalize_row(row, prompt_field, max_prompt_chars, fallback_id):
+def normalize_row(
+    row,
+    prompt_field,
+    max_prompt_chars,
+    fallback_id,
+    include_entry_point=False,
+):
     if prompt_field not in row:
         raise ValueError(f"row is missing prompt field {prompt_field!r}")
 
@@ -134,17 +148,52 @@ def normalize_row(row, prompt_field, max_prompt_chars, fallback_id):
     prompt = prompt.strip()
     if not prompt:
         return None
+    sample_id = str(row.get("task_id", fallback_id))
+    tests = row.get("test_list", row.get("tests", []))
+    if isinstance(tests, str):
+        tests = [tests]
+    if not isinstance(tests, list) or any(not isinstance(test, str) for test in tests):
+        raise ValueError(f"task {sample_id!r} tests must be text or a list of text")
+    entry_point = row.get("entry_point")
+    if entry_point is not None and not isinstance(entry_point, str):
+        entry_point = str(entry_point)
+    entry_point = (entry_point or "").strip() or infer_entry_point_from_tests(tests)
+    if include_entry_point:
+        if entry_point is None:
+            raise ValueError(f"task {sample_id!r} has no inferable entry point")
+        prompt = task_prompt_with_entry_point(prompt, entry_point)
     if len(prompt) > max_prompt_chars:
         return None
+    return {
+        "id": sample_id,
+        "prompt": prompt,
+        "task": {
+            "task_id": sample_id,
+            "prompt": prompt,
+            "test_list": tests,
+            "test_setup_code": str(row.get("test_setup_code", "") or ""),
+            "entry_point": entry_point,
+        },
+    }
 
-    sample_id = row.get("task_id", fallback_id)
-    return {"id": str(sample_id), "prompt": prompt}
 
-
-def sample_prompts(rows, count, seed, prompt_field, max_prompt_chars):
+def sample_prompts(
+    rows,
+    count,
+    seed,
+    prompt_field,
+    max_prompt_chars,
+    include_entry_point=False,
+):
     candidates = []
     for index, row in enumerate(rows):
-        normalized = normalize_row(row, prompt_field, max_prompt_chars, index)
+        normalized = normalize_row(
+            row,
+            prompt_field,
+            max_prompt_chars,
+            index,
+            include_entry_point=include_entry_point,
+        )
         if normalized is not None:
             candidates.append(normalized)
 
@@ -170,7 +219,7 @@ def build_bundle_config(
     source_split,
     sampling_config,
 ):
-    return {
+    bundle_config = {
         "trace_id": trace_id,
         "bundle_format": "lip_latent_bundle",
         "schema_version": 1,
@@ -181,16 +230,17 @@ def build_bundle_config(
         "extraction": {
             "device": "auto",
             "source_layer": -1,
-            "target_layer": -1,
-            "token_position": "last",
-            "max_length": 256,
+            "target_layer": int(sampling_config.get("target_layer", -1)),
+            "token_position": "last_non_padding",
+            "max_length": int(sampling_config.get("max_length", 256)),
             "batch_size": 1,
-            "dtype": "auto",
+            "dtype": str(sampling_config.get("dtype", "auto")),
             "trust_remote_code": True,
             "sequential_model_loading": True,
             "low_cpu_mem_usage": True,
             "device_map": "auto",
             "load_in_4bit": True,
+            "use_safetensors": True,
             "cache_dir": None,
             "local_files_only": False,
         },
@@ -215,6 +265,8 @@ def build_bundle_config(
             "shard_name": "shard_0.pt",
         },
     }
+    bundle_config.update(protocol_contract_metadata(sampling_config))
+    return bundle_config
 
 
 def resolve_output_settings(config):
@@ -294,6 +346,13 @@ def write_yaml(path, payload):
         yaml.safe_dump(payload, handle, sort_keys=False, allow_unicode=False)
 
 
+def write_jsonl(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
 def materialize_configs(config_path, output_dir_override=None, mock_data=False):
     config = load_yaml(config_path)
     train_split = required_string(config, "train_split")
@@ -303,8 +362,18 @@ def materialize_configs(config_path, output_dir_override=None, mock_data=False):
     eval_count = positive_int(config, "eval_count")
     seed = positive_int(config, "seed")
     max_prompt_chars = positive_int(config, "max_prompt_chars")
+    include_entry_point = config.get("include_entry_point_in_prompt", False)
+    if not isinstance(include_entry_point, bool):
+        raise ValueError("include_entry_point_in_prompt must be a boolean")
     output_dir = output_dir_override or Path(required_string(config, "output_dir"))
     output_settings = resolve_output_settings(config)
+    if include_entry_point:
+        suffix = (
+            " The benchmark entry-point name is included as task input; "
+            "tests and reference solutions are excluded."
+        )
+        output_settings["train_prompt_policy"] += suffix
+        output_settings["eval_prompt_policy"] += suffix
 
     train_rows = load_split_rows(config, train_split, mock_data)
     eval_rows = load_split_rows(config, eval_split, mock_data)
@@ -314,6 +383,7 @@ def materialize_configs(config_path, output_dir_override=None, mock_data=False):
         seed,
         prompt_field,
         max_prompt_chars,
+        include_entry_point,
     )
     eval_selected = sample_prompts(
         eval_rows,
@@ -321,6 +391,7 @@ def materialize_configs(config_path, output_dir_override=None, mock_data=False):
         seed,
         prompt_field,
         max_prompt_chars,
+        include_entry_point,
     )
 
     train_ids = {item["id"] for item in train_selected}
@@ -357,6 +428,13 @@ def materialize_configs(config_path, output_dir_override=None, mock_data=False):
     eval_path = output_dir / output_settings["eval_config_name"]
     write_yaml(train_path, train_config)
     write_yaml(eval_path, eval_config)
+    tasks_jsonl_value = config.get("tasks_jsonl")
+    tasks_jsonl = None
+    if tasks_jsonl_value is not None:
+        if not isinstance(tasks_jsonl_value, str) or not tasks_jsonl_value.strip():
+            raise ValueError("tasks_jsonl must be a non-empty string when provided")
+        tasks_jsonl = Path(tasks_jsonl_value)
+        write_jsonl(tasks_jsonl, [item["task"] for item in eval_selected])
 
     return {
         "train_config": train_path,
@@ -365,6 +443,7 @@ def materialize_configs(config_path, output_dir_override=None, mock_data=False):
         "eval_count": len(eval_selected),
         "train_ids": sorted(train_ids),
         "eval_ids": sorted(eval_ids),
+        "tasks_jsonl": tasks_jsonl,
         "mock_data": mock_data,
     }
 
@@ -378,6 +457,8 @@ def main():
     print(f"eval_config: {result['eval_config']}")
     print(f"train_prompts: {result['train_count']}")
     print(f"eval_prompts: {result['eval_count']}")
+    if result["tasks_jsonl"] is not None:
+        print(f"tasks_jsonl: {result['tasks_jsonl']}")
     print("train_eval_sampled_ids_disjoint: true")
 
 
