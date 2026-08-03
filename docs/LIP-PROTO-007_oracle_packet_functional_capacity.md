@@ -150,4 +150,14 @@ python -m src.scripts.plot_oracle_functional_capacity \
   --functional-summary runs/LIP-PROTO-007/functional-evaluation/summary.json
 ```
 
-Immutable artifact hashes and the Drive path are recorded after archival.
+Immutable artifacts are stored at
+`lip-artifacts/LIP-H0-005/LIP-PROTO-007/v1-functional-capacity-full` on Drive.
+The archive contains 16 payload files plus `SHA256SUMS`; all entries passed an
+independent `sha256sum --check`. Its provenance binds Git commit
+`0121fe71c03ebc05e89ef60aeec42ea6a1c85360`.
+
+- `SHA256SUMS`: `93c8aed7dc4a6a3f4318c98dbb7173e18f664c4d625e2d4657d8ed12c44ed4ea`
+- `config/LIP-PROTO-007_oracle_packet_functional_capacity.yaml`: `05f7b9ee156ba5c1d168037cf8bab2d089a93bd3350776f4f1e67abc7e7ef742`
+- `run/generations.jsonl`: `07fa06d9c90c5dff3bd448a9d2239b5529b7fb4d437fa0c9568417ca5fe44cf9`
+- `run/functional-evaluation/summary.json`: `8269678827c851771211db0df670f436ff21c7784499065388687eccdaa9f82e`
+- `run/functional-evaluation/LIP-PROTO-007_predictive_functional_gap.svg`: `0524afaad23c76e81a4722468b4603e75e30c0e397316c57e47bcd45d0c5e186`
