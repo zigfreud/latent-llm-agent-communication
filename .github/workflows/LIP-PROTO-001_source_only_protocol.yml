@@ -123,7 +123,9 @@ jobs:
           for manifest in (train_manifest, eval_manifest):
               assert manifest["target_layer"] == "-2"
               assert manifest["token_position"] == "last_non_padding"
-              assert manifest["prompt_protocol"]["version"] == "lip-prompt-v1"
+              assert manifest["prompt_protocols"]["source"]["mode"] == "raw"
+              assert manifest["prompt_protocols"]["target"]["mode"] == "chat_template"
+              assert manifest["prompt_protocols"]["target"]["add_generation_prompt"] is True
               assert manifest["extraction_mode"] == "dry_run"
               assert manifest["source_quantization"] == "bitsandbytes-4bit"
               assert manifest["target_quantization"] == "bitsandbytes-4bit"
@@ -133,4 +135,5 @@ jobs:
               assert len(manifest["sampled_ids"]) == 2
               assert len(manifest["sampled_prompt_sha256"]) == 2
           assert len(tasks) == 32
+          assert all(task["entry_point"] in task["prompt"] for task in tasks)
           PY
