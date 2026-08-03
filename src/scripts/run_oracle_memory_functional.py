@@ -24,6 +24,10 @@ from src.evaluation.oracle_memory import (
     plan_as_dicts,
     validate_memory_contract,
 )
+from src.evaluation.oracle_state_diagnostics import (
+    validate_state_diagnostics_contract,
+    summarize_state_diagnostics,
+)
 from src.evaluation.oracle_functional import stable_seed
 from src.evaluation.oracle_transport import normalize_layer_indices
 from src.pipelines.infer import load_target, model_input_device
@@ -37,8 +41,8 @@ from src.pipelines.oracle_experiment import (
     write_json,
 )
 from src.pipelines.oracle_memory import (
-    forward_with_layer_input_capture,
     forward_with_layer_input_replay,
+    forward_with_layer_state_capture,
     generate_with_layer_input_replay,
 )
 from src.pipelines.oracle_transport import (
@@ -104,6 +108,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
         "neutral_target_prompt",
         "carrier",
         "memory",
+        "diagnostics",
         "conditions",
         "controls",
         "generation",
@@ -129,6 +134,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
     generation = config.get("generation", {})
     evaluation = config.get("evaluation", {})
     output = config.get("output", {})
+    diagnostics = config.get("diagnostics", {})
     for name, value in (
         ("data", data),
         ("runtime", runtime),
@@ -136,6 +142,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
         ("generation", generation),
         ("evaluation", evaluation),
         ("output", output),
+        ("diagnostics", diagnostics),
     ):
         if not isinstance(value, Mapping):
             raise ValueError(f"{name} must be a mapping")
@@ -155,6 +162,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
     if not isinstance(runtime.get("load_4bit"), bool):
         raise ValueError("runtime.load_4bit must be a boolean")
     validate_memory_contract(config.get("memory", {}))
+    validate_state_diagnostics_contract(diagnostics)
     if list(config.get("conditions", [])) != list(ORACLE_MEMORY_CONDITIONS):
         raise ValueError("conditions must match the frozen oracle memory design")
     if controls != {
@@ -179,6 +187,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
     if any(not str(output.get(field, "")).strip() for field in (
         "generations_jsonl",
         "evaluation_dir",
+        "state_diagnostics_json",
     )):
         raise ValueError("output paths must be configured")
 
@@ -319,7 +328,7 @@ def run_generation(
     carrier_inputs = []
     formatted_task_prompts = []
     anchor_packets = []
-    input_memories = []
+    state_memories = []
     self_checks = []
     for task_index, task in enumerate(tasks):
         print(f"Capturing memory {task_index + 1}/{len(tasks)}: {task['task_id']}")
@@ -344,12 +353,13 @@ def run_generation(
             layer_idx=anchor_layer,
             positions=positions,
         )
-        memory_outputs, memory = forward_with_layer_input_capture(
+        memory_outputs, captured_states = forward_with_layer_state_capture(
             model,
             inputs,
             layer_indices=all_input_layers,
             positions=positions,
         )
+        memory = captured_states["residual_input"]
         if task_index < int(config["memory"]["self_check_tasks"]):
             threshold = float(config["memory"]["maximum_self_logit_delta"])
             anchor_replayed = forward_with_packet_replacement(
@@ -399,10 +409,37 @@ def run_generation(
         carrier_inputs.append(carrier)
         formatted_task_prompts.append(formatted)
         anchor_packets.append(anchor.detach().cpu())
-        input_memories.append(
-            {layer_idx: value.detach().cpu() for layer_idx, value in memory.items()}
+        state_memories.append(
+            {
+                state_type: {
+                    layer_idx: value.detach().cpu()
+                    for layer_idx, value in layer_states.items()
+                }
+                for state_type, layer_states in captured_states.items()
+            }
         )
-        del anchor, memory, outputs, memory_outputs
+        del anchor, memory, captured_states, outputs, memory_outputs
+
+    diagnostics_path = output_path.parent / Path(
+        str(config["output"]["state_diagnostics_json"])
+    ).name
+    state_diagnostics = summarize_state_diagnostics(
+        state_memories,
+        task_ids=[str(task["task_id"]) for task in tasks],
+        layer_indices=all_input_layers,
+        packet_size=ORACLE_MEMORY_PACKET_SIZE,
+        run_scope=run_scope,
+    )
+    state_diagnostics.update(
+        {
+            "experiment_id": "LIP-PROTO-008",
+            "design_sha256": design_sha256,
+            "target_model": config["models"]["target_model"],
+            "target_model_revision": target_revision,
+            "task_manifest_sha256": sha256_path(manifest_path),
+        }
+    )
+    write_json(diagnostics_path, state_diagnostics)
 
     plan = build_condition_plan(
         [str(task["task_id"]) for task in tasks],
@@ -471,7 +508,9 @@ def run_generation(
                     oracle_task_id = str(tasks[item.oracle_index]["task_id"])
                     injected_layers = list(scope["normalized_layers"])
                     packets = {
-                        layer_idx: input_memories[item.oracle_index][layer_idx]
+                        layer_idx: state_memories[item.oracle_index][
+                            "residual_input"
+                        ][layer_idx]
                         for layer_idx in injected_layers
                     }
                     boundary = "block_input"
@@ -569,11 +608,15 @@ def run_generation(
         "memory": dict(config["memory"]),
         "normalized_scopes": normalized_scopes,
         "self_checks": self_checks,
+        "state_diagnostics": str(diagnostics_path),
+        "state_diagnostics_protocol_version": state_diagnostics[
+            "protocol_version"
+        ],
         "carrier": dict(config["carrier"]),
         "generation": dict(config["generation"]),
     }
     write_json(output_path.with_suffix(".metadata.json"), metadata)
-    del anchor_packets, input_memories, task_inputs, carrier_inputs, model
+    del anchor_packets, state_memories, task_inputs, carrier_inputs, model
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()

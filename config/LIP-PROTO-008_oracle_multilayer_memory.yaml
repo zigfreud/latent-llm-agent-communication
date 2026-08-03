@@ -45,6 +45,17 @@ memory:
       boundary: "block_input"
       layers: [-32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
 
+diagnostics:
+  protocol_version: "lip-oracle-state-diagnostics-v1"
+  state_types: ["residual_input", "key_pre_rope", "value_pre_cache"]
+  metrics:
+    - "mean_l2_norm"
+    - "task_signal_fraction"
+    - "mean_pairwise_cosine"
+    - "task_effective_rank"
+    - "task_effective_rank_fraction"
+  store_raw_states: false
+
 conditions:
   - "neutral_no_lip"
   - "text_only_no_lip"
@@ -88,3 +99,4 @@ evaluation:
 output:
   generations_jsonl: "runs/LIP-PROTO-008/generations.jsonl"
   evaluation_dir: "runs/LIP-PROTO-008/evaluation"
+  state_diagnostics_json: "runs/LIP-PROTO-008/state-diagnostics.json"

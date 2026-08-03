@@ -1,3 +1,4 @@
+import pytest
 import torch
 import yaml
 
@@ -8,10 +9,15 @@ from src.evaluation.oracle_memory import (
     semantic_gate,
     validate_memory_contract,
 )
+from src.evaluation.oracle_state_diagnostics import (
+    ORACLE_STATE_DIAGNOSTICS_VERSION,
+    summarize_state_diagnostics,
+)
 from src.integrations.hooks import make_lip_packet_pre_hook
 from src.pipelines.oracle_memory import (
     forward_with_layer_input_capture,
     forward_with_layer_input_replay,
+    forward_with_layer_state_capture,
     generate_with_layer_input_replay,
 )
 from src.scripts.run_oracle_memory_functional import validate_config
@@ -63,6 +69,39 @@ class ToyTokenizer:
         return ",".join(str(value) for value in tokens.tolist())
 
 
+class ToyAttention(torch.nn.Module):
+    def __init__(self, key_scale, value_scale):
+        super().__init__()
+        self.k_proj = torch.nn.Linear(1, 1, bias=False)
+        self.v_proj = torch.nn.Linear(1, 1, bias=False)
+        with torch.no_grad():
+            self.k_proj.weight.fill_(key_scale)
+            self.v_proj.weight.fill_(value_scale)
+
+
+class ProjectingLayer(torch.nn.Module):
+    def __init__(self, increment, key_scale, value_scale):
+        super().__init__()
+        self.increment = increment
+        self.self_attn = ToyAttention(key_scale, value_scale)
+
+    def forward(self, hidden):
+        self.self_attn.k_proj(hidden)
+        self.self_attn.v_proj(hidden)
+        return hidden + self.increment
+
+
+class ProjectingToyModel(ToyModel):
+    def __init__(self):
+        self.model = ToyBackbone()
+        self.model.layers = torch.nn.ModuleList(
+            [
+                ProjectingLayer(1.0, 2.0, 3.0),
+                ProjectingLayer(10.0, 5.0, 7.0),
+            ]
+        )
+
+
 def toy_inputs():
     return {
         "input_ids": torch.tensor([[1, 2, 3]]),
@@ -96,6 +135,61 @@ def test_capture_records_inputs_at_each_block_boundary():
     )
     assert packets[0].tolist() == [[3.0]]
     assert packets[1].tolist() == [[4.0]]
+
+
+def test_state_capture_records_residual_key_and_value_boundaries():
+    _, states = forward_with_layer_state_capture(
+        ProjectingToyModel(),
+        toy_inputs(),
+        layer_indices=[0, 1],
+        positions=torch.tensor([2]),
+    )
+    assert states["residual_input"][0].tolist() == [[3.0]]
+    assert states["residual_input"][1].tolist() == [[4.0]]
+    assert states["key_pre_rope"][0].tolist() == [[6.0]]
+    assert states["key_pre_rope"][1].tolist() == [[20.0]]
+    assert states["value_pre_cache"][0].tolist() == [[9.0]]
+    assert states["value_pre_cache"][1].tolist() == [[28.0]]
+
+
+def test_state_diagnostics_cover_state_layer_position_grid_without_raw_states():
+    task_states = []
+    for task_value in (1.0, 2.0, 3.0):
+        task_states.append(
+            {
+                state_type: {
+                    0: torch.tensor(
+                        [[task_value], [task_value + 1.0]], dtype=torch.float32
+                    ),
+                    1: torch.tensor(
+                        [[task_value + 2.0], [task_value + 3.0]],
+                        dtype=torch.float32,
+                    ),
+                }
+                for state_type in (
+                    "residual_input",
+                    "key_pre_rope",
+                    "value_pre_cache",
+                )
+            }
+        )
+    summary = summarize_state_diagnostics(
+        task_states,
+        task_ids=["a", "b", "c"],
+        layer_indices=[0, 1],
+        packet_size=2,
+        run_scope="full",
+    )
+    assert summary["protocol_version"] == ORACLE_STATE_DIAGNOSTICS_VERSION
+    assert summary["packet_offsets"] == [-2, -1]
+    assert len(summary["cells"]) == 3 * 2 * 2
+    first = summary["cells"][0]
+    assert first["mean_l2_norm"] == 2.0
+    assert first["task_signal_fraction"] == pytest.approx(2.0 / 14.0)
+    assert first["mean_pairwise_cosine"] == 1.0
+    assert first["task_effective_rank"] == pytest.approx(1.0)
+    assert first["task_effective_rank_fraction"] == pytest.approx(1.0)
+    assert "raw_states" not in summary
 
 
 def test_same_state_input_replay_is_an_exact_forward_identity():

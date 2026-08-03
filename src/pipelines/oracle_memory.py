@@ -9,6 +9,97 @@ import torch
 from src.integrations.hooks import make_lip_packet_pre_hook
 
 
+ORACLE_CAPTURED_STATE_TYPES = (
+    "residual_input",
+    "key_pre_rope",
+    "value_pre_cache",
+)
+
+
+def _select_prompt_packet(hidden: torch.Tensor, positions: torch.Tensor) -> torch.Tensor:
+    if not isinstance(hidden, torch.Tensor) or hidden.ndim != 3:
+        raise ValueError("captured prompt state must be a rank-3 tensor")
+    if hidden.shape[0] != 1:
+        raise ValueError("oracle memory capture requires batch size one")
+    selected = positions.to(device=hidden.device, dtype=torch.long)
+    if selected.ndim != 1 or selected.numel() == 0:
+        raise ValueError("memory positions must be a non-empty rank-1 tensor")
+    if int(selected.min()) < 0 or int(selected.max()) >= hidden.shape[1]:
+        raise ValueError("memory position is outside the hidden-state sequence")
+    return hidden[0, selected, :].detach().clone()
+
+
+def forward_with_layer_state_capture(
+    model,
+    inputs: Mapping[str, torch.Tensor],
+    *,
+    layer_indices: Sequence[int],
+    positions: torch.Tensor,
+) -> tuple[Any, dict[str, dict[int, torch.Tensor]]]:
+    """Capture residual inputs and pre-cache K/V projections for each block."""
+
+    selected_layers = [int(layer) for layer in layer_indices]
+    if not selected_layers or len(set(selected_layers)) != len(selected_layers):
+        raise ValueError("layer_indices must be a non-empty unique sequence")
+    captured = {state_type: {} for state_type in ORACLE_CAPTURED_STATE_TYPES}
+    handles = []
+
+    def capture_block_input(layer_idx: int):
+        def hook(module, module_in):
+            if not module_in:
+                raise ValueError("block pre-hook requires positional hidden states")
+            captured["residual_input"][layer_idx] = _select_prompt_packet(
+                module_in[0], positions
+            )
+
+        return hook
+
+    def capture_projection(state_type: str, layer_idx: int):
+        def hook(module, module_in, module_out):
+            captured[state_type][layer_idx] = _select_prompt_packet(
+                module_out, positions
+            )
+
+        return hook
+
+    for layer_idx in selected_layers:
+        layer = model.model.layers[layer_idx]
+        attention = getattr(layer, "self_attn", None)
+        key_projection = getattr(attention, "k_proj", None)
+        value_projection = getattr(attention, "v_proj", None)
+        if key_projection is None or value_projection is None:
+            raise ValueError("decoder layer does not expose self_attn k_proj/v_proj")
+        handles.extend(
+            (
+                layer.register_forward_pre_hook(capture_block_input(layer_idx)),
+                key_projection.register_forward_hook(
+                    capture_projection("key_pre_rope", layer_idx)
+                ),
+                value_projection.register_forward_hook(
+                    capture_projection("value_pre_cache", layer_idx)
+                ),
+            )
+        )
+    try:
+        with torch.inference_mode():
+            outputs = model(
+                **inputs,
+                use_cache=False,
+                output_hidden_states=False,
+                return_dict=True,
+            )
+    finally:
+        for handle in handles:
+            handle.remove()
+    for state_type in ORACLE_CAPTURED_STATE_TYPES:
+        missing = set(selected_layers).difference(captured[state_type])
+        if missing:
+            raise RuntimeError(
+                f"failed to capture {state_type} at layer(s): {sorted(missing)}"
+            )
+    return outputs, captured
+
+
 def forward_with_layer_input_capture(
     model,
     inputs: Mapping[str, torch.Tensor],
@@ -28,17 +119,7 @@ def forward_with_layer_input_capture(
         def hook(module, module_in):
             if not module_in:
                 raise ValueError("block pre-hook requires positional hidden states")
-            hidden = module_in[0]
-            if not isinstance(hidden, torch.Tensor) or hidden.ndim != 3:
-                raise ValueError("captured block input must be rank-3 hidden states")
-            if hidden.shape[0] != 1:
-                raise ValueError("oracle memory capture requires batch size one")
-            selected = positions.to(device=hidden.device, dtype=torch.long)
-            if selected.ndim != 1 or selected.numel() == 0:
-                raise ValueError("memory positions must be a non-empty rank-1 tensor")
-            if int(selected.min()) < 0 or int(selected.max()) >= hidden.shape[1]:
-                raise ValueError("memory position is outside the hidden-state sequence")
-            captured[layer_idx] = hidden[0, selected, :].detach().clone()
+            captured[layer_idx] = _select_prompt_packet(module_in[0], positions)
 
         return hook
 

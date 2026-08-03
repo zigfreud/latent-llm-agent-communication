@@ -100,6 +100,7 @@ def design_fingerprint(config: Mapping) -> str:
         "neutral_target_prompt": config.get("neutral_target_prompt"),
         "carrier": config.get("carrier", {}),
         "memory": config.get("memory", {}),
+        "diagnostics": config.get("diagnostics", {}),
         "conditions": config.get("conditions", []),
         "controls": config.get("controls", {}),
         "generation": config.get("generation", {}),

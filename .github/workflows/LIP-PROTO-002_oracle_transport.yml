@@ -27,6 +27,7 @@ on:
       - "src/evaluation/oracle_transport.py"
       - "src/evaluation/oracle_functional.py"
       - "src/evaluation/oracle_memory.py"
+      - "src/evaluation/oracle_state_diagnostics.py"
       - "src/evaluation/linux_sandbox.py"
       - "src/integrations/hooks.py"
       - "src/pipelines/infer.py"
@@ -38,12 +39,14 @@ on:
       - "src/scripts/plot_oracle_token_position.py"
       - "src/scripts/run_oracle_packet_functional.py"
       - "src/scripts/run_oracle_memory_functional.py"
+      - "src/scripts/plot_oracle_state_diagnostics.py"
       - "src/scripts/evaluate_oracle_packet_semantics.py"
       - "src/scripts/run_hardened_oracle_evaluation.py"
       - "src/scripts/run_oracle_transport_audit.py"
       - "tests/test_oracle_transport.py"
       - "tests/test_oracle_functional.py"
       - "tests/test_oracle_memory.py"
+      - "tests/test_plot_oracle_state_diagnostics.py"
       - "tests/test_oracle_task_manifest.py"
       - "tests/test_linux_sandbox.py"
   workflow_dispatch:
@@ -77,6 +80,7 @@ jobs:
             src/evaluation/oracle_transport.py \
             src/evaluation/oracle_functional.py \
             src/evaluation/oracle_memory.py \
+            src/evaluation/oracle_state_diagnostics.py \
             src/evaluation/linux_sandbox.py \
             src/pipelines/oracle_experiment.py \
             src/pipelines/oracle_transport.py \
@@ -86,6 +90,7 @@ jobs:
             src/scripts/plot_oracle_token_position.py \
             src/scripts/run_oracle_packet_functional.py \
             src/scripts/run_oracle_memory_functional.py \
+            src/scripts/plot_oracle_state_diagnostics.py \
             src/scripts/evaluate_oracle_packet_semantics.py \
             src/scripts/run_hardened_oracle_evaluation.py \
             src/scripts/run_oracle_transport_audit.py \
@@ -105,7 +110,7 @@ jobs:
           python -c "import yaml; from src.scripts.run_oracle_memory_functional import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-008_oracle_multilayer_memory.yaml')))"
 
       - name: Run oracle transport tests
-        run: python -m pytest -q tests/test_oracle_transport.py tests/test_oracle_functional.py tests/test_oracle_memory.py tests/test_oracle_task_manifest.py tests/test_linux_sandbox.py tests/test_hooks.py tests/test_prompt_protocol.py
+        run: python -m pytest -q tests/test_oracle_transport.py tests/test_oracle_functional.py tests/test_oracle_memory.py tests/test_oracle_task_manifest.py tests/test_plot_oracle_state_diagnostics.py tests/test_linux_sandbox.py tests/test_hooks.py tests/test_prompt_protocol.py
 
       - name: Materialize mock oracle task registry
         run: |

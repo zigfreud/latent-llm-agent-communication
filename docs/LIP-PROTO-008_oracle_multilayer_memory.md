@@ -57,6 +57,30 @@ state that can control the target, then optimize or learn a smaller carrier.
 Before generation, exact same-task replay on one task must reproduce baseline
 logits within maximum absolute delta `1e-4` at all three registered scopes.
 
+## Registered state diagnostics
+
+The same capture pass records aggregate-only maps over the final 32 prompt
+positions and all 32 decoder layers for three state types:
+
+- `residual_input`: the residual stream entering each decoder block;
+- `key_pre_rope`: the output of that block's key projection before RoPE;
+- `value_pre_cache`: the value projection immediately before cache shaping.
+
+For every state type × layer × suffix-position cell, the run reports mean L2
+norm, task-centered energy fraction, mean cross-task cosine, and entropy
+effective rank (raw and normalized by its task-limited maximum). Raw hidden
+states are not written to the diagnostic artifact.
+
+These are localization diagnostics, not estimates of channel capacity in bits.
+High task-centered energy or rank shows that tasks occupy distinguishable state
+directions at a boundary; it does not establish that downstream generation uses
+those directions. Only the matched-versus-task-shuffled functional comparison
+tests task-specific causal control.
+
+The two-task preflight validates capture and plotting only. Its centered task
+matrix has rank at most one, so effective-rank maps become scientifically
+interpretable only in the frozen 32-task confirmation run.
+
 ## Fresh task registry
 
 The previous 32 validation tasks have all been consumed. This protocol samples
@@ -141,6 +165,15 @@ python -m src.scripts.run_hardened_oracle_evaluation \
   --generations runs/LIP-PROTO-008/preflight/generations.jsonl \
   --output-dir runs/LIP-PROTO-008/preflight/functional-evaluation \
   --allow-incomplete --overwrite
+```
+
+Render the preregistered layer × suffix-position × state-type maps after the
+diagnostic JSON has been inspected:
+
+```bash
+python -m src.scripts.plot_oracle_state_diagnostics \
+  --diagnostics runs/LIP-PROTO-008/preflight/state-diagnostics.json \
+  --output-stem runs/LIP-PROTO-008/preflight/LIP-PROTO-008_state_diagnostics
 ```
 
 The full confirmation command remains intentionally unexecuted until the
