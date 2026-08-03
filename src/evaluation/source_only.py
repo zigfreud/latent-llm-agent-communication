@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+import builtins
 import hashlib
 import json
 import random
@@ -29,6 +31,7 @@ def design_fingerprint(config: dict) -> str:
         "neutral_target_prompt": str(config.get("neutral_target_prompt", "")).strip(),
         "models": config.get("models", {}),
         "prompt_protocol": config.get("prompt_protocol", {}),
+        "prompt_protocols": config.get("prompt_protocols", {}),
         "extraction": config.get("extraction", {}),
         "lip": config.get("lip", {}),
         "controls": config.get("controls", {}),
@@ -43,6 +46,64 @@ def design_fingerprint(config: dict) -> str:
         ensure_ascii=False,
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def infer_entry_point_from_tests(tests: Iterable[str]) -> Optional[str]:
+    """Infer the function under test without exposing assertions to the model."""
+
+    builtin_names = set(dir(builtins))
+    candidates_by_test = []
+    for test in tests:
+        if not isinstance(test, str) or not test.strip():
+            continue
+        try:
+            tree = ast.parse(test)
+        except SyntaxError as exc:
+            raise ValueError(f"cannot infer entry point from invalid test: {test!r}") from exc
+        ranked_candidates = []
+
+        def collect(node: ast.AST, depth: int = 0) -> None:
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id not in builtin_names
+            ):
+                ranked_candidates.append((depth, node.func.id))
+            for child in ast.iter_child_nodes(node):
+                collect(child, depth + 1)
+
+        collect(tree)
+        nearest_depth = min(
+            (depth for depth, _ in ranked_candidates),
+            default=None,
+        )
+        candidates = {
+            name
+            for depth, name in ranked_candidates
+            if depth == nearest_depth
+        }
+        if candidates:
+            candidates_by_test.append(candidates)
+
+    if not candidates_by_test:
+        return None
+    common = set.intersection(*candidates_by_test)
+    if len(common) != 1:
+        rendered = ", ".join(sorted(common)) or "none"
+        raise ValueError(f"tests do not identify one common entry point: {rendered}")
+    return next(iter(common))
+
+
+def task_prompt_with_entry_point(prompt: str, entry_point: str) -> str:
+    """Bind the benchmark's required callable name into transmitted task text."""
+
+    prompt = str(prompt).strip()
+    entry_point = str(entry_point).strip()
+    if not prompt:
+        raise ValueError("task prompt must be non-empty")
+    if not entry_point:
+        raise ValueError("entry_point must be non-empty")
+    return f"{prompt}\n\nRequired function name: `{entry_point}`."
 
 
 @dataclass(frozen=True)

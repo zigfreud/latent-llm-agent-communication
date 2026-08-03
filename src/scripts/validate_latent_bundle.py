@@ -6,7 +6,7 @@ from pathlib import Path, PurePosixPath
 import torch
 
 from src.core.hidden_states import SUPPORTED_TOKEN_POSITIONS
-from src.core.prompt_protocol import parse_prompt_protocol
+from src.core.prompt_protocol import parse_prompt_protocol, protocol_pair_metadata
 
 
 REQUIRED_MANIFEST_FIELDS = {
@@ -94,11 +94,19 @@ def read_manifest(bundle_dir):
             fail(f"{field} must be a string when provided")
 
     prompt_protocol = manifest.get("prompt_protocol")
+    prompt_protocols = manifest.get("prompt_protocols")
+    if prompt_protocol is not None and prompt_protocols is not None:
+        fail("manifest must define prompt_protocol or prompt_protocols, not both")
     if prompt_protocol is not None:
         try:
             parse_prompt_protocol(prompt_protocol)
         except (TypeError, ValueError) as exc:
             fail(f"invalid prompt_protocol: {exc}")
+    if prompt_protocols is not None:
+        try:
+            protocol_pair_metadata(prompt_protocols)
+        except (TypeError, ValueError) as exc:
+            fail(f"invalid prompt_protocols: {exc}")
 
     token_position = manifest.get("token_position")
     if token_position is not None and token_position not in SUPPORTED_TOKEN_POSITIONS:

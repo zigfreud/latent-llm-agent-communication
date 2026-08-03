@@ -13,11 +13,15 @@ controls support a new claim.
 ## Protocol invariant
 
 Bundle construction, source extraction, target-control extraction, and
-generation use `lip-prompt-v1`. The checked-in configuration uses raw prompts,
-`last_non_padding`, source layer `-1`, and target layer `-2`. The target vector
-layer is aligned with the output of target transformer layer `-2`, where the
-generation hook intervenes. Both bundle extraction and probing use the same
-recorded bitsandbytes 4-bit loading policy for source and target models.
+generation use role-specific `lip-prompt-v1` contracts. DeepSeek-Coder-base
+uses raw task text because its tokenizer has no chat template. Llama-3-Instruct
+uses its native chat template, a generic code-only system instruction, and an
+assistant-generation marker for both target-vector extraction and controlled
+generation. The checked-in configuration uses `last_non_padding`, source layer
+`-1`, and target layer `-2`. The target vector layer is aligned with the output
+of target transformer layer `-2`, where the generation hook intervenes. Both
+bundle extraction and probing use the same recorded bitsandbytes 4-bit loading
+policy for source and target models.
 Real bundle construction records the resolved immutable Hugging Face commit for
 each model. The probe reloads those exact revisions and rejects manifests that
 contain only a mutable branch name or no revision.
@@ -30,7 +34,14 @@ checks those prompt digests, and records both training- and held-out-manifest
 digests in every generation row. It therefore does not perform a second,
 untracked source-vector extraction during generation.
 
-Changing prompt mode, layers, tokenizer special-token behavior, or token
+MBPP descriptions do not reliably state the callable name required by their
+tests. The materializer therefore infers one common non-builtin entry point from
+the assertions and appends only that name to the transmitted task prompt. It
+never adds assertions or reference code. The probe rejects a claim-oriented
+task when its required entry point is absent from the encoded prompt; otherwise
+functional scoring could demand information that never entered the channel.
+
+Changing either role's prompt mode, layers, tokenizer special-token behavior, or token
 position requires rebuilding both train and held-out bundles and retraining all
 adapters. Earlier checkpoints and bundles are not interchangeable with that new
 protocol even when tensor dimensions match.
@@ -57,6 +68,9 @@ Each result records `target_prompt_kind`, SHA-256 digests of both target-visible
 user text and fully formatted target input, vector provenance, training seed,
 and generation seed. The full task
 specification is attached only after generation so scoring remains auditable.
+The task prompt includes the benchmark-required callable name; the neutral
+target prompt does not, so the primary treatment still exposes no task-specific
+text to the receiver.
 
 ## Conditions
 

@@ -4,6 +4,8 @@ from src.evaluation.source_only import (
     build_condition_plan,
     design_fingerprint,
     derangement_indices,
+    infer_entry_point_from_tests,
+    task_prompt_with_entry_point,
     target_prompt_for_condition,
 )
 
@@ -55,3 +57,27 @@ def test_design_fingerprint_changes_with_target_text_policy():
     second = {"conditions": CONDITIONS, "neutral_target_prompt": "different"}
     assert design_fingerprint(first) == design_fingerprint(dict(first))
     assert design_fingerprint(first) != design_fingerprint(second)
+
+
+def test_entry_point_is_inferred_and_bound_into_transmitted_prompt():
+    tests = [
+        "assert sum_elements((1, 2, 3)) == 6",
+        "assert sum_elements((4, 5)) == 9",
+    ]
+    entry_point = infer_entry_point_from_tests(tests)
+    assert entry_point == "sum_elements"
+    prompt = task_prompt_with_entry_point("Sum tuple elements.", entry_point)
+    assert prompt.endswith("Required function name: `sum_elements`.")
+
+
+def test_entry_point_inference_rejects_inconsistent_tests():
+    with pytest.raises(ValueError, match="one common entry point"):
+        infer_entry_point_from_tests(["assert foo()", "assert bar()"])
+
+
+def test_entry_point_inference_ignores_nested_argument_constructors():
+    tests = [
+        "assert max_chain_length([Pair(5, 24), Pair(15, 25)]) == 2",
+        "assert max_chain_length([Pair(1, 2)]) == 1",
+    ]
+    assert infer_entry_point_from_tests(tests) == "max_chain_length"

@@ -20,12 +20,17 @@ import torch
 import yaml
 
 from src.core.models import LIPAdapter
-from src.core.prompt_protocol import format_prompt, protocol_metadata
+from src.core.prompt_protocol import (
+    format_prompt,
+    protocol_contract_metadata,
+    resolve_role_prompt_protocol,
+)
 from src.core.utils import set_seed
 from src.evaluation.source_only import (
     SOURCE_ONLY_PROTOCOL_VERSION,
     build_condition_plan,
     design_fingerprint,
+    infer_entry_point_from_tests,
     target_prompt_for_condition,
     validate_conditions,
 )
@@ -87,12 +92,16 @@ def task_from_row(row: Mapping[str, Any], fallback_index: int) -> dict:
         tests = [tests]
     if not isinstance(tests, list) or any(not isinstance(test, str) for test in tests):
         raise ValueError(f"task {task_id!r} tests must be text or a list of text")
+    entry_point = row.get("entry_point")
+    if entry_point is not None:
+        entry_point = str(entry_point).strip() or None
+    entry_point = entry_point or infer_entry_point_from_tests(tests)
     return {
         "task_id": str(task_id),
         "prompt": str(prompt).strip(),
         "test_list": tests,
         "test_setup_code": str(row.get("test_setup_code", "") or ""),
-        "entry_point": row.get("entry_point"),
+        "entry_point": entry_point,
     }
 
 
@@ -156,6 +165,18 @@ def resolve_tasks(config: Mapping[str, Any], override: Path | None) -> list[dict
     ids = [task["task_id"] for task in tasks]
     if len(set(ids)) != len(ids):
         raise ValueError("task IDs must be unique")
+    require_entry_point = data_config.get("require_entry_point_in_prompt", False)
+    if not isinstance(require_entry_point, bool):
+        raise ValueError("data.require_entry_point_in_prompt must be a boolean")
+    if require_entry_point:
+        for task in tasks:
+            entry_point = task.get("entry_point")
+            if not isinstance(entry_point, str) or not entry_point:
+                raise ValueError(f"task {task['task_id']} has no entry point")
+            if entry_point not in task["prompt"]:
+                raise ValueError(
+                    f"task {task['task_id']} prompt omits required entry point"
+                )
     return tasks
 
 
@@ -290,10 +311,10 @@ def verify_training_bundle(config: Mapping[str, Any]) -> dict:
         "source_layer": str(int(extraction.get("source_layer", -1))),
         "target_layer": str(int(extraction.get("target_layer", -1))),
         "token_position": str(extraction.get("token_position", "last_non_padding")),
-        "prompt_protocol": protocol_metadata(config.get("prompt_protocol")),
         "input_dim": int(adapter_dims.get("input_dim", 2048)),
         "output_dim": int(adapter_dims.get("output_dim", 4096)),
     }
+    expected.update(protocol_contract_metadata(config))
     if not expected["trace_id"]:
         raise ValueError("adapter.training_bundle_trace_id is required")
     mismatches = [
@@ -379,7 +400,6 @@ def verify_heldout_bundle(
         "source_layer": str(int(extraction.get("source_layer", -1))),
         "target_layer": str(int(extraction.get("target_layer", -1))),
         "token_position": str(extraction.get("token_position", "last_non_padding")),
-        "prompt_protocol": protocol_metadata(config.get("prompt_protocol")),
         "input_dim": int(adapter_dims.get("input_dim", 2048)),
         "output_dim": int(adapter_dims.get("output_dim", 4096)),
         "source_dataset": data_config.get("dataset_name"),
@@ -388,6 +408,7 @@ def verify_heldout_bundle(
         "prompt_field": data_config.get("prompt_field", "text"),
         "sampling_seed": int(data_config.get("sampling_seed", 42)),
     }
+    expected.update(protocol_contract_metadata(config))
     if not expected["trace_id"]:
         raise ValueError("data.heldout_bundle_trace_id is required")
     mismatches = [
@@ -567,7 +588,7 @@ def run_probe(
 
     runtime = config.get("runtime", {})
     extraction = config.get("extraction", {})
-    protocol = config.get("prompt_protocol", {})
+    protocol = resolve_role_prompt_protocol(config, "target")
     lip = config.get("lip", {})
     adapter_config = config.get("adapter", {})
     generation_config = config.get("generation", {})
@@ -944,7 +965,6 @@ def run_probe(
         "new_records": new_records,
         "resumed": resume,
         "models": models,
-        "prompt_protocol": protocol,
         "extraction": extraction,
         "lip": lip,
         "neutral_target_user_prompt_sha256": hashlib.sha256(
@@ -955,6 +975,7 @@ def run_probe(
             "text_only_no_lip": "task prompt (oracle textual control)",
         },
     }
+    metadata.update(protocol_contract_metadata(config))
     write_json(output_path.with_suffix(".metadata.json"), metadata)
     return metadata
 

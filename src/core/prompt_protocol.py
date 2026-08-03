@@ -13,6 +13,7 @@ from typing import Any, Iterable, Mapping, Optional
 
 PROMPT_PROTOCOL_VERSION = "lip-prompt-v1"
 SUPPORTED_PROMPT_MODES = {"raw", "chat_template"}
+PROMPT_ROLES = ("source", "target")
 
 
 @dataclass(frozen=True)
@@ -126,6 +127,54 @@ def protocol_metadata(
     """Return a JSON-serializable normalized protocol description."""
 
     return asdict(parse_prompt_protocol(protocol_config))
+
+
+def protocol_pair_metadata(
+    protocol_configs: Mapping[str, Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Validate and normalize role-specific source/target prompt protocols."""
+
+    if not isinstance(protocol_configs, Mapping):
+        raise ValueError("prompt_protocols must be a mapping")
+    unknown = sorted(set(protocol_configs).difference(PROMPT_ROLES))
+    missing = sorted(set(PROMPT_ROLES).difference(protocol_configs))
+    if unknown:
+        raise ValueError(f"unknown prompt_protocols role(s): {', '.join(unknown)}")
+    if missing:
+        raise ValueError(f"missing prompt_protocols role(s): {', '.join(missing)}")
+    return {
+        role: protocol_metadata(protocol_configs[role])
+        for role in PROMPT_ROLES
+    }
+
+
+def resolve_role_prompt_protocol(
+    config: Mapping[str, Any],
+    role: str,
+) -> dict[str, Any]:
+    """Resolve one role while retaining legacy single-protocol compatibility."""
+
+    if role not in PROMPT_ROLES:
+        raise ValueError(f"prompt role must be one of: {', '.join(PROMPT_ROLES)}")
+    has_single = "prompt_protocol" in config
+    has_pair = "prompt_protocols" in config
+    if has_single and has_pair:
+        raise ValueError("configure prompt_protocol or prompt_protocols, not both")
+    if has_pair:
+        return protocol_pair_metadata(config["prompt_protocols"])[role]
+    return protocol_metadata(config.get("prompt_protocol"))
+
+
+def protocol_contract_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the manifest fragment for a single or role-specific contract."""
+
+    has_single = "prompt_protocol" in config
+    has_pair = "prompt_protocols" in config
+    if has_single and has_pair:
+        raise ValueError("configure prompt_protocol or prompt_protocols, not both")
+    if has_pair:
+        return {"prompt_protocols": protocol_pair_metadata(config["prompt_protocols"])}
+    return {"prompt_protocol": protocol_metadata(config.get("prompt_protocol"))}
 
 
 def tokenizer_add_special_tokens(

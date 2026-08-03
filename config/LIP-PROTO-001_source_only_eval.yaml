@@ -4,11 +4,17 @@ models:
   source_model: "deepseek-ai/deepseek-coder-1.3b-base"
   target_model: "NousResearch/Meta-Llama-3-8B-Instruct"
 
-prompt_protocol:
-  version: "lip-prompt-v1"
-  mode: "raw"
-  add_generation_prompt: false
-  system_prompt: null
+prompt_protocols:
+  source:
+    version: "lip-prompt-v1"
+    mode: "raw"
+    add_generation_prompt: false
+    system_prompt: null
+  target:
+    version: "lip-prompt-v1"
+    mode: "chat_template"
+    add_generation_prompt: true
+    system_prompt: "You are a Python code generator. Return only Python code and define exactly the required function name."
 
 extraction:
   source_layer: -1
@@ -64,8 +70,9 @@ data:
   task_count: 32
   sampling_seed: 42
   max_prompt_chars: 512
+  require_entry_point_in_prompt: true
 
-neutral_target_prompt: "Implement the requested Python function. Return only Python code."
+neutral_target_prompt: "Infer the requested task from the supplied latent signal. Implement the required Python function."
 
 conditions:
   - "neutral_no_lip"

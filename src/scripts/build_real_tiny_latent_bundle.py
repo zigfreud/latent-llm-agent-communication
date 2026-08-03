@@ -11,7 +11,8 @@ import yaml
 from src.core.hidden_states import SUPPORTED_TOKEN_POSITIONS, select_hidden_vectors
 from src.core.prompt_protocol import (
     format_prompts,
-    protocol_metadata,
+    protocol_contract_metadata,
+    resolve_role_prompt_protocol,
     tokenizer_add_special_tokens,
 )
 from src.scripts.package_latent_bundle import package_bundle
@@ -243,6 +244,7 @@ def extract_hidden_vectors(
     config,
     device,
     dtype,
+    prompt_protocol=None,
     revision=None,
 ):
     try:
@@ -277,9 +279,9 @@ def extract_hidden_vectors(
     formatted_prompts = format_prompts(
         prompts,
         tokenizer,
-        config.get("prompt_protocol"),
+        prompt_protocol,
     )
-    add_special_tokens = tokenizer_add_special_tokens(config.get("prompt_protocol"))
+    add_special_tokens = tokenizer_add_special_tokens(prompt_protocol)
 
     try:
         model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
@@ -358,6 +360,8 @@ def make_real_records(prompts, input_dim, output_dim, config, device):
     source_layer = get_nested(config, "extraction", "source_layer")
     target_layer = get_nested(config, "extraction", "target_layer")
     dtype = resolve_dtype(config, device)
+    source_prompt_protocol = resolve_role_prompt_protocol(config, "source")
+    target_prompt_protocol = resolve_role_prompt_protocol(config, "target")
 
     src_vectors, resolved_source_revision = extract_hidden_vectors(
         source_model,
@@ -367,6 +371,7 @@ def make_real_records(prompts, input_dim, output_dim, config, device):
         config,
         device,
         dtype,
+        prompt_protocol=source_prompt_protocol,
         revision=source_revision,
     )
     tgt_vectors, resolved_target_revision = extract_hidden_vectors(
@@ -377,6 +382,7 @@ def make_real_records(prompts, input_dim, output_dim, config, device):
         config,
         device,
         dtype,
+        prompt_protocol=target_prompt_protocol,
         revision=target_revision,
     )
     if len(src_vectors) != len(tgt_vectors):
@@ -440,7 +446,6 @@ def write_bundle(
         "source_layer": str(source_layer),
         "target_layer": str(target_layer),
         "token_position": get_nested(config, "extraction", "token_position"),
-        "prompt_protocol": protocol_metadata(config.get("prompt_protocol")),
         "extraction_mode": "dry_run" if dry_run else "real",
         "source_quantization": (
             "bitsandbytes-4bit"
@@ -471,6 +476,7 @@ def write_bundle(
             }
         ],
     }
+    manifest.update(protocol_contract_metadata(config))
     data_config = get_nested(config, "data")
     for field in (
         "source_dataset",

@@ -35,6 +35,10 @@ def test_source_only_config_has_independent_seeds_and_required_controls():
     assert config["data"]["heldout_bundle_manifest"].endswith(
         "mbpp_eval_bundle_32/manifest.json"
     )
+    assert config["data"]["require_entry_point_in_prompt"] is True
+    assert config["prompt_protocols"]["source"]["mode"] == "raw"
+    assert config["prompt_protocols"]["target"]["mode"] == "chat_template"
+    assert config["prompt_protocols"]["target"]["add_generation_prompt"] is True
     assert config["controls"]["shuffled_source_latent"] == {
         "permutation": "sattolo_derangement",
         "norm_reference": "matching_source_latent",
@@ -93,6 +97,8 @@ def test_materializer_writes_exact_heldout_task_file(tmp_path):
     assert [row["task_id"] for row in rows] == eval_config["data"]["sampled_ids"]
     assert [row["prompt"] for row in rows] == eval_config["data"]["prompts"]
     assert all(row["test_list"] == [] for row in rows)
+    assert all(row["entry_point"] in row["prompt"] for row in rows)
+    assert "prompt_protocols" in eval_config
 
 
 def test_protocol_requirements_are_portable_between_cpu_and_colab():
