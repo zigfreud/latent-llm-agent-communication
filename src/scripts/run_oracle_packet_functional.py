@@ -26,6 +26,7 @@ from src.evaluation.oracle_transport import normalize_layer_indices
 from src.pipelines.infer import load_target, model_input_device
 from src.pipelines.oracle_experiment import (
     bind_tasks_to_manifest,
+    generation_kwargs,
     load_tasks,
     load_yaml,
     prompt_sha256,
@@ -211,25 +212,6 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ValueError("every evaluation comparison must name two conditions")
     if not str(output.get("generations_jsonl", "")).strip():
         raise ValueError("output.generations_jsonl must be configured")
-
-
-def generation_kwargs(config: Mapping[str, Any], tokenizer) -> dict[str, Any]:
-    do_sample = bool(config["do_sample"])
-    kwargs = {
-        "max_new_tokens": int(config["max_new_tokens"]),
-        "do_sample": do_sample,
-        "repetition_penalty": float(config.get("repetition_penalty", 1.0)),
-        "pad_token_id": tokenizer.eos_token_id,
-        "eos_token_id": tokenizer.eos_token_id,
-    }
-    if do_sample:
-        kwargs.update(
-            {
-                "temperature": float(config["temperature"]),
-                "top_p": float(config.get("top_p", 1.0)),
-            }
-        )
-    return kwargs
 
 
 def read_existing(path: Path) -> tuple[set[tuple[str, str, int]], list[dict]]:

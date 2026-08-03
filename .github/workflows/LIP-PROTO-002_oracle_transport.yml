@@ -12,30 +12,39 @@ on:
       - "config/LIP-PROTO-005_oracle_packet_functional.yaml"
       - "config/LIP-PROTO-006_oracle_token_position.yaml"
       - "config/LIP-PROTO-007_oracle_packet_functional_capacity.yaml"
+      - "config/LIP-PROTO-008_mbpp_test_sampling.yaml"
+      - "config/LIP-PROTO-008_oracle_multilayer_memory.yaml"
       - "docs/LIP-PROTO-002_oracle_transport_audit.md"
       - "docs/LIP-PROTO-003_length_controlled_oracle.md"
       - "docs/LIP-PROTO-004_oracle_packet_capacity.md"
       - "docs/LIP-PROTO-005_oracle_packet_functional.md"
       - "docs/LIP-PROTO-006_oracle_token_position.md"
       - "docs/LIP-PROTO-007_oracle_packet_functional_capacity.md"
+      - "docs/LIP-PROTO-008_oracle_multilayer_memory.md"
       - "requirements-protocol.txt"
       - "src/core/prompt_protocol.py"
       - "src/core/utils.py"
       - "src/evaluation/oracle_transport.py"
       - "src/evaluation/oracle_functional.py"
+      - "src/evaluation/oracle_memory.py"
       - "src/evaluation/linux_sandbox.py"
       - "src/integrations/hooks.py"
       - "src/pipelines/infer.py"
       - "src/pipelines/oracle_experiment.py"
       - "src/pipelines/oracle_transport.py"
+      - "src/pipelines/oracle_memory.py"
+      - "src/scripts/materialize_oracle_tasks.py"
       - "src/scripts/run_oracle_packet_audit.py"
       - "src/scripts/plot_oracle_token_position.py"
       - "src/scripts/run_oracle_packet_functional.py"
+      - "src/scripts/run_oracle_memory_functional.py"
       - "src/scripts/evaluate_oracle_packet_semantics.py"
       - "src/scripts/run_hardened_oracle_evaluation.py"
       - "src/scripts/run_oracle_transport_audit.py"
       - "tests/test_oracle_transport.py"
       - "tests/test_oracle_functional.py"
+      - "tests/test_oracle_memory.py"
+      - "tests/test_oracle_task_manifest.py"
       - "tests/test_linux_sandbox.py"
   workflow_dispatch:
 
@@ -67,19 +76,23 @@ jobs:
           python -m compileall -q \
             src/evaluation/oracle_transport.py \
             src/evaluation/oracle_functional.py \
+            src/evaluation/oracle_memory.py \
             src/evaluation/linux_sandbox.py \
             src/pipelines/oracle_experiment.py \
             src/pipelines/oracle_transport.py \
+            src/pipelines/oracle_memory.py \
+            src/scripts/materialize_oracle_tasks.py \
             src/scripts/run_oracle_packet_audit.py \
             src/scripts/plot_oracle_token_position.py \
             src/scripts/run_oracle_packet_functional.py \
+            src/scripts/run_oracle_memory_functional.py \
             src/scripts/evaluate_oracle_packet_semantics.py \
             src/scripts/run_hardened_oracle_evaluation.py \
             src/scripts/run_oracle_transport_audit.py \
             tests/test_oracle_transport.py
 
       - name: Import audit entry points
-        run: python -c "import src.scripts.run_oracle_transport_audit; import src.scripts.run_oracle_packet_audit; import src.scripts.run_oracle_packet_functional; import src.scripts.evaluate_oracle_packet_semantics; import src.scripts.run_hardened_oracle_evaluation"
+        run: python -c "import src.scripts.run_oracle_transport_audit; import src.scripts.run_oracle_packet_audit; import src.scripts.run_oracle_packet_functional; import src.scripts.run_oracle_memory_functional; import src.scripts.materialize_oracle_tasks; import src.scripts.evaluate_oracle_packet_semantics; import src.scripts.run_hardened_oracle_evaluation"
 
       - name: Validate frozen audit configuration
         run: |
@@ -89,6 +102,26 @@ jobs:
           python -c "import yaml; from src.scripts.run_oracle_packet_audit import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-006_oracle_token_position.yaml')))"
           python -c "import yaml; from src.scripts.run_oracle_packet_functional import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-005_oracle_packet_functional.yaml')))"
           python -c "import yaml; from src.scripts.run_oracle_packet_functional import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-007_oracle_packet_functional_capacity.yaml')))"
+          python -c "import yaml; from src.scripts.run_oracle_memory_functional import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-008_oracle_multilayer_memory.yaml')))"
 
       - name: Run oracle transport tests
-        run: python -m pytest -q tests/test_oracle_transport.py tests/test_oracle_functional.py tests/test_linux_sandbox.py tests/test_hooks.py tests/test_prompt_protocol.py
+        run: python -m pytest -q tests/test_oracle_transport.py tests/test_oracle_functional.py tests/test_oracle_memory.py tests/test_oracle_task_manifest.py tests/test_linux_sandbox.py tests/test_hooks.py tests/test_prompt_protocol.py
+
+      - name: Materialize mock oracle task registry
+        run: |
+          python -m src.scripts.materialize_oracle_tasks \
+            --config config/LIP-PROTO-008_mbpp_test_sampling.yaml \
+            --mock-data
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(
+              Path("datasets/LIP-PROTO-008/mbpp_test_task_manifest.json")
+              .read_text(encoding="utf-8")
+          )
+          assert manifest["manifest_kind"] == "lip_oracle_task_manifest"
+          assert manifest["mock_data"] is True
+          assert manifest["task_count"] == 32
+          assert len(manifest["sampled_task_sha256"]) == 32
+          PY
