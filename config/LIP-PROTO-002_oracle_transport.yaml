@@ -1,0 +1,40 @@
+experiment_id: "LIP-PROTO-002"
+source_protocol_experiment: "LIP-PROTO-001"
+
+models:
+  target_model: "NousResearch/Meta-Llama-3-8B-Instruct"
+
+prompt_protocol:
+  version: "lip-prompt-v1"
+  mode: "chat_template"
+  add_generation_prompt: true
+  system_prompt: "You are a Python code generator. Return only Python code and define exactly the required function name."
+
+runtime:
+  device: "auto"
+  load_4bit: true
+
+data:
+  tasks_jsonl: "datasets/LIP-PROTO-001/mbpp_validation_tasks.jsonl"
+  heldout_bundle_manifest: "datasets/LIP-PROTO-001/mbpp_eval_bundle_32/manifest.json"
+  require_real_bundle: true
+  task_count: 16
+  selection_task_count: 8
+  preflight_task_count: 2
+
+neutral_target_prompt: "Infer the requested task from the supplied latent signal. Implement the required Python function."
+
+audit:
+  layers: [-1, -2, -4, -8, -16, -24, -32]
+  injection_mode: "replace"
+  seed: 1729
+  reference_max_new_tokens: 64
+  minimum_reference_tokens: 8
+  self_check_tasks: 1
+  minimum_task_advantage_nll: 0.05
+  minimum_informative_tasks_per_split: 2
+  minimum_confirmation_recovery: 0.10
+  maximum_self_nll_delta: 0.0001
+
+output:
+  directory: "runs/LIP-PROTO-002/oracle-transport"
