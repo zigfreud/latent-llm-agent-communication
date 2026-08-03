@@ -56,6 +56,12 @@ exact state replaced at its original site should leave continuation NLL
 unchanged within tolerance. Failure of that check invalidates the hook/layer
 alignment before any cross-prompt interpretation.
 
+Oracle states are captured directly from the output of each configured
+transformer block. They are not selected from the model-wide
+`output_hidden_states` tuple, whose final entry may include a post-block final
+normalization and therefore does not represent the `model.layers[-1]` hook
+interface.
+
 ## Known scope boundary
 
 The task and neutral prompts have different token lengths. The summary records

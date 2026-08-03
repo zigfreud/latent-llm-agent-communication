@@ -266,6 +266,50 @@ def forward_with_optional_replacement(
             handle.remove()
 
 
+def forward_with_layer_capture(
+    model,
+    inputs: Mapping[str, torch.Tensor],
+    *,
+    layers: list[int],
+    position: int,
+):
+    """Run one forward pass and capture actual transformer-block outputs."""
+
+    captured: dict[int, torch.Tensor] = {}
+    handles = []
+
+    def capture_hook(layer_idx: int):
+        def hook(module, module_in, module_out):
+            hidden = module_out[0] if isinstance(module_out, tuple) else module_out
+            if not isinstance(hidden, torch.Tensor) or hidden.ndim != 3:
+                raise ValueError("captured layer output must contain rank-3 hidden states")
+            if not 0 <= position < hidden.shape[1]:
+                raise ValueError("capture position is outside the hidden-state sequence")
+            captured[layer_idx] = hidden[0, position, :].detach().clone()
+
+        return hook
+
+    for layer in layers:
+        handles.append(
+            model.model.layers[layer].register_forward_hook(capture_hook(layer))
+        )
+    try:
+        with torch.inference_mode():
+            outputs = model(
+                **inputs,
+                use_cache=False,
+                output_hidden_states=False,
+                return_dict=True,
+            )
+    finally:
+        for handle in handles:
+            handle.remove()
+    missing = set(layers).difference(captured)
+    if missing:
+        raise RuntimeError(f"failed to capture configured layer outputs: {sorted(missing)}")
+    return outputs, captured
+
+
 def write_json(path: Path, payload: Any) -> None:
     path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -373,22 +417,15 @@ def run_audit(
 
         task_teacher_inputs = append_reference(task_inputs, reference_ids)
         neutral_teacher_inputs = append_reference(neutral_inputs, reference_ids)
-        task_outputs = forward_with_optional_replacement(
+        task_outputs, oracle_vectors = forward_with_layer_capture(
             model,
             task_teacher_inputs,
-            output_hidden_states=True,
+            layers=layers,
+            position=task_prompt_length - 1,
         )
-        if task_outputs.hidden_states is None:
-            raise RuntimeError("target model did not return hidden states")
         task_metrics = continuation_token_metrics(
             task_outputs.logits, reference_ids, task_prompt_length
         )
-        oracle_vectors = {
-            layer: task_outputs.hidden_states[layer][0, task_prompt_length - 1, :]
-            .detach()
-            .clone()
-            for layer in layers
-        }
         del task_outputs
 
         neutral_outputs = forward_with_optional_replacement(
@@ -472,14 +509,17 @@ def run_audit(
     selection_task_count = int(config["data"]["selection_task_count"])
     if run_scope != "full":
         selection_task_count = max(1, len(tasks) // 2)
+    effective_minimum_informative_tasks = (
+        int(audit["minimum_informative_tasks_per_split"])
+        if run_scope == "full"
+        else 1
+    )
     summary = summarize_oracle_transport(
         records,
         task_ids=[task["task_id"] for task in tasks],
         layers=layers,
         selection_task_count=selection_task_count,
-        minimum_informative_tasks_per_split=int(
-            audit["minimum_informative_tasks_per_split"]
-        ),
+        minimum_informative_tasks_per_split=effective_minimum_informative_tasks,
         minimum_confirmation_recovery=float(
             audit["minimum_confirmation_recovery"]
         ),

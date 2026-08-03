@@ -12,6 +12,7 @@ from src.evaluation.oracle_transport import (
 )
 from src.scripts.run_oracle_transport_audit import (
     bind_tasks_to_manifest,
+    forward_with_layer_capture,
     validate_config,
 )
 
@@ -182,3 +183,47 @@ def test_config_rejects_factorial_expansion_of_injection_mode():
     config["audit"]["injection_mode"] = "add"
     with pytest.raises(ValueError, match="fixes injection_mode=replace"):
         validate_config(config)
+
+
+def test_layer_capture_reads_module_output_before_model_postprocessing():
+    class Layer(torch.nn.Module):
+        def __init__(self, increment):
+            super().__init__()
+            self.increment = increment
+
+        def forward(self, hidden):
+            return hidden + self.increment
+
+    class Backbone(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layers = torch.nn.ModuleList([Layer(1.0), Layer(2.0)])
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.model = Backbone()
+
+        def forward(
+            self,
+            input_ids,
+            attention_mask,
+            use_cache,
+            output_hidden_states,
+            return_dict,
+        ):
+            hidden = input_ids.float().unsqueeze(-1)
+            for layer in self.model.layers:
+                hidden = layer(hidden)
+            return type("Output", (), {"logits": hidden * 10.0})()
+
+    inputs = {
+        "input_ids": torch.tensor([[1, 2, 3]]),
+        "attention_mask": torch.ones(1, 3, dtype=torch.long),
+    }
+    outputs, captured = forward_with_layer_capture(
+        Model(), inputs, layers=[-1, -2], position=2
+    )
+    assert captured[-2].item() == 4.0
+    assert captured[-1].item() == 6.0
+    assert outputs.logits[0, 2, 0].item() == 60.0
