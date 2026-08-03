@@ -1,0 +1,90 @@
+# LIP-PROTO-007 functional packet-capacity escalation
+
+## Purpose
+
+`LIP-PROTO-005` found that an exact same-task `K=8` suffix packet recovered
+predictive likelihood but never produced the required callable entry point.
+`LIP-PROTO-006` localized the apparent discrepancy: the first task-specific
+function-name token recovers about 49%/25% of the text advantage at `K=8`, but
+86%/89% at `K=16` and 90%/95% at `K=32` on the selection/confirmation splits.
+
+`LIP-PROTO-007` tests the resulting preregistered hypothesis: a larger packet
+at the same residual interface crosses a functional decision boundary. This is
+still a target-oracle interface experiment. It asks whether the interface can
+carry actionable task identity before training a source-to-target bridge.
+
+## Frozen design
+
+The final 16 tasks of the immutable 32-task held-out bundle (Python slice
+`16:32`) were not used by `LIP-PROTO-004`, `LIP-PROTO-005`, or
+`LIP-PROTO-006`. They are reserved here as one claim-eligible evaluation set.
+The layer (`-16`), suffix positions, exact `replace` intervention,
+length-controlled neutral carrier, model revision, prompt contract, sampling
+parameters, and three generation seeds remain fixed.
+
+The full factorial design has eight conditions:
+
+- shared controls: `neutral_no_lip` and `text_only_no_lip`;
+- same-task oracle packets at `K = 8, 16, 32`;
+- a Sattolo task derangement at each `K`, preserving capacity and intervention
+  form while destroying task identity.
+
+The runner captures the largest 32-vector suffix once per task. Each smaller
+condition takes the corresponding suffix of that exact capture, so the
+capacity comparison does not change layer, task state, or capture pass. The
+same effective random seed is reused across all eight conditions within each
+task and replicate. The full design contains `16 × 8 × 3 = 384` generations.
+
+## Causal contrasts and decision rule
+
+For each capacity, the same-task packet is compared with both the neutral
+carrier and the equal-capacity task-mismatched packet. A capacity is called
+task-specific only when its task-clustered functional pass mean is strictly
+higher than both. The protocol gate passes when the task-text control has
+nonzero capacity and at least one packet size is task-specific. The summary
+also reports the smallest supported capacity.
+
+This gate is a design decision, not a substitute for uncertainty. All nine
+registered paired contrasts report task-clustered bootstrap intervals, exact
+sign-flip tests for 16 tasks, and Holm correction. Raw task/seed outcomes remain
+primary if the mean gate and inferential evidence disagree.
+
+Interpretation is frozen as follows:
+
+- `K=16` or `K=32` beats both controls: actionable task identity exists at this
+  single-layer residual interface, and bridge training should target the
+  smallest supported capacity;
+- all matched packets fail while text succeeds: increasing residual suffix
+  capacity is insufficient, motivating a soft-prefix or KV-cache interface;
+- matched and mismatched packets move together: the effect is packet energy or
+  generation perturbation, not transmitted task identity;
+- text fails broadly: the task/model/generation budget is not an informative
+  functional test and no interface conclusion is claim-eligible.
+
+## Execution
+
+```bash
+python -m src.scripts.run_oracle_packet_functional \
+  --config config/LIP-PROTO-007_oracle_packet_functional_capacity.yaml \
+  --preflight --overwrite
+
+python -m src.scripts.run_oracle_packet_functional \
+  --config config/LIP-PROTO-007_oracle_packet_functional_capacity.yaml \
+  --overwrite
+
+python -m src.scripts.evaluate_oracle_packet_semantics \
+  --config config/LIP-PROTO-007_oracle_packet_functional_capacity.yaml \
+  --generations runs/LIP-PROTO-007/generations.jsonl \
+  --overwrite
+```
+
+Generation and syntax inspection do not execute candidate code. Functional
+evaluation must use the previously probed disposable sandbox: private network
+and mount namespaces, Drive and credentials masked, UID/GID `nobody`, empty
+environment, `no_new_privs`, and per-candidate CPU/memory/time limits. The
+resource-limited Python subprocess alone is explicitly not a security
+boundary.
+
+## Result
+
+Pending frozen execution.

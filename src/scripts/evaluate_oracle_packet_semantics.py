@@ -1,4 +1,4 @@
-"""Score syntax or opt-in functional behavior for LIP-PROTO-005 outputs."""
+"""Score syntax or opt-in functional behavior for oracle packet outputs."""
 
 from __future__ import annotations
 
@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from src.evaluation.oracle_functional import (
-    ORACLE_FUNCTIONAL_PROTOCOL_VERSION,
     declares_entry_point,
     design_fingerprint,
+    packet_contract,
+    protocol_version_for_config,
     semantic_gate,
 )
 from src.evaluation.semantics import evaluate_generation
@@ -62,7 +63,8 @@ def validate_generation_grid(
     allow_incomplete: bool,
 ) -> dict[str, Any]:
     design_sha256 = design_fingerprint(dict(config))
-    if metadata.get("protocol_version") != ORACLE_FUNCTIONAL_PROTOCOL_VERSION:
+    protocol_version = protocol_version_for_config(config)
+    if metadata.get("protocol_version") != protocol_version:
         raise ValueError("generation metadata uses the wrong protocol version")
     if metadata.get("design_sha256") != design_sha256:
         raise ValueError("generation metadata does not match the frozen config")
@@ -83,7 +85,7 @@ def validate_generation_grid(
     observed = []
     task_specs: dict[str, Mapping[str, Any]] = {}
     for row in records:
-        if row.get("protocol_version") != ORACLE_FUNCTIONAL_PROTOCOL_VERSION:
+        if row.get("protocol_version") != protocol_version:
             raise ValueError("generation record uses the wrong protocol version")
         if row.get("design_sha256") != design_sha256:
             raise ValueError("generation record does not match the frozen config")
@@ -190,17 +192,20 @@ def evaluate(
         )
     gate = None
     if functional:
+        packet_sizes, replication_size = packet_contract(config)
         gate = semantic_gate(
             {
                 condition: values["mean"]
                 for condition, values in metrics["functional_pass"][
                     "conditions"
                 ].items()
-            }
+            },
+            packet_sizes=packet_sizes,
+            replication_size=replication_size,
         )
     summary = {
         "experiment_id": config["experiment_id"],
-        "protocol_version": ORACLE_FUNCTIONAL_PROTOCOL_VERSION,
+        "protocol_version": protocol_version_for_config(config),
         "generations_jsonl": str(generations_path),
         "generation_metadata": str(metadata_path),
         "scored_jsonl": str(output_dir / "scored_generations.jsonl"),

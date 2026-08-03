@@ -14,11 +14,12 @@ import torch
 from src.core.prompt_protocol import protocol_metadata
 from src.core.utils import set_seed
 from src.evaluation.oracle_functional import (
-    ORACLE_FUNCTIONAL_CONDITIONS,
-    ORACLE_FUNCTIONAL_PROTOCOL_VERSION,
     build_condition_plan,
     design_fingerprint,
+    expected_functional_conditions,
+    packet_contract,
     plan_as_dicts,
+    protocol_version_for_config,
     stable_seed,
 )
 from src.evaluation.oracle_transport import normalize_layer_indices
@@ -58,6 +59,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def validate_config(config: Mapping[str, Any]) -> None:
+    experiment_id = config.get("experiment_id")
+    if experiment_id not in {"LIP-PROTO-005", "LIP-PROTO-007"}:
+        raise ValueError("experiment_id must be LIP-PROTO-005 or LIP-PROTO-007")
+
     expected_top_level = {
         "experiment_id",
         "source_protocol_experiment",
@@ -75,15 +80,22 @@ def validate_config(config: Mapping[str, Any]) -> None:
         "evaluation",
         "output",
     }
+    if experiment_id == "LIP-PROTO-007":
+        expected_top_level.update(
+            {"functional_anchor_experiment", "position_audit_experiment"}
+        )
     unknown = sorted(set(config).difference(expected_top_level))
     if unknown:
         raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
-    if config.get("experiment_id") != "LIP-PROTO-005":
-        raise ValueError("experiment_id must be LIP-PROTO-005")
     if config.get("source_protocol_experiment") != "LIP-PROTO-001":
         raise ValueError("source_protocol_experiment must bind LIP-PROTO-001")
     if config.get("capacity_selection_experiment") != "LIP-PROTO-004":
         raise ValueError("capacity_selection_experiment must bind LIP-PROTO-004")
+    if experiment_id == "LIP-PROTO-007":
+        if config.get("functional_anchor_experiment") != "LIP-PROTO-005":
+            raise ValueError("functional_anchor_experiment must bind LIP-PROTO-005")
+        if config.get("position_audit_experiment") != "LIP-PROTO-006":
+            raise ValueError("position_audit_experiment must bind LIP-PROTO-006")
 
     protocol = protocol_metadata(config.get("prompt_protocol"))
     if protocol["mode"] != "chat_template" or not protocol["add_generation_prompt"]:
@@ -95,7 +107,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
         "left_pad_masked_to_task_length"
     ):
         raise ValueError(
-            "LIP-PROTO-005 requires carrier.mode=left_pad_masked_to_task_length"
+            f"{experiment_id} requires carrier.mode=left_pad_masked_to_task_length"
         )
 
     data = config.get("data", {})
@@ -127,20 +139,41 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ValueError("functional task slice exceeds the bound held-out task count")
     if not 2 <= preflight_count <= functional_count:
         raise ValueError("preflight_task_count must fit the functional task slice")
-    if data.get("functional_split") != "confirmation":
-        raise ValueError("LIP-PROTO-005 freezes the confirmation task split")
-    if start != 8 or functional_count != 8:
-        raise ValueError("LIP-PROTO-005 freezes the LIP-PROTO-004 final eight tasks")
+    if experiment_id == "LIP-PROTO-005":
+        if data.get("functional_split") != "confirmation":
+            raise ValueError("LIP-PROTO-005 freezes the confirmation task split")
+        if bound_count != 16 or start != 8 or functional_count != 8:
+            raise ValueError(
+                "LIP-PROTO-005 freezes the LIP-PROTO-004 final eight tasks"
+            )
+    else:
+        if data.get("functional_split") != "unused_heldout_16_32":
+            raise ValueError("LIP-PROTO-007 freezes the unused held-out task split")
+        if (
+            bound_count != 32
+            or start != 16
+            or functional_count != 16
+            or preflight_count != 2
+        ):
+            raise ValueError("LIP-PROTO-007 freezes held-out tasks 16:32")
 
     if int(packet.get("layer_idx", 0)) != -16:
-        raise ValueError("LIP-PROTO-005 freezes layer_idx=-16")
-    if int(packet.get("selected_size", 0)) != 8:
-        raise ValueError("LIP-PROTO-005 freezes selected_size=8")
-    if int(packet.get("replication_size", 0)) != 1:
-        raise ValueError("LIP-PROTO-005 freezes replication_size=1")
+        raise ValueError(f"{experiment_id} freezes layer_idx=-16")
     if packet.get("injection_mode") != "replace":
-        raise ValueError("LIP-PROTO-005 fixes injection_mode=replace")
-    if list(config.get("conditions", [])) != list(ORACLE_FUNCTIONAL_CONDITIONS):
+        raise ValueError(f"{experiment_id} fixes injection_mode=replace")
+    if experiment_id == "LIP-PROTO-005":
+        if int(packet.get("selected_size", 0)) != 8:
+            raise ValueError("LIP-PROTO-005 freezes selected_size=8")
+        if int(packet.get("replication_size", 0)) != 1:
+            raise ValueError("LIP-PROTO-005 freezes replication_size=1")
+    packet_sizes, replication_size = packet_contract(config)
+    if experiment_id == "LIP-PROTO-007" and packet_sizes != (8, 16, 32):
+        raise ValueError("LIP-PROTO-007 freezes packet.sizes=[8, 16, 32]")
+    expected_conditions = expected_functional_conditions(
+        packet_sizes,
+        replication_size=replication_size,
+    )
+    if list(config.get("conditions", [])) != list(expected_conditions):
         raise ValueError("conditions must match the frozen oracle functional design")
     if controls != {
         "shuffled_oracle_packet": {
@@ -153,6 +186,8 @@ def validate_config(config: Mapping[str, Any]) -> None:
     seeds = generation.get("seeds", [])
     if not isinstance(seeds, list) or not seeds or len(set(seeds)) != len(seeds):
         raise ValueError("generation.seeds must be a non-empty unique list")
+    if experiment_id == "LIP-PROTO-007" and seeds != [101, 202, 303]:
+        raise ValueError("LIP-PROTO-007 freezes generation seeds [101, 202, 303]")
     if int(generation.get("max_new_tokens", 0)) <= 0:
         raise ValueError("generation.max_new_tokens must be positive")
     if not isinstance(generation.get("do_sample"), bool):
@@ -163,6 +198,17 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ValueError("runtime.load_4bit must be a boolean")
     if int(evaluation.get("bootstrap_iterations", 0)) <= 0:
         raise ValueError("evaluation.bootstrap_iterations must be positive")
+    comparisons = evaluation.get("comparisons", [])
+    conditions = set(config.get("conditions", []))
+    if not isinstance(comparisons, list) or not comparisons:
+        raise ValueError("evaluation.comparisons must be a non-empty list")
+    if any(
+        not isinstance(comparison, list)
+        or len(comparison) != 2
+        or any(condition not in conditions for condition in comparison)
+        for comparison in comparisons
+    ):
+        raise ValueError("every evaluation comparison must name two conditions")
     if not str(output.get("generations_jsonl", "")).strip():
         raise ValueError("output.generations_jsonl must be configured")
 
@@ -253,6 +299,8 @@ def run_generation(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     protocol = protocol_metadata(config.get("prompt_protocol"))
+    protocol_version = protocol_version_for_config(config)
+    packet_sizes, replication_size = packet_contract(config)
     design_sha256 = design_fingerprint(config)
     conditions = list(config["conditions"])
     expected_keys = {
@@ -268,7 +316,7 @@ def run_generation(
         if existing_keys.difference(expected_keys):
             raise ValueError("existing generations do not belong to this run scope")
         if any(
-            row.get("protocol_version") != ORACLE_FUNCTIONAL_PROTOCOL_VERSION
+            row.get("protocol_version") != protocol_version
             or row.get("design_sha256") != design_sha256
             or row.get("run_scope") != run_scope
             for row in existing_rows
@@ -288,13 +336,13 @@ def run_generation(
     layer_idx = normalize_layer_indices(
         [int(config["packet"]["layer_idx"])], len(model.model.layers)
     )[0]
-    packet_size = int(config["packet"]["selected_size"])
+    capture_size = max(packet_sizes)
     neutral_formatted, native_neutral_inputs = encode_prompt(
         str(config["neutral_target_prompt"]), tokenizer, protocol, device
     )
     native_neutral_length = int(native_neutral_inputs["input_ids"].shape[1])
-    if packet_size > native_neutral_length:
-        raise ValueError("selected packet does not fit visible neutral carrier tokens")
+    if capture_size > native_neutral_length:
+        raise ValueError("largest packet does not fit visible neutral carrier tokens")
 
     task_inputs: list[dict[str, torch.Tensor]] = []
     carrier_inputs: list[dict[str, torch.Tensor]] = []
@@ -310,7 +358,11 @@ def run_generation(
             pad_token_id=tokenizer.pad_token_id,
             mode=str(config["carrier"]["mode"]),
         )
-        positions = torch.arange(prompt_length - packet_size, prompt_length, device=device)
+        positions = torch.arange(
+            prompt_length - capture_size,
+            prompt_length,
+            device=device,
+        )
         if not bool(torch.all(carrier["attention_mask"][0, positions] == 1).item()):
             raise RuntimeError("selected packet overlaps masked carrier positions")
         outputs, packet = forward_with_packet_capture(
@@ -329,6 +381,8 @@ def run_generation(
         [str(task["task_id"]) for task in tasks],
         conditions,
         shuffle_seed=int(config["controls"]["shuffled_oracle_packet"]["seed"]),
+        packet_sizes=packet_sizes,
+        replication_size=replication_size,
     )
     gen_kwargs = generation_kwargs(config["generation"], tokenizer)
     output_mode = "a" if resume and output_path.exists() else "w"
@@ -383,7 +437,7 @@ def run_generation(
                     else neutral_formatted
                 )
                 record = {
-                    "protocol_version": ORACLE_FUNCTIONAL_PROTOCOL_VERSION,
+                    "protocol_version": protocol_version,
                     "design_sha256": design_sha256,
                     "experiment_id": config["experiment_id"],
                     "run_scope": run_scope,
@@ -428,7 +482,7 @@ def run_generation(
 
     complete = existing_keys == expected_keys
     metadata = {
-        "protocol_version": ORACLE_FUNCTIONAL_PROTOCOL_VERSION,
+        "protocol_version": protocol_version,
         "design_sha256": design_sha256,
         "experiment_id": config["experiment_id"],
         "source_protocol_experiment": config["source_protocol_experiment"],
@@ -457,7 +511,7 @@ def run_generation(
         "captured_packets": [
             {
                 "task_id": str(task["task_id"]),
-                "packet_size": packet_size,
+                "packet_size": capture_size,
                 "packet_frobenius_norm": float(packet.float().norm(p=2).item()),
                 "packet_sha256": tensor_sha256(packet),
             }
@@ -466,6 +520,9 @@ def run_generation(
         "carrier": dict(config["carrier"]),
         "generation": dict(config["generation"]),
     }
+    for lineage_field in ("functional_anchor_experiment", "position_audit_experiment"):
+        if lineage_field in config:
+            metadata[lineage_field] = config[lineage_field]
     write_json(output_path.with_suffix(".metadata.json"), metadata)
     del packets, task_inputs, carrier_inputs, model
     gc.collect()
@@ -480,7 +537,8 @@ def main() -> None:
     if args.output is not None:
         output_path = args.output
     elif args.preflight:
-        output_path = Path("runs/LIP-PROTO-005/preflight/generations.jsonl")
+        configured_output = Path(str(config["output"]["generations_jsonl"]))
+        output_path = configured_output.parent / "preflight" / "generations.jsonl"
     else:
         output_path = Path(str(config["output"]["generations_jsonl"]))
     metadata = run_generation(
