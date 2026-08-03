@@ -7,6 +7,7 @@ from src.evaluation.oracle_functional import (
     ORACLE_FUNCTIONAL_CONDITIONS,
     ORACLE_FUNCTIONAL_PROTOCOL_VERSION,
     build_condition_plan,
+    declares_entry_point,
     design_fingerprint,
 )
 from src.pipelines.oracle_experiment import load_yaml
@@ -55,6 +56,15 @@ def test_design_fingerprint_changes_with_generation_or_packet_contract():
     changed = copy.deepcopy(config)
     changed["generation"]["temperature"] = 0.3
     assert design_fingerprint(changed) != baseline
+
+
+def test_entry_point_metric_requires_an_actual_function_declaration():
+    assert declares_entry_point("def solve():\n    return 1", "solve") is True
+    assert declares_entry_point("solve = lambda: 1", "solve") is False
+    assert declares_entry_point("def other():\n    return 1", "solve") is False
+    assert declares_entry_point("def solve(:\n    pass", "solve") is False
+    with pytest.raises(ValueError, match="entry_point"):
+        declares_entry_point("def solve():\n    pass", None)
     changed = copy.deepcopy(config)
     changed["packet"]["layer_idx"] = -8
     assert design_fingerprint(changed) != baseline

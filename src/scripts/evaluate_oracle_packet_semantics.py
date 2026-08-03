@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 
 from src.evaluation.oracle_functional import (
     ORACLE_FUNCTIONAL_PROTOCOL_VERSION,
+    declares_entry_point,
     design_fingerprint,
 )
 from src.evaluation.semantics import evaluate_generation
@@ -141,16 +142,20 @@ def evaluate(
     )
     prepare_output_dir(output_dir, overwrite=overwrite)
     evaluation_config = config["evaluation"]
-    scored = [
-        evaluate_generation(
+    scored = []
+    for row in records:
+        scored_row = evaluate_generation(
             row,
             row["task_spec"],
             run_functional=functional,
             timeout_seconds=float(evaluation_config["timeout_seconds"]),
             memory_mb=int(evaluation_config["memory_mb"]),
         )
-        for row in records
-    ]
+        scored_row["entry_point_declared"] = declares_entry_point(
+            scored_row["extracted_code"],
+            row["task_spec"].get("entry_point"),
+        )
+        scored.append(scored_row)
     conditions = list(config["conditions"])
     comparisons = list(evaluation_config["comparisons"])
     statistics_kwargs = {
@@ -165,7 +170,14 @@ def evaluate(
             conditions,
             comparisons,
             **statistics_kwargs,
-        )
+        ),
+        "entry_point_declared": summarize_metric(
+            scored,
+            "entry_point_declared",
+            conditions,
+            comparisons,
+            **statistics_kwargs,
+        ),
     }
     if functional:
         metrics["functional_pass"] = summarize_metric(

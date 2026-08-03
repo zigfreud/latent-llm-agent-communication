@@ -42,7 +42,8 @@ python -m src.scripts.evaluate_oracle_packet_semantics \
 ```
 
 Generation and code execution are deliberately separated. Syntax scoring does
-not execute model output. Functional scoring must run without Drive mounts,
+not execute model output. It reports both syntax pass and whether the generated
+AST declares the benchmark's required entry point. Functional scoring must run without Drive mounts,
 credentials, or network access in a disposable sandbox; the legacy
 resource-limited subprocess is explicitly not a security boundary.
 

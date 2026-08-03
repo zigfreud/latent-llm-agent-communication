@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 from dataclasses import asdict, dataclass
@@ -103,3 +104,19 @@ def build_condition_plan(
 
 def plan_as_dicts(plan: Iterable[OracleCondition]) -> list[dict]:
     return [asdict(item) for item in plan]
+
+
+def declares_entry_point(code: str, entry_point: str | None) -> bool:
+    """Return whether syntactically valid candidate code declares the required name."""
+
+    if not isinstance(entry_point, str) or not entry_point.strip():
+        raise ValueError("functional task must define a non-empty entry_point")
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return False
+    return any(
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == entry_point
+        for node in ast.walk(tree)
+    )
