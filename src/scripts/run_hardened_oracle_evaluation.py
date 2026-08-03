@@ -34,7 +34,7 @@ NOBODY_UID = 65534
 NOBODY_GID = 65534
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INTERNAL_SOURCE = Path("/tmp/lip-work/source")
-INTERNAL_OUTPUT = Path("/tmp/lip-work/output")
+INTERNAL_OUTPUT = Path("/tmp/lip-work/output/evaluation")
 INTERNAL_CONFIG = INTERNAL_SOURCE / "input" / "config.yaml"
 INTERNAL_GENERATIONS = INTERNAL_SOURCE / "input" / "generations.jsonl"
 
@@ -217,8 +217,9 @@ def _run_parent(args: argparse.Namespace) -> None:
             detail = (completed.stderr or completed.stdout)[-4000:]
             raise RuntimeError(f"hardened evaluation failed:\n{detail}")
 
-        summary_path = output / "summary.json"
-        report_path = output / "sandbox_report.json"
+        sandbox_output = output / "evaluation"
+        summary_path = sandbox_output / "summary.json"
+        report_path = sandbox_output / "sandbox_report.json"
         if not summary_path.is_file() or not report_path.is_file():
             raise RuntimeError("hardened evaluator did not produce summary and probe report")
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
@@ -228,7 +229,7 @@ def _run_parent(args: argparse.Namespace) -> None:
             raise RuntimeError("sandbox result does not bind the staged input hashes")
 
         prepare_output_dir(output_dir, overwrite=args.overwrite)
-        shutil.copytree(output, output_dir, dirs_exist_ok=True)
+        shutil.copytree(sandbox_output, output_dir, dirs_exist_ok=True)
 
     print("Hardened oracle functional evaluation completed")
     print(f"execution_mode: {summary['execution_mode']}")
@@ -275,6 +276,7 @@ def _run_worker(args: argparse.Namespace) -> None:
         "probe_report": "sandbox_report.json",
     }
     config = load_yaml(INTERNAL_CONFIG)
+    os.umask(0o077)
     summary = evaluate(
         config,
         INTERNAL_GENERATIONS,
