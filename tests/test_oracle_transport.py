@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 
 import pytest
 import torch
@@ -20,6 +21,10 @@ from src.pipelines.oracle_transport import (
     forward_with_packet_replacement,
 )
 from src.scripts.run_oracle_packet_audit import validate_config as validate_packet_config
+from src.scripts.plot_oracle_token_position import (
+    recovery_by_packet_size,
+    recovery_by_token_position,
+)
 from src.scripts.run_oracle_transport_audit import (
     bind_tasks_to_manifest,
     validate_config,
@@ -419,6 +424,44 @@ def test_position_summary_tracks_support_at_each_token_position():
     assert selection_positions["3"]["recovery_fraction"] == pytest.approx(0.5)
     assert summary["claim_eligible"] is False
     assert summary["gate"]["passed"] is False
+
+
+def test_position_plot_extractors_preserve_missing_measurements():
+    summary = {
+        "packet_sizes": [1, 8],
+        "by_packet_size": {
+            "1": {
+                "selection": {
+                    "windows": {"first_8_tokens": {"recovery_fraction": None}},
+                    "by_token_position": {
+                        "1": {"informative": False, "recovery_fraction": None},
+                        "2": {"informative": True, "recovery_fraction": 0.2},
+                    },
+                }
+            },
+            "8": {
+                "selection": {
+                    "windows": {"first_8_tokens": {"recovery_fraction": 0.3}},
+                    "by_token_position": {
+                        "1": {"informative": True, "recovery_fraction": 0.4},
+                        "2": {"informative": True, "recovery_fraction": 0.5},
+                    },
+                }
+            },
+        },
+    }
+    sizes, capacity = recovery_by_packet_size(
+        summary, split="selection", window="first_8_tokens"
+    )
+    positions, profile = recovery_by_token_position(
+        summary, packet_size=1, split="selection"
+    )
+    assert sizes == [1, 8]
+    assert math.isnan(capacity[0])
+    assert capacity[1] == pytest.approx(0.3)
+    assert positions == [1, 2]
+    assert math.isnan(profile[0])
+    assert profile[1] == pytest.approx(0.2)
 
 
 def test_packet_config_freezes_layer_capacity_axis_and_replication_anchor():

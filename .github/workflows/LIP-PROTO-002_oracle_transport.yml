@@ -26,6 +26,7 @@ on:
       - "src/pipelines/oracle_experiment.py"
       - "src/pipelines/oracle_transport.py"
       - "src/scripts/run_oracle_packet_audit.py"
+      - "src/scripts/plot_oracle_token_position.py"
       - "src/scripts/run_oracle_packet_functional.py"
       - "src/scripts/evaluate_oracle_packet_semantics.py"
       - "src/scripts/run_oracle_transport_audit.py"
@@ -64,6 +65,7 @@ jobs:
             src/pipelines/oracle_experiment.py \
             src/pipelines/oracle_transport.py \
             src/scripts/run_oracle_packet_audit.py \
+            src/scripts/plot_oracle_token_position.py \
             src/scripts/run_oracle_packet_functional.py \
             src/scripts/evaluate_oracle_packet_semantics.py \
             src/scripts/run_oracle_transport_audit.py \

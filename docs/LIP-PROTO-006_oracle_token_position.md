@@ -123,3 +123,61 @@ python -m src.scripts.run_oracle_packet_audit \
 None of these outcomes decides whether latent agent communication is possible
 in general. The protocol discriminates between a capacity failure and a
 bootstrap/interface failure under one precisely defined intervention.
+
+## Frozen full-run result
+
+The 16-task full run selected `K=8` on the first eight tasks and confirmed the
+first-eight-token recovery gate on the disjoint final eight tasks. Exact
+self-replacement had maximum absolute NLL delta `0.0` over all seven packet
+sizes. The preflight was not used for selection or inference.
+
+| K | First 8 selection | First 8 confirmation | After token 8 selection | After token 8 confirmation | Full selection | Full confirmation |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 0.26% | 0.46% | -0.09% | 0.65% | 0.18% | 0.51% |
+| 2 | 0.34% | 0.89% | -0.49% | 0.39% | 0.13% | 0.75% |
+| 4 | 7.31% | 7.71% | 9.56% | 3.29% | 7.87% | 6.48% |
+| 8 | 37.08% | 31.17% | 10.63% | 5.13% | 30.50% | 23.92% |
+| 16 | 68.84% | 71.26% | 13.37% | 8.80% | 55.04% | 53.86% |
+| 32 | 76.73% | 77.20% | 26.17% | 27.36% | 64.15% | 63.32% |
+| 48 | 77.10% | 76.14% | 25.83% | 27.34% | 64.34% | 62.54% |
+
+The result rejects the narrow hypothesis that `LIP-PROTO-004` recovery was
+created mainly by the late teacher-forced continuation. Recovery is stronger
+inside the first eight tokens than after token eight for every `K >= 8`, and
+the capacity curve again saturates near `K=32`.
+
+The first continuation token is normally a Markdown code-fence token and has
+no informative task-text advantage on the selection split. Token positions
+1--3 therefore cannot serve as a stable semantic bootstrap statistic. Position
+4 is usually the first task-specific function-name token: its pooled task-text
+advantage is 13.54/13.48 NLL on the selection/confirmation splits. Recovery at
+that exact position rises from 49%/25% for `K=8` to 86%/89% for `K=16` and
+90%/95% for `K=32`.
+
+This reconciles the NLL and functional results more precisely. `K=8` carries
+substantial information about the required entry point, but partial likelihood
+recovery need not change the free-generation argmax; `LIP-PROTO-005` still
+observed zero correct non-text entry points at that capacity. The sharp rise at
+`K=16` and `K=32` motivates a functional packet-size escalation rather than an
+immediate switch to a different carrier.
+
+Generate the registered vector figure directly from the archived summary:
+
+```bash
+python -m src.scripts.plot_oracle_token_position \
+  --summary runs/LIP-PROTO-006/oracle-token-position/summary.json
+```
+
+Immutable artifacts are stored at
+`lip-artifacts/LIP-H0-005/LIP-PROTO-006/v1-token-position-full` on Drive:
+
+- `summary.json`: `90206a52c0c607da05df311fc7c03da2b30852044aaf3b4c6377e4b05a29e0a8`
+- `oracle_packet_records.jsonl`: `35cb58a4eea89484b17807ead3109a065420ac01729c55a0ad6401212d110fbb`
+- `references.jsonl`: `4b490be0ebfc547d551a7596577bb760f580c9c7ec36426ec925e7a624d68d66`
+- `resolved_config.yaml`: `fa01c47707b1d4ccccfc8ce5af130eefc13b3a55f416ddc95a372549b7d74c15`
+
+The next protocol must keep layer `-16` and the suffix-replacement carrier,
+reserve the unused held-out tasks 16:32, and compare functional matched and
+task-mismatched packets at `K = [8, 16, 32]`. `K=8` is the replication anchor;
+`K=16` and `K=32` test whether the early-token likelihood curve crosses a
+functional decision boundary.
