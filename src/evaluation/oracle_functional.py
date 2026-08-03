@@ -6,7 +6,7 @@ import ast
 import hashlib
 import json
 from dataclasses import asdict, dataclass
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from src.evaluation.source_only import derangement_indices
 
@@ -120,3 +120,26 @@ def declares_entry_point(code: str, entry_point: str | None) -> bool:
         and node.name == entry_point
         for node in ast.walk(tree)
     )
+
+
+def semantic_gate(condition_means: Mapping[str, float]) -> dict:
+    """Apply the frozen functional decision rule to task-clustered pass rates."""
+
+    required = set(ORACLE_FUNCTIONAL_CONDITIONS)
+    missing = sorted(required.difference(condition_means))
+    if missing:
+        raise ValueError(f"functional gate is missing condition(s): {', '.join(missing)}")
+    means = {condition: float(condition_means[condition]) for condition in required}
+    checks = {
+        "text_control_nonzero": means["text_only_no_lip"] > 0.0,
+        "k8_beats_neutral": means["oracle_packet_k8"] > means["neutral_no_lip"],
+        "k8_beats_shuffled_k8": means["oracle_packet_k8"]
+        > means["shuffled_oracle_packet_k8"],
+        "k8_beats_k1": means["oracle_packet_k8"] > means["oracle_packet_k1"],
+    }
+    return {
+        "metric": "functional_pass",
+        "condition_means": means,
+        "checks": checks,
+        "passed": all(checks.values()),
+    }

@@ -9,6 +9,7 @@ from src.evaluation.oracle_functional import (
     build_condition_plan,
     declares_entry_point,
     design_fingerprint,
+    semantic_gate,
 )
 from src.pipelines.oracle_experiment import load_yaml
 from src.pipelines.oracle_transport import generate_with_optional_packet
@@ -68,6 +69,21 @@ def test_entry_point_metric_requires_an_actual_function_declaration():
     assert declares_entry_point("def solve(:\n    pass", "solve") is False
     with pytest.raises(ValueError, match="entry_point"):
         declares_entry_point("def solve():\n    pass", None)
+
+
+def test_semantic_gate_requires_text_capacity_and_three_packet_improvements():
+    passing = {
+        "neutral_no_lip": 0.0,
+        "text_only_no_lip": 0.5,
+        "oracle_packet_k1": 0.0,
+        "oracle_packet_k8": 0.25,
+        "shuffled_oracle_packet_k8": 0.0,
+    }
+    assert semantic_gate(passing)["passed"] is True
+    failing = {**passing, "oracle_packet_k8": 0.0}
+    gate = semantic_gate(failing)
+    assert gate["checks"]["text_control_nonzero"] is True
+    assert gate["passed"] is False
 
 
 def test_generate_with_packet_replaces_prompt_prefill_once():

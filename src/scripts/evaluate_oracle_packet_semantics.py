@@ -11,6 +11,7 @@ from src.evaluation.oracle_functional import (
     ORACLE_FUNCTIONAL_PROTOCOL_VERSION,
     declares_entry_point,
     design_fingerprint,
+    semantic_gate,
 )
 from src.evaluation.semantics import evaluate_generation
 from src.evaluation.statistics import summarize_metric
@@ -187,6 +188,16 @@ def evaluate(
             comparisons,
             **statistics_kwargs,
         )
+    gate = None
+    if functional:
+        gate = semantic_gate(
+            {
+                condition: values["mean"]
+                for condition, values in metrics["functional_pass"][
+                    "conditions"
+                ].items()
+            }
+        )
     summary = {
         "experiment_id": config["experiment_id"],
         "protocol_version": ORACLE_FUNCTIONAL_PROTOCOL_VERSION,
@@ -199,6 +210,14 @@ def evaluate(
             functional
             and design_validation["complete"]
             and design_validation["run_scope"] == "full"
+        ),
+        "semantic_gate": gate,
+        "semantic_transport_supported": bool(
+            functional
+            and design_validation["complete"]
+            and design_validation["run_scope"] == "full"
+            and gate
+            and gate["passed"]
         ),
         "design_validation": design_validation,
         "metrics": metrics,
