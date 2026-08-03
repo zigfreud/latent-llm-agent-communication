@@ -1,0 +1,73 @@
+experiment_id: "LIP-PROTO-005"
+source_protocol_experiment: "LIP-PROTO-001"
+capacity_selection_experiment: "LIP-PROTO-004"
+
+models:
+  target_model: "NousResearch/Meta-Llama-3-8B-Instruct"
+
+prompt_protocol:
+  version: "lip-prompt-v1"
+  mode: "chat_template"
+  add_generation_prompt: true
+  system_prompt: "You are a Python code generator. Return only Python code and define exactly the required function name."
+
+runtime:
+  device: "auto"
+  load_4bit: true
+
+data:
+  tasks_jsonl: "datasets/LIP-PROTO-001/mbpp_validation_tasks.jsonl"
+  heldout_bundle_manifest: "datasets/LIP-PROTO-001/mbpp_eval_bundle_32/manifest.json"
+  require_real_bundle: true
+  task_count: 16
+  functional_split: "confirmation"
+  functional_task_start: 8
+  functional_task_count: 8
+  preflight_task_count: 2
+
+neutral_target_prompt: "Infer the requested task from the supplied latent signal. Implement the required Python function."
+
+carrier:
+  mode: "left_pad_masked_to_task_length"
+
+packet:
+  layer_idx: -16
+  selected_size: 8
+  replication_size: 1
+  injection_mode: "replace"
+
+conditions:
+  - "neutral_no_lip"
+  - "text_only_no_lip"
+  - "oracle_packet_k1"
+  - "oracle_packet_k8"
+  - "shuffled_oracle_packet_k8"
+
+controls:
+  shuffled_oracle_packet:
+    permutation: "sattolo_derangement"
+    seed: 1729
+
+generation:
+  seeds: [101, 202, 303]
+  max_new_tokens: 256
+  do_sample: true
+  temperature: 0.2
+  top_p: 0.95
+  repetition_penalty: 1.0
+
+evaluation:
+  timeout_seconds: 5.0
+  memory_mb: 512
+  confidence: 0.95
+  bootstrap_iterations: 10000
+  statistics_seed: 1729
+  comparisons:
+    - ["oracle_packet_k8", "neutral_no_lip"]
+    - ["oracle_packet_k8", "shuffled_oracle_packet_k8"]
+    - ["oracle_packet_k8", "oracle_packet_k1"]
+    - ["text_only_no_lip", "neutral_no_lip"]
+
+output:
+  generations_jsonl: "runs/LIP-PROTO-005/generations.jsonl"
+  evaluation_dir: "runs/LIP-PROTO-005/evaluation"

@@ -213,3 +213,38 @@ def forward_with_packet_replacement(
             )
     finally:
         handle.remove()
+
+
+def generate_with_optional_packet(
+    model,
+    tokenizer,
+    inputs: Mapping[str, torch.Tensor],
+    *,
+    generation_kwargs: Mapping[str, Any],
+    layer_idx: int | None = None,
+    positions: torch.Tensor | None = None,
+    vectors: torch.Tensor | None = None,
+) -> str:
+    """Generate a continuation while replacing one packet during prompt prefill."""
+
+    if inputs["input_ids"].ndim != 2 or inputs["input_ids"].shape[0] != 1:
+        raise ValueError("oracle packet generation currently requires one prompt")
+    handle = None
+    if vectors is not None:
+        if layer_idx is None or positions is None:
+            raise ValueError("layer_idx and positions are required with packet vectors")
+        hook = make_lip_packet_hook(vectors, positions, enable=True, mode="replace")
+        handle = model.model.layers[layer_idx].register_forward_hook(hook)
+    elif layer_idx is not None or positions is not None:
+        raise ValueError("packet layer and positions require packet vectors")
+    prompt_length = int(inputs["input_ids"].shape[1])
+    try:
+        with torch.inference_mode():
+            generated = model.generate(**inputs, **dict(generation_kwargs))
+    finally:
+        if handle is not None:
+            handle.remove()
+    continuation = generated[0, prompt_length:]
+    return tokenizer.decode(continuation, skip_special_tokens=True).replace(
+        "</s>", ""
+    ).strip()

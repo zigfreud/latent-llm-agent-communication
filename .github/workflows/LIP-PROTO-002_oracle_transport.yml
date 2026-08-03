@@ -9,20 +9,26 @@ on:
       - "config/LIP-PROTO-002_oracle_transport.yaml"
       - "config/LIP-PROTO-003_length_controlled_oracle.yaml"
       - "config/LIP-PROTO-004_oracle_packet_capacity.yaml"
+      - "config/LIP-PROTO-005_oracle_packet_functional.yaml"
       - "docs/LIP-PROTO-002_oracle_transport_audit.md"
       - "docs/LIP-PROTO-003_length_controlled_oracle.md"
       - "docs/LIP-PROTO-004_oracle_packet_capacity.md"
+      - "docs/LIP-PROTO-005_oracle_packet_functional.md"
       - "requirements-protocol.txt"
       - "src/core/prompt_protocol.py"
       - "src/core/utils.py"
       - "src/evaluation/oracle_transport.py"
+      - "src/evaluation/oracle_functional.py"
       - "src/integrations/hooks.py"
       - "src/pipelines/infer.py"
       - "src/pipelines/oracle_experiment.py"
       - "src/pipelines/oracle_transport.py"
       - "src/scripts/run_oracle_packet_audit.py"
+      - "src/scripts/run_oracle_packet_functional.py"
+      - "src/scripts/evaluate_oracle_packet_semantics.py"
       - "src/scripts/run_oracle_transport_audit.py"
       - "tests/test_oracle_transport.py"
+      - "tests/test_oracle_functional.py"
   workflow_dispatch:
 
 permissions:
@@ -52,20 +58,24 @@ jobs:
         run: |
           python -m compileall -q \
             src/evaluation/oracle_transport.py \
+            src/evaluation/oracle_functional.py \
             src/pipelines/oracle_experiment.py \
             src/pipelines/oracle_transport.py \
             src/scripts/run_oracle_packet_audit.py \
+            src/scripts/run_oracle_packet_functional.py \
+            src/scripts/evaluate_oracle_packet_semantics.py \
             src/scripts/run_oracle_transport_audit.py \
             tests/test_oracle_transport.py
 
       - name: Import audit entry points
-        run: python -c "import src.scripts.run_oracle_transport_audit; import src.scripts.run_oracle_packet_audit"
+        run: python -c "import src.scripts.run_oracle_transport_audit; import src.scripts.run_oracle_packet_audit; import src.scripts.run_oracle_packet_functional; import src.scripts.evaluate_oracle_packet_semantics"
 
       - name: Validate frozen audit configuration
         run: |
           python -c "import yaml; from src.scripts.run_oracle_transport_audit import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-002_oracle_transport.yaml')))"
           python -c "import yaml; from src.scripts.run_oracle_transport_audit import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-003_length_controlled_oracle.yaml')))"
           python -c "import yaml; from src.scripts.run_oracle_packet_audit import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-004_oracle_packet_capacity.yaml')))"
+          python -c "import yaml; from src.scripts.run_oracle_packet_functional import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-005_oracle_packet_functional.yaml')))"
 
       - name: Run oracle transport tests
-        run: python -m pytest -q tests/test_oracle_transport.py tests/test_hooks.py tests/test_prompt_protocol.py
+        run: python -m pytest -q tests/test_oracle_transport.py tests/test_oracle_functional.py tests/test_hooks.py tests/test_prompt_protocol.py
