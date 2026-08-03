@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -79,7 +80,9 @@ def write_markdown(path: Path, summary: dict):
         f"- Records: {summary['record_count']}",
         f"- Tasks: {summary['task_count']}",
         f"- Execution mode: {summary['execution_mode']}",
+        f"- Run scope: {summary['design_validation']['run_scope']}",
         f"- Complete factorial design: {str(summary['design_validation']['complete']).lower()}",
+        f"- Claim eligible: {str(summary['design_validation']['claim_eligible']).lower()}",
         "- Confidence intervals resample tasks and average repeated training/generation seeds within task.",
         "",
     ]
@@ -155,6 +158,7 @@ def validate_generation_records(
     training_bundle_hashes = set()
     heldout_bundle_hashes = set()
     checkpoint_hashes = {}
+    run_scopes = set()
     neutral_hash = hashlib.sha256(
         str(config.get("neutral_target_prompt", "")).strip().encode("utf-8")
     ).hexdigest()
@@ -164,6 +168,14 @@ def validate_generation_records(
         "source_latent": ("translated_source", "matching"),
         "shuffled_source_latent": ("translated_source", "different"),
         "random_norm_matched": ("random_norm_matched", None),
+        "oracle_target_latent": ("target_hidden", "matching"),
+    }
+    norm_reference_expectations = {
+        "neutral_no_lip": (None, None),
+        "text_only_no_lip": (None, None),
+        "source_latent": ("translated_source", "matching"),
+        "shuffled_source_latent": ("matching_translated_source", "matching"),
+        "random_norm_matched": ("matching_translated_source", "matching"),
         "oracle_target_latent": ("target_hidden", "matching"),
     }
 
@@ -184,6 +196,7 @@ def validate_generation_records(
             raise ValueError(f"unexpected seed in generation record: {key}")
         if row.get("protocol_version") != "lip-source-only-v1":
             raise ValueError("generation record has the wrong protocol_version")
+        run_scopes.add(row.get("run_scope"))
         design_hashes.add(row.get("design_sha256"))
         training_bundle_hashes.add(row.get("training_bundle_manifest_sha256"))
         heldout_bundle_hashes.add(row.get("heldout_bundle_manifest_sha256"))
@@ -220,6 +233,17 @@ def validate_generation_records(
             if norm is None or float(norm) <= 0:
                 raise ValueError(f"generation record {key} has no positive vector norm")
 
+        expected_norm_kind, norm_task_relation = norm_reference_expectations[condition]
+        if row.get("vector_norm_reference_kind") != expected_norm_kind:
+            raise ValueError(f"generation record {key} has the wrong norm reference")
+        norm_reference_task_id = row.get("vector_norm_reference_task_id")
+        if norm_task_relation == "matching" and str(norm_reference_task_id) != task_id:
+            raise ValueError(
+                f"generation record {key} must use the matching task as norm reference"
+            )
+        if norm_task_relation is None and norm_reference_task_id is not None:
+            raise ValueError(f"generation record {key} has unexpected norm provenance")
+
         if condition == "text_only_no_lip":
             if row.get("target_prompt_kind") != "task":
                 raise ValueError(f"generation record {key} must expose task text")
@@ -234,7 +258,39 @@ def validate_generation_records(
             if row.get("target_user_prompt_sha256") != neutral_hash:
                 raise ValueError(f"generation record {key} used a non-neutral target prompt")
 
+    rows_by_key = {
+        (
+            str(row["task_id"]),
+            str(row["condition"]),
+            int(row["training_seed"]),
+            int(row["generation_seed"]),
+        ): row
+        for row in records
+    }
+    for task_id, _, training_seed, generation_seed in keys:
+        source = rows_by_key.get(
+            (task_id, "source_latent", training_seed, generation_seed)
+        )
+        if source is None:
+            continue
+        source_norm = float(source["injected_vector_norm"])
+        for control in ("shuffled_source_latent", "random_norm_matched"):
+            row = rows_by_key.get((task_id, control, training_seed, generation_seed))
+            if row is not None and not math.isclose(
+                float(row["injected_vector_norm"]),
+                source_norm,
+                rel_tol=1e-5,
+                abs_tol=1e-6,
+            ):
+                raise ValueError(
+                    f"{control} norm does not match source_latent for "
+                    f"{task_id}/{training_seed}/{generation_seed}"
+                )
+
     expected_design_hash = design_fingerprint(config)
+    allowed_run_scopes = {"full", "preflight", "diagnostic_subset"}
+    if len(run_scopes) != 1 or not run_scopes.issubset(allowed_run_scopes):
+        raise ValueError("generation records must share one valid run_scope")
     if design_hashes != {expected_design_hash}:
         raise ValueError("generation records do not match the configured design fingerprint")
     if len(training_bundle_hashes) != 1 or not all(
@@ -269,8 +325,12 @@ def validate_generation_records(
         raise ValueError(
             f"generation design is missing {len(missing)} records; first missing: {missing[0]}"
         )
+    complete = not missing and len(tasks) == expected_task_count
+    run_scope = next(iter(run_scopes))
     return {
-        "complete": not missing and len(tasks) == expected_task_count,
+        "complete": complete,
+        "run_scope": run_scope,
+        "claim_eligible": complete and run_scope == "full",
         "task_count": len(tasks),
         "expected_task_count": expected_task_count,
         "record_count": len(records),

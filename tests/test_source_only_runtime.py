@@ -8,7 +8,9 @@ import torch
 from src.scripts.run_source_only_probe import (
     load_heldout_vectors,
     load_existing_results,
+    match_vector_norm,
     random_norm_matched,
+    select_execution_axes,
     stable_seed,
     verify_heldout_bundle,
 )
@@ -154,6 +156,37 @@ def test_random_control_matches_each_reference_norm():
     control = random_norm_matched(reference, seed=12)
     assert control.norm().item() == pytest.approx(reference.norm().item())
     assert torch.equal(control, random_norm_matched(reference, seed=12))
+
+
+def test_shuffled_direction_can_be_matched_to_current_source_norm():
+    shuffled = torch.tensor([[0.0, 2.0, 0.0]])
+    matching_source = torch.tensor([[3.0, 4.0, 0.0]])
+    control = match_vector_norm(shuffled, matching_source)
+    assert control.norm().item() == pytest.approx(matching_source.norm().item())
+    assert torch.nn.functional.cosine_similarity(control, shuffled).item() == pytest.approx(1.0)
+
+
+def test_norm_matching_rejects_zero_vectors():
+    with pytest.raises(ValueError, match="positive norms"):
+        match_vector_norm(torch.zeros(1, 3), torch.ones(1, 3))
+
+
+def test_preflight_selects_two_tasks_one_checkpoint_and_one_generation_seed():
+    tasks = [{"task_id": "a"}, {"task_id": "b"}]
+    checkpoints = [
+        {"training_seed": 41, "path": "a"},
+        {"training_seed": 42, "path": "b"},
+        {"training_seed": 43, "path": "c"},
+    ]
+    selected, training_seeds, generation_seeds = select_execution_axes(
+        tasks,
+        checkpoints,
+        [101, 202, 303],
+        preflight=True,
+    )
+    assert selected == checkpoints[:1]
+    assert training_seeds == [41]
+    assert generation_seeds == [101]
 
 
 def test_stable_seed_is_deterministic_and_order_sensitive():

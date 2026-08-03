@@ -47,6 +47,14 @@ def parse_args():
     parser.add_argument("--tasks", type=Path, default=None)
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--max-tasks", type=int, default=None)
+    parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help=(
+            "Run two tasks, the first adapter checkpoint, and the first generation "
+            "seed as a non-claim-eligible real-model diagnostic."
+        ),
+    )
     output_mode = parser.add_mutually_exclusive_group()
     output_mode.add_argument(
         "--resume",
@@ -151,13 +159,25 @@ def resolve_tasks(config: Mapping[str, Any], override: Path | None) -> list[dict
     return tasks
 
 
+def match_vector_norm(vector: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
+    """Match ``vector`` to ``reference`` energy without changing its direction."""
+
+    vector_norm = vector.detach().float().norm(p=2, dim=-1, keepdim=True)
+    reference_norm = reference.detach().float().norm(p=2, dim=-1, keepdim=True)
+    if not torch.isfinite(vector_norm).all() or not torch.isfinite(reference_norm).all():
+        raise ValueError("control vectors must have finite norms")
+    if (vector_norm <= 1e-12).any() or (reference_norm <= 1e-12).any():
+        raise ValueError("control vectors must have positive norms")
+    scale = reference_norm.to(vector.device) / vector_norm.to(vector.device)
+    return vector * scale.to(dtype=vector.dtype)
+
+
 def random_norm_matched(reference: torch.Tensor, seed: int) -> torch.Tensor:
     generator = torch.Generator(device="cpu")
     generator.manual_seed(int(seed))
     noise = torch.randn(reference.shape, generator=generator, dtype=torch.float32)
-    reference_norm = reference.detach().cpu().float().norm(p=2, dim=-1, keepdim=True)
-    noise = noise * (reference_norm / noise.norm(p=2, dim=-1, keepdim=True).clamp_min(1e-12))
-    return noise.to(device=reference.device, dtype=reference.dtype)
+    noise = noise.to(device=reference.device, dtype=reference.dtype)
+    return match_vector_norm(noise, reference)
 
 
 def stable_seed(*values: int) -> int:
@@ -190,6 +210,24 @@ def resolve_adapter_device(value: str) -> str:
     if value not in {"cpu", "cuda"}:
         raise ValueError("runtime.device_adapter must be auto, cpu, or cuda")
     return value
+
+
+def select_execution_axes(
+    tasks: list[dict],
+    checkpoints: list[dict],
+    generation_seeds: list[int],
+    *,
+    preflight: bool,
+) -> tuple[list[dict], list[int], list[int]]:
+    """Select the factorial axes while keeping preflight intentionally tiny."""
+
+    checkpoint_seeds = [int(item["training_seed"]) for item in checkpoints]
+    normalized_generation_seeds = [int(seed) for seed in generation_seeds]
+    if preflight:
+        if len(tasks) != 2:
+            raise ValueError("preflight requires exactly two tasks")
+        return checkpoints[:1], checkpoint_seeds[:1], normalized_generation_seeds[:1]
+    return checkpoints, checkpoint_seeds, normalized_generation_seeds
 
 
 def write_json(path: Path, payload: Any):
@@ -519,6 +557,7 @@ def run_probe(
     *,
     resume: bool = False,
     overwrite: bool = False,
+    preflight: bool = False,
 ) -> dict:
     experiment_id = str(config.get("experiment_id", "LIP-PROTO-001"))
     conditions = validate_conditions(config.get("conditions", []))
@@ -532,23 +571,52 @@ def run_probe(
     lip = config.get("lip", {})
     adapter_config = config.get("adapter", {})
     generation_config = config.get("generation", {})
-    checkpoints = adapter_config.get("checkpoints", [])
-    if not isinstance(checkpoints, list) or not checkpoints:
+    configured_checkpoints = adapter_config.get("checkpoints", [])
+    if not isinstance(configured_checkpoints, list) or not configured_checkpoints:
         raise ValueError("adapter.checkpoints must be a non-empty list")
     if any(
         not isinstance(item, dict) or "training_seed" not in item or "path" not in item
-        for item in checkpoints
+        for item in configured_checkpoints
     ):
         raise ValueError("each adapter checkpoint needs training_seed and path")
-    generation_seeds = generation_config.get("seeds", [])
-    if not isinstance(generation_seeds, list) or not generation_seeds:
+    configured_generation_seeds = generation_config.get("seeds", [])
+    if not isinstance(configured_generation_seeds, list) or not configured_generation_seeds:
         raise ValueError("generation.seeds must be a non-empty list")
-    checkpoint_seeds = [int(item["training_seed"]) for item in checkpoints]
+    configured_checkpoint_seeds = [
+        int(item["training_seed"]) for item in configured_checkpoints
+    ]
+    checkpoint_seeds = list(configured_checkpoint_seeds)
     if len(set(checkpoint_seeds)) != len(checkpoint_seeds):
         raise ValueError("adapter checkpoint training_seed values must be unique")
-    normalized_generation_seeds = [int(seed) for seed in generation_seeds]
+    configured_normalized_generation_seeds = [
+        int(seed) for seed in configured_generation_seeds
+    ]
+    normalized_generation_seeds = list(configured_normalized_generation_seeds)
     if len(set(normalized_generation_seeds)) != len(normalized_generation_seeds):
         raise ValueError("generation.seeds values must be unique")
+    checkpoints, checkpoint_seeds, normalized_generation_seeds = select_execution_axes(
+        tasks,
+        configured_checkpoints,
+        normalized_generation_seeds,
+        preflight=preflight,
+    )
+
+    controls = config.get("controls", {})
+    expected_controls = {
+        "shuffled_source_latent": {
+            "permutation": "sattolo_derangement",
+            "norm_reference": "matching_source_latent",
+        },
+        "random_norm_matched": {
+            "distribution": "isotropic_gaussian",
+            "norm_reference": "matching_source_latent",
+        },
+    }
+    if controls != expected_controls:
+        raise ValueError(
+            "controls must pin the shuffled derangement and matching-source norm "
+            "references defined by LIP-PROTO-001"
+        )
     if int(extraction.get("target_layer", -1)) != int(lip.get("layer_idx", -2)):
         raise ValueError(
             "extraction.target_layer must match lip.layer_idx for intervention alignment"
@@ -562,6 +630,20 @@ def run_probe(
             "current model loaders require runtime.quantization_compute_dtype=float16"
         )
     design_sha256 = design_fingerprint(config)
+    configured_task_count = int(config.get("data", {}).get("task_count", len(tasks)))
+    full_design_selected = (
+        not preflight
+        and len(tasks) == configured_task_count
+        and checkpoint_seeds == configured_checkpoint_seeds
+        and normalized_generation_seeds == configured_normalized_generation_seeds
+    )
+    run_scope = (
+        "preflight"
+        if preflight
+        else "full"
+        if full_design_selected
+        else "diagnostic_subset"
+    )
 
     existing_keys = set()
     existing_rows = []
@@ -590,6 +672,7 @@ def run_probe(
         row.get("protocol_version") != SOURCE_ONLY_PROTOCOL_VERSION
         or row.get("experiment_id") != experiment_id
         or row.get("design_sha256") != design_sha256
+        or row.get("run_scope") != run_scope
         for row in existing_rows
     ):
         raise ValueError("existing results use a different experiment design")
@@ -733,14 +816,29 @@ def run_probe(
                     )
                     vector = None
                     vector_task_id = None
+                    vector_norm_reference_kind = None
+                    vector_norm_reference_task_id = None
                     if item.vector_kind == "translated_source":
                         vector = translated[item.vector_index]
                         vector_task_id = tasks[item.vector_index]["task_id"]
+                        vector_norm_reference_task_id = task["task_id"]
+                        if item.condition == "shuffled_source_latent":
+                            vector = match_vector_norm(
+                                vector,
+                                translated[item.task_index],
+                            )
+                            vector_norm_reference_kind = "matching_translated_source"
+                        else:
+                            vector_norm_reference_kind = "translated_source"
                     elif item.vector_kind == "random_norm_matched":
                         vector = random_vectors[item.vector_index]
+                        vector_norm_reference_kind = "matching_translated_source"
+                        vector_norm_reference_task_id = task["task_id"]
                     elif item.vector_kind == "target_hidden":
                         vector = oracle[item.vector_index]
                         vector_task_id = tasks[item.vector_index]["task_id"]
+                        vector_norm_reference_kind = "target_hidden"
+                        vector_norm_reference_task_id = task["task_id"]
 
                     effective_seed = stable_seed(
                         generation_seed,
@@ -774,6 +872,7 @@ def run_probe(
                         "protocol_version": SOURCE_ONLY_PROTOCOL_VERSION,
                         "design_sha256": design_sha256,
                         "experiment_id": experiment_id,
+                        "run_scope": run_scope,
                         "task_id": task["task_id"],
                         "condition": item.condition,
                         "training_seed": training_seed,
@@ -788,6 +887,8 @@ def run_probe(
                         ).hexdigest(),
                         "vector_kind": item.vector_kind,
                         "vector_task_id": vector_task_id,
+                        "vector_norm_reference_kind": vector_norm_reference_kind,
+                        "vector_norm_reference_task_id": vector_norm_reference_task_id,
                         "injected_vector_norm": (
                             float(vector.detach().float().norm(p=2).cpu().item())
                             if vector is not None
@@ -838,6 +939,8 @@ def run_probe(
         "records": total_records,
         "expected_records": len(allowed_keys),
         "complete": existing_keys == allowed_keys,
+        "run_scope": run_scope,
+        "claim_eligible": full_design_selected and existing_keys == allowed_keys,
         "new_records": new_records,
         "resumed": resume,
         "models": models,
@@ -860,26 +963,40 @@ def main():
     args = parse_args()
     config = load_yaml(args.config)
     tasks = resolve_tasks(config, args.tasks)
-    if args.max_tasks is not None:
+    if args.preflight and args.max_tasks is not None:
+        raise ValueError("--preflight and --max-tasks are mutually exclusive")
+    if args.preflight:
+        if len(tasks) < 2:
+            raise ValueError("--preflight requires at least two available tasks")
+        tasks = tasks[:2]
+    elif args.max_tasks is not None:
         if args.max_tasks <= 0:
             raise ValueError("--max-tasks must be positive")
         tasks = tasks[: args.max_tasks]
-    output_path = args.output or Path(
-        config.get("output", {}).get(
-            "generations_jsonl",
-            "runs/LIP-PROTO-001/generations.jsonl",
+    if args.output is not None:
+        output_path = args.output
+    elif args.preflight:
+        output_path = Path("runs/LIP-PROTO-001/preflight/generations.jsonl")
+    else:
+        output_path = Path(
+            config.get("output", {}).get(
+                "generations_jsonl",
+                "runs/LIP-PROTO-001/generations.jsonl",
+            )
         )
-    )
     metadata = run_probe(
         config,
         tasks,
         output_path,
         resume=args.resume,
         overwrite=args.overwrite,
+        preflight=args.preflight,
     )
     print("Source-only probe completed")
     print(f"records: {metadata['records']}")
     print(f"new_records: {metadata['new_records']}")
+    print(f"run_scope: {metadata['run_scope']}")
+    print(f"claim_eligible: {metadata['claim_eligible']}")
     print(f"results: {metadata['results_jsonl']}")
 
 

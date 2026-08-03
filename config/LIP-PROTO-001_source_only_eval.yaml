@@ -45,6 +45,14 @@ lip:
   vector_scaling: "none"
   gain: 1.0
 
+controls:
+  shuffled_source_latent:
+    permutation: "sattolo_derangement"
+    norm_reference: "matching_source_latent"
+  random_norm_matched:
+    distribution: "isotropic_gaussian"
+    norm_reference: "matching_source_latent"
+
 data:
   tasks_jsonl: "datasets/LIP-PROTO-001/mbpp_validation_tasks.jsonl"
   heldout_bundle_manifest: "datasets/LIP-PROTO-001/mbpp_eval_bundle_32/manifest.json"

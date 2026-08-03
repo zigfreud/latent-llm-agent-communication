@@ -31,6 +31,7 @@ def design_fingerprint(config: dict) -> str:
         "prompt_protocol": config.get("prompt_protocol", {}),
         "extraction": config.get("extraction", {}),
         "lip": config.get("lip", {}),
+        "controls": config.get("controls", {}),
         "adapter": config.get("adapter", {}),
         "data": config.get("data", {}),
         "generation": config.get("generation", {}),

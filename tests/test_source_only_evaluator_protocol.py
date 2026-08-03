@@ -52,9 +52,22 @@ def make_records(config):
                 vector_task_id = other
             else:
                 vector_task_id = None
+            if condition == "source_latent":
+                norm_reference_kind = "translated_source"
+                norm_reference_task_id = task_id
+            elif condition in {"shuffled_source_latent", "random_norm_matched"}:
+                norm_reference_kind = "matching_translated_source"
+                norm_reference_task_id = task_id
+            elif condition == "oracle_target_latent":
+                norm_reference_kind = "target_hidden"
+                norm_reference_task_id = task_id
+            else:
+                norm_reference_kind = None
+                norm_reference_task_id = None
             rows.append(
                 {
                     "protocol_version": "lip-source-only-v1",
+                    "run_scope": "full",
                     "design_sha256": fingerprint,
                     "training_bundle_manifest_sha256": "a" * 64,
                     "heldout_bundle_manifest_sha256": "c" * 64,
@@ -75,6 +88,8 @@ def make_records(config):
                     ).hexdigest(),
                     "vector_kind": vector_kinds[condition],
                     "vector_task_id": vector_task_id,
+                    "vector_norm_reference_kind": norm_reference_kind,
+                    "vector_norm_reference_task_id": norm_reference_task_id,
                     "injected_vector_norm": (
                         None if vector_kinds[condition] is None else 2.0
                     ),
@@ -99,3 +114,22 @@ def test_source_latent_task_text_leak_is_rejected():
     ).hexdigest()
     with pytest.raises(ValueError, match="non-neutral"):
         validate_generation_records(rows, config)
+
+
+def test_shuffled_norm_mismatch_is_rejected():
+    config = make_design()
+    rows = make_records(config)
+    shuffled = next(row for row in rows if row["condition"] == "shuffled_source_latent")
+    shuffled["injected_vector_norm"] = 3.0
+    with pytest.raises(ValueError, match="norm does not match"):
+        validate_generation_records(rows, config)
+
+
+def test_preflight_scope_is_never_claim_eligible():
+    config = make_design()
+    rows = make_records(config)
+    for row in rows:
+        row["run_scope"] = "preflight"
+    report = validate_generation_records(rows, config)
+    assert report["complete"] is True
+    assert report["claim_eligible"] is False

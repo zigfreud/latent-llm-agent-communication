@@ -35,6 +35,13 @@ def test_source_only_config_has_independent_seeds_and_required_controls():
     assert config["data"]["heldout_bundle_manifest"].endswith(
         "mbpp_eval_bundle_32/manifest.json"
     )
+    assert config["controls"]["shuffled_source_latent"] == {
+        "permutation": "sattolo_derangement",
+        "norm_reference": "matching_source_latent",
+    }
+    assert config["controls"]["random_norm_matched"]["norm_reference"] == (
+        "matching_source_latent"
+    )
 
 
 def test_target_extraction_layer_matches_injection_layer():

@@ -46,8 +46,12 @@ The primary `source_latent` condition follows this path:
 Replacement is used because the adapter is trained to predict the target hidden
 state itself, not an additive residual. The protocol does not recalibrate that
 vector against input-embedding energy: `vector_scaling=none` and `gain=1.0`
-preserve the learned target-space norm. The random control is norm-matched to
-the corresponding translated vector.
+preserve the learned target-space norm. Both semantic-negative controls are
+matched to the corresponding translated vector's norm: the shuffled control
+keeps another task's direction but adopts the current task treatment's norm,
+while the random control uses an isotropic Gaussian direction at that same
+norm. This prevents a source-versus-control result from being explained only
+by injected energy.
 
 Each result records `target_prompt_kind`, SHA-256 digests of both target-visible
 user text and fully formatted target input, vector provenance, training seed,
@@ -61,13 +65,16 @@ specification is attached only after generation so scoring remains auditable.
 | `neutral_no_lip` | No | None | Neutral baseline |
 | `text_only_no_lip` | Yes | None | Oracle textual baseline |
 | `source_latent` | No | Matching translated source | Primary treatment |
-| `shuffled_source_latent` | No | Another task's translated source | Semantic correspondence control |
+| `shuffled_source_latent` | No | Another task's translated-source direction, matching treatment norm | Semantic correspondence control |
 | `random_norm_matched` | No | Random vector with matched norm | Energy-only control |
 | `oracle_target_latent` | No during generation | Target hidden state extracted from task text | Injection-channel upper-bound diagnostic |
 
 The shuffled mapping is a deterministic derangement, so it has no accidental
-fixed points. Sampling is reset to the same task-level seed across conditions,
-which provides common random numbers for paired comparisons.
+fixed points. Its injected norm and the random control's norm are checked
+against `source_latent` for every task/training-seed/generation-seed cell during
+evaluation. Every row also records the semantic vector source and the separate
+norm-reference task. Sampling is reset to the same task-level seed across
+conditions, which provides common random numbers for paired comparisons.
 
 ## Rebuild and train independent replicas
 
@@ -140,6 +147,34 @@ checkpoint/manifest SHA-256 digests in run metadata.
 
 ## Generate all controls
 
+Before spending the full generation budget, run the real-model preflight after
+the bundles exist and the seed-41 adapter has been trained:
+
+```bash
+python -m src.scripts.run_source_only_probe \
+  --config config/LIP-PROTO-001_source_only_eval.yaml \
+  --preflight
+
+python -m src.scripts.evaluate_source_only_semantics \
+  --config config/LIP-PROTO-001_source_only_eval.yaml \
+  --generations runs/LIP-PROTO-001/preflight/generations.jsonl \
+  --output-dir runs/LIP-PROTO-001/preflight/evaluation \
+  --allow-incomplete
+```
+
+The preflight uses exactly two held-out tasks, the first configured adapter
+checkpoint, one generation seed, and all six conditions: 12 records. It still
+loads the actual Llama target, validates the actual bundles and checkpoint,
+and exercises the injection hook. Its rows are labeled `run_scope=preflight`;
+metadata and evaluation reports mark `claim_eligible=false`. It cannot be resumed into
+or mistaken for the complete factorial run. Inspect the raw outputs and verify
+that the text-only and oracle conditions establish usable task and injection
+channels before launching the full design. If those gates fail, stop and revise
+the prompt/intervention protocol rather than multiplying an invalid setup by
+1,728 generations.
+
+For the complete claim-eligible run:
+
 ```bash
 python -m src.scripts.run_source_only_probe \
   --config config/LIP-PROTO-001_source_only_eval.yaml
@@ -158,6 +193,9 @@ three stochastic generation seeds, and six conditions: 1,728 result records.
 No-vector baselines are deterministic for a fixed task/generation seed and do
 not depend on an adapter, so their text is generated once and copied across
 adapter-seed records with an explicit reuse flag.
+
+`--max-tasks` remains available for ad hoc diagnostics, but any subset receives
+`run_scope=diagnostic_subset` and `claim_eligible=false` in metadata.
 
 ## Score and summarize
 
