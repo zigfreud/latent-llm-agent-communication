@@ -1,4 +1,4 @@
-"""Audit whether one exact target hidden state survives cross-prompt transport."""
+"""Measure how target-oracle transport changes with latent packet capacity."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from src.evaluation.oracle_transport import (
     continuation_token_metrics,
     normalize_layer_indices,
     recovery_fraction,
-    summarize_oracle_transport,
+    summarize_packet_capacity,
 )
 from src.pipelines.infer import load_target, model_input_device
 from src.pipelines.oracle_experiment import (
@@ -32,16 +32,13 @@ from src.pipelines.oracle_transport import (
     append_reference,
     build_neutral_carrier,
     encode_prompt,
-    forward_with_layer_capture,
     forward_with_optional_replacement,
+    forward_with_packet_capture,
+    forward_with_packet_replacement,
 )
 
 
-DEFAULT_CONFIG = Path("config/LIP-PROTO-002_oracle_transport.yaml")
-EXPERIMENT_CARRIER_MODES = {
-    "LIP-PROTO-002": "native",
-    "LIP-PROTO-003": "left_pad_masked_to_task_length",
-}
+DEFAULT_CONFIG = Path("config/LIP-PROTO-004_oracle_packet_capacity.yaml")
 
 
 def parse_args() -> argparse.Namespace:
@@ -61,6 +58,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
     expected_top_level = {
         "experiment_id",
         "source_protocol_experiment",
+        "layer_selection_experiment",
         "models",
         "prompt_protocol",
         "runtime",
@@ -73,27 +71,26 @@ def validate_config(config: Mapping[str, Any]) -> None:
     unknown = sorted(set(config).difference(expected_top_level))
     if unknown:
         raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
-    experiment_id = str(config.get("experiment_id", ""))
-    if experiment_id not in EXPERIMENT_CARRIER_MODES:
-        allowed = ", ".join(EXPERIMENT_CARRIER_MODES)
-        raise ValueError(f"experiment_id must be one of: {allowed}")
+    if config.get("experiment_id") != "LIP-PROTO-004":
+        raise ValueError("experiment_id must be LIP-PROTO-004")
     if config.get("source_protocol_experiment") != "LIP-PROTO-001":
         raise ValueError("source_protocol_experiment must bind LIP-PROTO-001")
+    if config.get("layer_selection_experiment") != "LIP-PROTO-003":
+        raise ValueError("layer_selection_experiment must bind LIP-PROTO-003")
 
     protocol = protocol_metadata(config.get("prompt_protocol"))
     if protocol["mode"] != "chat_template" or not protocol["add_generation_prompt"]:
         raise ValueError(
-            "oracle audit requires the target chat template and generation marker"
+            "oracle packet audit requires the target chat template and generation marker"
         )
     if not str(config.get("neutral_target_prompt", "")).strip():
         raise ValueError("neutral_target_prompt must be non-empty")
-    carrier = config.get("carrier", {"mode": "native"})
-    if not isinstance(carrier, Mapping):
-        raise ValueError("carrier must be a mapping")
-    expected_carrier = EXPERIMENT_CARRIER_MODES[experiment_id]
-    if carrier.get("mode", "native") != expected_carrier:
+    carrier = config.get("carrier", {})
+    if not isinstance(carrier, Mapping) or carrier.get("mode") != (
+        "left_pad_masked_to_task_length"
+    ):
         raise ValueError(
-            f"{experiment_id} requires carrier.mode={expected_carrier}"
+            "LIP-PROTO-004 requires carrier.mode=left_pad_masked_to_task_length"
         )
 
     data = config.get("data", {})
@@ -117,21 +114,31 @@ def validate_config(config: Mapping[str, Any]) -> None:
     if not 2 <= preflight_count <= task_count:
         raise ValueError("preflight_task_count must be between 2 and task_count")
     if str(audit.get("injection_mode", "")) != "replace":
-        raise ValueError("LIP-PROTO-002 fixes injection_mode=replace")
-    if int(audit.get("reference_max_new_tokens", 0)) <= 0:
-        raise ValueError("reference_max_new_tokens must be positive")
-    if int(audit.get("minimum_reference_tokens", 0)) <= 0:
-        raise ValueError("minimum_reference_tokens must be positive")
-    if int(audit.get("self_check_tasks", 0)) <= 0:
-        raise ValueError("self_check_tasks must be positive")
-    if int(audit.get("minimum_informative_tasks_per_split", 0)) <= 0:
-        raise ValueError("minimum_informative_tasks_per_split must be positive")
-    if float(audit.get("minimum_task_advantage_nll", -1.0)) < 0:
-        raise ValueError("minimum_task_advantage_nll must be non-negative")
-    if float(audit.get("minimum_confirmation_recovery", -1.0)) < 0:
-        raise ValueError("minimum_confirmation_recovery must be non-negative")
-    if float(audit.get("maximum_self_nll_delta", -1.0)) < 0:
-        raise ValueError("maximum_self_nll_delta must be non-negative")
+        raise ValueError("LIP-PROTO-004 fixes injection_mode=replace")
+    if int(audit.get("layer_idx", 0)) >= 0:
+        raise ValueError("layer_idx must be a negative transformer-layer index")
+    packet_sizes = [int(size) for size in audit.get("packet_sizes", [])]
+    if not packet_sizes or packet_sizes != sorted(set(packet_sizes)):
+        raise ValueError("packet_sizes must be strictly increasing and unique")
+    if any(size <= 0 for size in packet_sizes):
+        raise ValueError("packet_sizes must be positive")
+    if packet_sizes[0] != 1:
+        raise ValueError("packet_sizes must start at 1 to anchor LIP-PROTO-003")
+    for field in (
+        "reference_max_new_tokens",
+        "minimum_reference_tokens",
+        "self_check_tasks",
+        "minimum_informative_tasks_per_split",
+    ):
+        if int(audit.get(field, 0)) <= 0:
+            raise ValueError(f"{field} must be positive")
+    for field in (
+        "minimum_task_advantage_nll",
+        "minimum_recovery",
+        "maximum_self_nll_delta",
+    ):
+        if float(audit.get(field, -1.0)) < 0:
+            raise ValueError(f"{field} must be non-negative")
     if not isinstance(runtime.get("load_4bit"), bool):
         raise ValueError("runtime.load_4bit must be a boolean")
     if not str(output.get("directory", "")).strip():
@@ -164,13 +171,13 @@ def run_audit(
 
     prepare_output_dir(output_dir, overwrite=overwrite)
     protocol = protocol_metadata(config.get("prompt_protocol"))
-    carrier_mode = str(config.get("carrier", {}).get("mode", "native"))
+    carrier_mode = str(config["carrier"]["mode"])
     runtime = config["runtime"]
     audit = config["audit"]
     target_revision = str(manifest["target_model_revision"])
     set_seed(int(audit.get("seed", 1729)))
 
-    print("Loading target model for oracle transport audit...")
+    print("Loading target model for oracle packet audit...")
     model, tokenizer = load_target(
         str(config["models"]["target_model"]),
         str(runtime.get("device", "auto")),
@@ -178,12 +185,20 @@ def run_audit(
         revision=target_revision,
     )
     device = model_input_device(model)
-    layers = normalize_layer_indices(
-        audit["layers"], len(model.model.layers)
-    )
+    layer_idx = normalize_layer_indices(
+        [int(audit["layer_idx"])], len(model.model.layers)
+    )[0]
+    packet_sizes = [int(size) for size in audit["packet_sizes"]]
+    maximum_packet_size = max(packet_sizes)
     neutral_formatted, neutral_inputs = encode_prompt(
         str(config["neutral_target_prompt"]), tokenizer, protocol, device
     )
+    native_neutral_prompt_length = int(neutral_inputs["input_ids"].shape[1])
+    if maximum_packet_size > native_neutral_prompt_length:
+        raise ValueError(
+            "maximum packet size exceeds the visible native neutral carrier; "
+            "injected positions would remain attention-masked"
+        )
 
     references: list[dict[str, Any]] = []
     records: list[dict[str, Any]] = []
@@ -197,7 +212,10 @@ def run_audit(
             task["prompt"], tokenizer, protocol, device
         )
         task_prompt_length = int(task_inputs["input_ids"].shape[1])
-        native_neutral_prompt_length = int(neutral_inputs["input_ids"].shape[1])
+        if maximum_packet_size > task_prompt_length:
+            raise ValueError(
+                f"task {task['task_id']} is shorter than the maximum packet size"
+            )
         task_neutral_inputs = build_neutral_carrier(
             neutral_inputs,
             task_prompt_length=task_prompt_length,
@@ -216,9 +234,9 @@ def run_audit(
         reference_ids = generated[0, task_prompt_length:].detach()
         if int(reference_ids.numel()) < minimum_reference_tokens:
             raise RuntimeError(
-                f"task {task['task_id']} produced only {reference_ids.numel()} reference tokens"
+                f"task {task['task_id']} produced only {reference_ids.numel()} "
+                "reference tokens"
             )
-        reference_text = tokenizer.decode(reference_ids, skip_special_tokens=True)
         references.append(
             {
                 "task_id": task["task_id"],
@@ -226,17 +244,32 @@ def run_audit(
                 "formatted_task_prompt_sha256": prompt_sha256(task_formatted),
                 "reference_token_count": int(reference_ids.numel()),
                 "reference_token_ids": reference_ids.detach().cpu().tolist(),
-                "reference_text": reference_text,
+                "reference_text": tokenizer.decode(
+                    reference_ids, skip_special_tokens=True
+                ),
             }
         )
 
         task_teacher_inputs = append_reference(task_inputs, reference_ids)
         neutral_teacher_inputs = append_reference(task_neutral_inputs, reference_ids)
-        task_outputs, oracle_vectors = forward_with_layer_capture(
+        maximum_positions = torch.arange(
+            task_prompt_length - maximum_packet_size,
+            task_prompt_length,
+            device=device,
+        )
+        visible_packet_mask = task_neutral_inputs["attention_mask"][
+            0, maximum_positions
+        ]
+        if not bool(torch.all(visible_packet_mask == 1).item()):
+            raise RuntimeError(
+                "packet overlaps attention-masked carrier positions; capacity audit "
+                "would be invalid"
+            )
+        task_outputs, maximum_packet = forward_with_packet_capture(
             model,
             task_teacher_inputs,
-            layers=layers,
-            position=task_prompt_length - 1,
+            layer_idx=layer_idx,
+            positions=maximum_positions,
         )
         task_metrics = continuation_token_metrics(
             task_outputs.logits, reference_ids, task_prompt_length
@@ -244,21 +277,22 @@ def run_audit(
         del task_outputs
 
         neutral_outputs = forward_with_optional_replacement(
-            model,
-            neutral_teacher_inputs,
+            model, neutral_teacher_inputs
         )
         neutral_metrics = continuation_token_metrics(
             neutral_outputs.logits, reference_ids, neutral_prompt_length
         )
         del neutral_outputs
 
-        for layer in layers:
-            injected_outputs = forward_with_optional_replacement(
+        for packet_size in packet_sizes:
+            positions = maximum_positions[-packet_size:]
+            vectors = maximum_packet[-packet_size:, :]
+            injected_outputs = forward_with_packet_replacement(
                 model,
                 neutral_teacher_inputs,
-                layer_idx=layer,
-                position=neutral_prompt_length - 1,
-                vector=oracle_vectors[layer],
+                layer_idx=layer_idx,
+                positions=positions,
+                vectors=vectors,
             )
             injected_metrics = continuation_token_metrics(
                 injected_outputs.logits, reference_ids, neutral_prompt_length
@@ -273,12 +307,12 @@ def run_audit(
 
             self_nll_delta = None
             if task_index < self_check_tasks:
-                self_outputs = forward_with_optional_replacement(
+                self_outputs = forward_with_packet_replacement(
                     model,
                     task_teacher_inputs,
-                    layer_idx=layer,
-                    position=task_prompt_length - 1,
-                    vector=oracle_vectors[layer],
+                    layer_idx=layer_idx,
+                    positions=positions,
+                    vectors=vectors,
                 )
                 self_metrics = continuation_token_metrics(
                     self_outputs.logits, reference_ids, task_prompt_length
@@ -301,10 +335,13 @@ def run_audit(
                     "formatted_neutral_prompt_sha256": prompt_sha256(
                         neutral_formatted
                     ),
-                    "layer_idx": layer,
+                    "layer_idx": layer_idx,
+                    "packet_size": packet_size,
+                    "packet_start_position": int(positions[0].item()),
+                    "packet_stop_position_exclusive": int(positions[-1].item()) + 1,
+                    "packet_positions_attention_visible": True,
                     "injection_mode": "replace",
                     "carrier_mode": carrier_mode,
-                    "injection_position": "last_non_padding_generation_boundary",
                     "task_prompt_token_count": task_prompt_length,
                     "native_neutral_prompt_token_count": native_neutral_prompt_length,
                     "neutral_prompt_token_count": neutral_prompt_length,
@@ -321,7 +358,7 @@ def run_audit(
                     "self_nll_delta": self_nll_delta,
                 }
             )
-        del oracle_vectors, task_teacher_inputs, neutral_teacher_inputs, reference_ids
+        del maximum_packet, task_teacher_inputs, neutral_teacher_inputs, reference_ids
 
     selection_task_count = int(config["data"]["selection_task_count"])
     if run_scope != "full":
@@ -331,15 +368,13 @@ def run_audit(
         if run_scope == "full"
         else 1
     )
-    summary = summarize_oracle_transport(
+    summary = summarize_packet_capacity(
         records,
         task_ids=[task["task_id"] for task in tasks],
-        layers=layers,
+        packet_sizes=packet_sizes,
         selection_task_count=selection_task_count,
         minimum_informative_tasks_per_split=effective_minimum_informative_tasks,
-        minimum_confirmation_recovery=float(
-            audit["minimum_confirmation_recovery"]
-        ),
+        minimum_recovery=float(audit["minimum_recovery"]),
         maximum_self_nll_delta=float(audit["maximum_self_nll_delta"]),
         run_scope=run_scope,
     )
@@ -347,6 +382,7 @@ def run_audit(
         {
             "experiment_id": config["experiment_id"],
             "source_protocol_experiment": config["source_protocol_experiment"],
+            "layer_selection_experiment": config["layer_selection_experiment"],
             "config": str(config_path),
             "config_sha256": sha256_path(config_path),
             "heldout_bundle_manifest": str(manifest_path),
@@ -354,33 +390,35 @@ def run_audit(
             "target_model": config["models"]["target_model"],
             "target_model_revision": target_revision,
             "prompt_protocol": protocol,
+            "layer_idx": layer_idx,
+            "layer_selection_source": "selection split",
             "injection_mode": "replace",
             "carrier": {
                 "mode": carrier_mode,
                 "pad_token_id": tokenizer.pad_token_id,
-                "padding_attention": (
-                    "masked" if carrier_mode != "native" else "not_applicable"
-                ),
+                "padding_attention": "masked",
+                "packet_positions_attention_visible": True,
             },
             "reference_generation": {
                 "do_sample": False,
                 "max_new_tokens": int(audit["reference_max_new_tokens"]),
             },
-            "position_confounded_by_prompt_length": carrier_mode == "native",
+            "capacity_axis_only": True,
         }
     )
 
     write_jsonl(output_dir / "references.jsonl", references)
-    write_jsonl(output_dir / "oracle_transport_records.jsonl", records)
+    write_jsonl(output_dir / "oracle_packet_records.jsonl", records)
     write_json(output_dir / "summary.json", summary)
     (output_dir / "resolved_config.yaml").write_text(
         yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
     )
-    print("Oracle transport audit completed")
+    print("Oracle packet audit completed")
     print(f"run_scope: {run_scope}")
     print(f"tasks: {len(tasks)}")
-    print(f"layers: {layers}")
-    print(f"selected_layer: {summary['selected_layer']}")
+    print(f"layer_idx: {layer_idx}")
+    print(f"packet_sizes: {packet_sizes}")
+    print(f"selected_packet_size: {summary['selected_packet_size']}")
     print(f"gate_passed: {summary['gate']['passed']}")
     print(f"summary: {output_dir / 'summary.json'}")
     return summary
@@ -392,7 +430,9 @@ def main() -> None:
     if args.output_dir is not None:
         output_dir = args.output_dir
     elif args.preflight:
-        output_dir = Path(str(config.get("output", {}).get("directory"))).parent / "preflight"
+        output_dir = Path(str(config.get("output", {}).get("directory"))).parent / (
+            "preflight"
+        )
     else:
         output_dir = Path(str(config.get("output", {}).get("directory")))
     run_audit(

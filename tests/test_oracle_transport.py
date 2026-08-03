@@ -8,12 +8,18 @@ from src.evaluation.oracle_transport import (
     continuation_token_metrics,
     normalize_layer_indices,
     recovery_fraction,
+    summarize_packet_capacity,
     summarize_oracle_transport,
 )
-from src.scripts.run_oracle_transport_audit import (
-    bind_tasks_to_manifest,
+from src.pipelines.oracle_transport import (
     build_neutral_carrier,
     forward_with_layer_capture,
+    forward_with_packet_capture,
+    forward_with_packet_replacement,
+)
+from src.scripts.run_oracle_packet_audit import validate_config as validate_packet_config
+from src.scripts.run_oracle_transport_audit import (
+    bind_tasks_to_manifest,
     validate_config,
 )
 
@@ -253,3 +259,136 @@ def test_length_controlled_experiment_requires_masked_carrier():
     config["carrier"]["mode"] = "native"
     with pytest.raises(ValueError, match="requires carrier.mode"):
         validate_config(config)
+
+
+def test_packet_summary_selects_smallest_crossing_and_confirms_it():
+    task_ids = ["s1", "s2", "c1", "c2"]
+    rows = []
+    recoveries = {
+        1: {task_id: 0.01 for task_id in task_ids},
+        2: {"s1": 0.11, "s2": 0.13, "c1": 0.14, "c2": 0.12},
+        4: {task_id: 0.9 for task_id in task_ids},
+    }
+    for packet_size, by_task in recoveries.items():
+        for task_id, recovery in by_task.items():
+            rows.append(
+                {
+                    "task_id": task_id,
+                    "packet_size": packet_size,
+                    "informative": True,
+                    "task_advantage_nll": 1.0,
+                    "recovery_fraction": recovery,
+                    "self_nll_delta": 0.0 if task_id == "s1" else None,
+                }
+            )
+    summary = summarize_packet_capacity(
+        rows,
+        task_ids=task_ids,
+        packet_sizes=[1, 2, 4],
+        selection_task_count=2,
+        minimum_informative_tasks_per_split=2,
+        minimum_recovery=0.1,
+        maximum_self_nll_delta=0.0001,
+        run_scope="full",
+    )
+    assert summary["selected_packet_size"] == 2
+    assert summary["confirmation"]["mean_recovery_fraction"] == pytest.approx(0.13)
+    assert summary["gate"]["passed"] is True
+
+
+def test_packet_summary_without_selection_crossing_has_no_confirmation_gate():
+    task_ids = ["s", "c"]
+    rows = [
+        {
+            "task_id": task_id,
+            "packet_size": size,
+            "informative": True,
+            "task_advantage_nll": 1.0,
+            "recovery_fraction": 0.05,
+            "self_nll_delta": 0.0,
+        }
+        for size in (1, 2)
+        for task_id in task_ids
+    ]
+    summary = summarize_packet_capacity(
+        rows,
+        task_ids=task_ids,
+        packet_sizes=[1, 2],
+        selection_task_count=1,
+        minimum_informative_tasks_per_split=1,
+        minimum_recovery=0.1,
+        maximum_self_nll_delta=0.0001,
+        run_scope="full",
+    )
+    assert summary["selected_packet_size"] is None
+    assert summary["confirmation"] is None
+    assert summary["gate"]["passed"] is False
+
+
+def test_packet_config_freezes_layer_capacity_axis_and_replication_anchor():
+    config = protocol_config()
+    config["experiment_id"] = "LIP-PROTO-004"
+    config["layer_selection_experiment"] = "LIP-PROTO-003"
+    config["carrier"] = {"mode": "left_pad_masked_to_task_length"}
+    config["audit"] = {
+        "layer_idx": -16,
+        "packet_sizes": [1, 2, 4],
+        "injection_mode": "replace",
+        "reference_max_new_tokens": 8,
+        "minimum_reference_tokens": 2,
+        "self_check_tasks": 1,
+        "minimum_task_advantage_nll": 0.05,
+        "minimum_informative_tasks_per_split": 1,
+        "minimum_recovery": 0.1,
+        "maximum_self_nll_delta": 0.0001,
+    }
+    validate_packet_config(config)
+    config["audit"]["packet_sizes"] = [2, 4]
+    with pytest.raises(ValueError, match="start at 1"):
+        validate_packet_config(config)
+
+
+def test_packet_capture_and_replacement_share_block_output_boundary():
+    class Layer(torch.nn.Module):
+        def forward(self, hidden):
+            return hidden + 1.0
+
+    class Backbone(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layers = torch.nn.ModuleList([Layer()])
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.model = Backbone()
+
+        def forward(
+            self,
+            input_ids,
+            attention_mask,
+            use_cache,
+            output_hidden_states,
+            return_dict,
+        ):
+            hidden = self.model.layers[0](input_ids.float().unsqueeze(-1))
+            return type("Output", (), {"logits": hidden})()
+
+    model = Model()
+    inputs = {
+        "input_ids": torch.tensor([[1, 2, 3, 4]]),
+        "attention_mask": torch.ones(1, 4, dtype=torch.long),
+    }
+    positions = torch.tensor([1, 3])
+    baseline, packet = forward_with_packet_capture(
+        model, inputs, layer_idx=-1, positions=positions
+    )
+    replaced = forward_with_packet_replacement(
+        model,
+        inputs,
+        layer_idx=-1,
+        positions=positions,
+        vectors=packet,
+    )
+    assert packet[:, 0].tolist() == [3.0, 5.0]
+    assert torch.equal(replaced.logits, baseline.logits)
