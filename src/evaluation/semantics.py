@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import ast
+import ctypes
 import json
+import os
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 
@@ -34,6 +37,11 @@ if resource is not None:
     memory = int(payload["memory_mb"]) * 1024 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
     resource.setrlimit(resource.RLIMIT_CPU, (int(payload["cpu_seconds"]), int(payload["cpu_seconds"])))
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (1024 * 1024, 1024 * 1024))
+    resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))
+    if hasattr(resource, "RLIMIT_NPROC"):
+        resource.setrlimit(resource.RLIMIT_NPROC, (32, 32))
 
 namespace = {"__name__": "__candidate__"}
 try:
@@ -48,6 +56,36 @@ except BaseException as exc:
 else:
     print(json.dumps({"passed": True, "error_type": None, "error": None}))
 """
+
+
+@dataclass(frozen=True)
+class CandidateProcessPolicy:
+    """Linux process restrictions applied before candidate Python starts."""
+
+    uid: int
+    gid: int
+    environment: tuple[tuple[str, str], ...] = (
+        ("LC_ALL", "C.UTF-8"),
+        ("PATH", "/usr/local/bin:/usr/bin:/bin"),
+    )
+    no_new_privs: bool = True
+
+
+def build_candidate_preexec(policy: CandidateProcessPolicy):
+    if os.name != "posix":
+        raise RuntimeError("candidate process policies require a POSIX host")
+
+    def restrict_process() -> None:
+        os.setgroups([])
+        os.setgid(int(policy.gid))
+        os.setuid(int(policy.uid))
+        if policy.no_new_privs:
+            libc = ctypes.CDLL(None, use_errno=True)
+            if libc.prctl(38, 1, 0, 0, 0) != 0:  # PR_SET_NO_NEW_PRIVS
+                error = ctypes.get_errno()
+                raise OSError(error, os.strerror(error))
+
+    return restrict_process
 
 
 def extract_code(text: str) -> str:
@@ -92,6 +130,7 @@ def run_functional_tests(
     *,
     timeout_seconds: float = 5.0,
     memory_mb: int = 512,
+    process_policy: CandidateProcessPolicy | None = None,
 ) -> dict[str, Any]:
     """Run untrusted code in a resource-limited subprocess, not a security sandbox."""
 
@@ -110,6 +149,10 @@ def run_functional_tests(
             capture_output=True,
             timeout=timeout_seconds,
             check=False,
+            env=(dict(process_policy.environment) if process_policy else None),
+            preexec_fn=(
+                build_candidate_preexec(process_policy) if process_policy else None
+            ),
         )
     except subprocess.TimeoutExpired:
         return {
@@ -147,6 +190,7 @@ def evaluate_generation(
     run_functional: bool = False,
     timeout_seconds: float = 5.0,
     memory_mb: int = 512,
+    process_policy: CandidateProcessPolicy | None = None,
 ) -> dict[str, Any]:
     code = extract_code(str(record.get("output_text", "")))
     result = dict(record)
@@ -159,6 +203,7 @@ def evaluate_generation(
                 task,
                 timeout_seconds=timeout_seconds,
                 memory_mb=memory_mb,
+                process_policy=process_policy,
             )
         )
     elif run_functional:

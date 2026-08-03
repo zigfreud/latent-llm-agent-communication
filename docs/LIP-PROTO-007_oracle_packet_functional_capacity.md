@@ -76,6 +76,12 @@ python -m src.scripts.evaluate_oracle_packet_semantics \
   --config config/LIP-PROTO-007_oracle_packet_functional_capacity.yaml \
   --generations runs/LIP-PROTO-007/generations.jsonl \
   --overwrite
+
+python -m src.scripts.run_hardened_oracle_evaluation \
+  --config config/LIP-PROTO-007_oracle_packet_functional_capacity.yaml \
+  --generations runs/LIP-PROTO-007/generations.jsonl \
+  --output-dir runs/LIP-PROTO-007/functional-evaluation \
+  --overwrite
 ```
 
 Generation and syntax inspection do not execute candidate code. Functional
@@ -83,7 +89,13 @@ evaluation must use the previously probed disposable sandbox: private network
 and mount namespaces, Drive and credentials masked, UID/GID `nobody`, empty
 environment, `no_new_privs`, and per-candidate CPU/memory/time limits. The
 resource-limited Python subprocess alone is explicitly not a security
-boundary.
+boundary. The versioned hardened entry point stages immutable inputs, enters
+private mount/network/PID/IPC/UTS namespaces, masks host data mounts, and keeps
+the evaluator privileged only inside that namespace. Every candidate then
+drops to UID/GID `nobody`, an allowlisted environment, zero effective
+capabilities, and `no_new_privs`. Candidate processes cannot write the staged
+source or the evaluator's result directory. A machine-readable probe report
+must pass before any generated program executes.
 
 ## Result
 

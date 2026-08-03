@@ -14,7 +14,7 @@ from src.evaluation.oracle_functional import (
     protocol_version_for_config,
     semantic_gate,
 )
-from src.evaluation.semantics import evaluate_generation
+from src.evaluation.semantics import CandidateProcessPolicy, evaluate_generation
 from src.evaluation.statistics import summarize_metric
 from src.pipelines.oracle_experiment import (
     load_json_object,
@@ -133,6 +133,8 @@ def evaluate(
     functional: bool,
     allow_incomplete: bool,
     overwrite: bool,
+    candidate_process_policy: CandidateProcessPolicy | None = None,
+    security_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     metadata_path = generations_path.with_suffix(".metadata.json")
     metadata = load_json_object(metadata_path)
@@ -153,6 +155,7 @@ def evaluate(
             run_functional=functional,
             timeout_seconds=float(evaluation_config["timeout_seconds"]),
             memory_mb=int(evaluation_config["memory_mb"]),
+            process_policy=candidate_process_policy,
         )
         scored_row["entry_point_declared"] = declares_entry_point(
             scored_row["extracted_code"],
@@ -209,8 +212,18 @@ def evaluate(
         "generations_jsonl": str(generations_path),
         "generation_metadata": str(metadata_path),
         "scored_jsonl": str(output_dir / "scored_generations.jsonl"),
-        "execution_mode": "functional_subprocess" if functional else "syntax_only",
-        "subprocess_is_security_sandbox": False if functional else None,
+        "execution_mode": (
+            "functional_hardened_namespace"
+            if functional and security_context
+            else "functional_subprocess"
+            if functional
+            else "syntax_only"
+        ),
+        "subprocess_is_security_sandbox": (
+            bool(security_context and security_context.get("validated"))
+            if functional
+            else None
+        ),
         "claim_eligible": bool(
             functional
             and design_validation["complete"]
@@ -227,6 +240,8 @@ def evaluate(
         "design_validation": design_validation,
         "metrics": metrics,
     }
+    if security_context is not None:
+        summary["sandbox"] = dict(security_context)
     write_jsonl(output_dir / "scored_generations.jsonl", scored)
     write_json(output_dir / "summary.json", summary)
     return summary
