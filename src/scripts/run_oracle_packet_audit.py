@@ -13,9 +13,11 @@ from src.core.prompt_protocol import protocol_metadata
 from src.core.utils import set_seed
 from src.evaluation.oracle_transport import (
     continuation_token_metrics,
+    continuation_token_profile,
     normalize_layer_indices,
     recovery_fraction,
     summarize_packet_capacity,
+    summarize_packet_position_recovery,
 )
 from src.pipelines.infer import load_target, model_input_device
 from src.pipelines.oracle_experiment import (
@@ -59,6 +61,8 @@ def validate_config(config: Mapping[str, Any]) -> None:
         "experiment_id",
         "source_protocol_experiment",
         "layer_selection_experiment",
+        "capacity_source_experiment",
+        "functional_source_experiment",
         "models",
         "prompt_protocol",
         "runtime",
@@ -66,17 +70,24 @@ def validate_config(config: Mapping[str, Any]) -> None:
         "neutral_target_prompt",
         "carrier",
         "audit",
+        "position_analysis",
         "output",
     }
     unknown = sorted(set(config).difference(expected_top_level))
     if unknown:
         raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
-    if config.get("experiment_id") != "LIP-PROTO-004":
-        raise ValueError("experiment_id must be LIP-PROTO-004")
+    experiment_id = str(config.get("experiment_id", ""))
+    if experiment_id not in {"LIP-PROTO-004", "LIP-PROTO-006"}:
+        raise ValueError("experiment_id must be LIP-PROTO-004 or LIP-PROTO-006")
     if config.get("source_protocol_experiment") != "LIP-PROTO-001":
         raise ValueError("source_protocol_experiment must bind LIP-PROTO-001")
     if config.get("layer_selection_experiment") != "LIP-PROTO-003":
         raise ValueError("layer_selection_experiment must bind LIP-PROTO-003")
+    if experiment_id == "LIP-PROTO-006":
+        if config.get("capacity_source_experiment") != "LIP-PROTO-004":
+            raise ValueError("capacity_source_experiment must bind LIP-PROTO-004")
+        if config.get("functional_source_experiment") != "LIP-PROTO-005":
+            raise ValueError("functional_source_experiment must bind LIP-PROTO-005")
 
     protocol = protocol_metadata(config.get("prompt_protocol"))
     if protocol["mode"] != "chat_template" or not protocol["add_generation_prompt"]:
@@ -90,7 +101,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
         "left_pad_masked_to_task_length"
     ):
         raise ValueError(
-            "LIP-PROTO-004 requires carrier.mode=left_pad_masked_to_task_length"
+            "oracle packet audits require carrier.mode=left_pad_masked_to_task_length"
         )
 
     data = config.get("data", {})
@@ -114,7 +125,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
     if not 2 <= preflight_count <= task_count:
         raise ValueError("preflight_task_count must be between 2 and task_count")
     if str(audit.get("injection_mode", "")) != "replace":
-        raise ValueError("LIP-PROTO-004 fixes injection_mode=replace")
+        raise ValueError("oracle packet audits fix injection_mode=replace")
     if int(audit.get("layer_idx", 0)) >= 0:
         raise ValueError("layer_idx must be a negative transformer-layer index")
     packet_sizes = [int(size) for size in audit.get("packet_sizes", [])]
@@ -143,6 +154,60 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ValueError("runtime.load_4bit must be a boolean")
     if not str(output.get("directory", "")).strip():
         raise ValueError("output.directory must be configured")
+
+    position_analysis = config.get("position_analysis")
+    if experiment_id == "LIP-PROTO-004":
+        if config.get("capacity_source_experiment") is not None or config.get(
+            "functional_source_experiment"
+        ) is not None:
+            raise ValueError("LIP-PROTO-004 must not declare later-protocol lineage")
+        if position_analysis is not None:
+            raise ValueError("LIP-PROTO-004 must not enable position_analysis")
+        return
+    if not isinstance(position_analysis, Mapping):
+        raise ValueError("LIP-PROTO-006 requires position_analysis")
+    allowed_position_fields = {
+        "prefix_token_counts",
+        "gate_prefix_token_count",
+        "minimum_task_support_per_split",
+        "estimator",
+    }
+    unknown_position_fields = sorted(
+        set(position_analysis).difference(allowed_position_fields)
+    )
+    if unknown_position_fields:
+        raise ValueError(
+            "unknown position_analysis field(s): "
+            + ", ".join(unknown_position_fields)
+        )
+    prefix_counts = [
+        int(count) for count in position_analysis.get("prefix_token_counts", [])
+    ]
+    if not prefix_counts or prefix_counts != sorted(set(prefix_counts)) or any(
+        count <= 0 for count in prefix_counts
+    ):
+        raise ValueError(
+            "position_analysis.prefix_token_counts must be positive, increasing, "
+            "and unique"
+        )
+    gate_prefix = int(position_analysis.get("gate_prefix_token_count", 0))
+    if gate_prefix not in prefix_counts:
+        raise ValueError(
+            "position_analysis.gate_prefix_token_count must be a configured prefix"
+        )
+    if int(audit["minimum_reference_tokens"]) < max(prefix_counts):
+        raise ValueError(
+            "minimum_reference_tokens must cover the largest position-analysis prefix"
+        )
+    minimum_position_support = int(
+        position_analysis.get("minimum_task_support_per_split", 0)
+    )
+    if minimum_position_support <= 0:
+        raise ValueError("minimum_task_support_per_split must be positive")
+    if minimum_position_support > min(selection_count, task_count - selection_count):
+        raise ValueError("minimum_task_support_per_split exceeds a frozen split")
+    if position_analysis.get("estimator") != "pooled_nll_ratio":
+        raise ValueError("position_analysis.estimator must be pooled_nll_ratio")
 
 
 def run_audit(
@@ -174,6 +239,12 @@ def run_audit(
     carrier_mode = str(config["carrier"]["mode"])
     runtime = config["runtime"]
     audit = config["audit"]
+    position_analysis = config.get("position_analysis")
+    score_continuation = (
+        continuation_token_profile
+        if isinstance(position_analysis, Mapping)
+        else continuation_token_metrics
+    )
     target_revision = str(manifest["target_model_revision"])
     set_seed(int(audit.get("seed", 1729)))
 
@@ -271,7 +342,7 @@ def run_audit(
             layer_idx=layer_idx,
             positions=maximum_positions,
         )
-        task_metrics = continuation_token_metrics(
+        task_metrics = score_continuation(
             task_outputs.logits, reference_ids, task_prompt_length
         )
         del task_outputs
@@ -279,7 +350,7 @@ def run_audit(
         neutral_outputs = forward_with_optional_replacement(
             model, neutral_teacher_inputs
         )
-        neutral_metrics = continuation_token_metrics(
+        neutral_metrics = score_continuation(
             neutral_outputs.logits, reference_ids, neutral_prompt_length
         )
         del neutral_outputs
@@ -294,7 +365,7 @@ def run_audit(
                 positions=positions,
                 vectors=vectors,
             )
-            injected_metrics = continuation_token_metrics(
+            injected_metrics = score_continuation(
                 injected_outputs.logits, reference_ids, neutral_prompt_length
             )
             del injected_outputs
@@ -322,42 +393,56 @@ def run_audit(
                 )
                 del self_outputs
 
-            records.append(
-                {
-                    "experiment_id": config["experiment_id"],
-                    "run_scope": run_scope,
-                    "task_index": task_index,
-                    "task_id": task["task_id"],
-                    "task_prompt_sha256": prompt_sha256(task["prompt"]),
-                    "neutral_prompt_sha256": prompt_sha256(
-                        str(config["neutral_target_prompt"])
-                    ),
-                    "formatted_neutral_prompt_sha256": prompt_sha256(
-                        neutral_formatted
-                    ),
-                    "layer_idx": layer_idx,
-                    "packet_size": packet_size,
-                    "packet_start_position": int(positions[0].item()),
-                    "packet_stop_position_exclusive": int(positions[-1].item()) + 1,
-                    "packet_positions_attention_visible": True,
-                    "injection_mode": "replace",
-                    "carrier_mode": carrier_mode,
-                    "task_prompt_token_count": task_prompt_length,
-                    "native_neutral_prompt_token_count": native_neutral_prompt_length,
-                    "neutral_prompt_token_count": neutral_prompt_length,
-                    "reference_token_count": int(reference_ids.numel()),
-                    "task_nll": task_metrics["nll"],
-                    "task_top1_accuracy": task_metrics["top1_accuracy"],
-                    "neutral_nll": neutral_metrics["nll"],
-                    "neutral_top1_accuracy": neutral_metrics["top1_accuracy"],
-                    "injected_nll": injected_metrics["nll"],
-                    "injected_top1_accuracy": injected_metrics["top1_accuracy"],
-                    "task_advantage_nll": advantage,
-                    "informative": informative,
-                    "recovery_fraction": recovery,
-                    "self_nll_delta": self_nll_delta,
-                }
-            )
+            record = {
+                "experiment_id": config["experiment_id"],
+                "run_scope": run_scope,
+                "task_index": task_index,
+                "task_id": task["task_id"],
+                "task_prompt_sha256": prompt_sha256(task["prompt"]),
+                "neutral_prompt_sha256": prompt_sha256(
+                    str(config["neutral_target_prompt"])
+                ),
+                "formatted_neutral_prompt_sha256": prompt_sha256(neutral_formatted),
+                "layer_idx": layer_idx,
+                "packet_size": packet_size,
+                "packet_start_position": int(positions[0].item()),
+                "packet_stop_position_exclusive": int(positions[-1].item()) + 1,
+                "packet_positions_attention_visible": True,
+                "injection_mode": "replace",
+                "carrier_mode": carrier_mode,
+                "task_prompt_token_count": task_prompt_length,
+                "native_neutral_prompt_token_count": native_neutral_prompt_length,
+                "neutral_prompt_token_count": neutral_prompt_length,
+                "reference_token_count": int(reference_ids.numel()),
+                "task_nll": task_metrics["nll"],
+                "task_top1_accuracy": task_metrics["top1_accuracy"],
+                "neutral_nll": neutral_metrics["nll"],
+                "neutral_top1_accuracy": neutral_metrics["top1_accuracy"],
+                "injected_nll": injected_metrics["nll"],
+                "injected_top1_accuracy": injected_metrics["top1_accuracy"],
+                "task_advantage_nll": advantage,
+                "informative": informative,
+                "recovery_fraction": recovery,
+                "self_nll_delta": self_nll_delta,
+            }
+            if isinstance(position_analysis, Mapping):
+                record.update(
+                    {
+                        "task_token_nlls": task_metrics["token_nlls"],
+                        "task_token_top1_correct": task_metrics[
+                            "token_top1_correct"
+                        ],
+                        "neutral_token_nlls": neutral_metrics["token_nlls"],
+                        "neutral_token_top1_correct": neutral_metrics[
+                            "token_top1_correct"
+                        ],
+                        "injected_token_nlls": injected_metrics["token_nlls"],
+                        "injected_token_top1_correct": injected_metrics[
+                            "token_top1_correct"
+                        ],
+                    }
+                )
+            records.append(record)
         del maximum_packet, task_teacher_inputs, neutral_teacher_inputs, reference_ids
 
     selection_task_count = int(config["data"]["selection_task_count"])
@@ -368,16 +453,38 @@ def run_audit(
         if run_scope == "full"
         else 1
     )
-    summary = summarize_packet_capacity(
-        records,
-        task_ids=[task["task_id"] for task in tasks],
-        packet_sizes=packet_sizes,
-        selection_task_count=selection_task_count,
-        minimum_informative_tasks_per_split=effective_minimum_informative_tasks,
-        minimum_recovery=float(audit["minimum_recovery"]),
-        maximum_self_nll_delta=float(audit["maximum_self_nll_delta"]),
-        run_scope=run_scope,
-    )
+    task_ids = [task["task_id"] for task in tasks]
+    if isinstance(position_analysis, Mapping):
+        summary = summarize_packet_position_recovery(
+            records,
+            task_ids=task_ids,
+            packet_sizes=packet_sizes,
+            selection_task_count=selection_task_count,
+            prefix_token_counts=position_analysis["prefix_token_counts"],
+            gate_prefix_token_count=int(
+                position_analysis["gate_prefix_token_count"]
+            ),
+            minimum_task_support_per_split=(
+                int(position_analysis["minimum_task_support_per_split"])
+                if run_scope == "full"
+                else 1
+            ),
+            minimum_task_advantage=float(audit["minimum_task_advantage_nll"]),
+            minimum_recovery=float(audit["minimum_recovery"]),
+            maximum_self_nll_delta=float(audit["maximum_self_nll_delta"]),
+            run_scope=run_scope,
+        )
+    else:
+        summary = summarize_packet_capacity(
+            records,
+            task_ids=task_ids,
+            packet_sizes=packet_sizes,
+            selection_task_count=selection_task_count,
+            minimum_informative_tasks_per_split=effective_minimum_informative_tasks,
+            minimum_recovery=float(audit["minimum_recovery"]),
+            maximum_self_nll_delta=float(audit["maximum_self_nll_delta"]),
+            run_scope=run_scope,
+        )
     summary.update(
         {
             "experiment_id": config["experiment_id"],
@@ -403,9 +510,20 @@ def run_audit(
                 "do_sample": False,
                 "max_new_tokens": int(audit["reference_max_new_tokens"]),
             },
-            "capacity_axis_only": True,
+            "capacity_axis_only": position_analysis is None,
         }
     )
+    if isinstance(position_analysis, Mapping):
+        summary.update(
+            {
+                "capacity_source_experiment": config["capacity_source_experiment"],
+                "functional_source_experiment": config[
+                    "functional_source_experiment"
+                ],
+                "analysis_axis": "target_continuation_token_position",
+                "position_analysis": dict(position_analysis),
+            }
+        )
 
     write_jsonl(output_dir / "references.jsonl", references)
     write_jsonl(output_dir / "oracle_packet_records.jsonl", records)

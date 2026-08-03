@@ -1,0 +1,53 @@
+experiment_id: "LIP-PROTO-006"
+source_protocol_experiment: "LIP-PROTO-001"
+layer_selection_experiment: "LIP-PROTO-003"
+capacity_source_experiment: "LIP-PROTO-004"
+functional_source_experiment: "LIP-PROTO-005"
+
+models:
+  target_model: "NousResearch/Meta-Llama-3-8B-Instruct"
+
+prompt_protocol:
+  version: "lip-prompt-v1"
+  mode: "chat_template"
+  add_generation_prompt: true
+  system_prompt: "You are a Python code generator. Return only Python code and define exactly the required function name."
+
+runtime:
+  device: "auto"
+  load_4bit: true
+
+data:
+  tasks_jsonl: "datasets/LIP-PROTO-001/mbpp_validation_tasks.jsonl"
+  heldout_bundle_manifest: "datasets/LIP-PROTO-001/mbpp_eval_bundle_32/manifest.json"
+  require_real_bundle: true
+  task_count: 16
+  selection_task_count: 8
+  preflight_task_count: 2
+
+neutral_target_prompt: "Infer the requested task from the supplied latent signal. Implement the required Python function."
+
+carrier:
+  mode: "left_pad_masked_to_task_length"
+
+audit:
+  layer_idx: -16
+  packet_sizes: [1, 2, 4, 8, 16, 32, 48]
+  injection_mode: "replace"
+  seed: 1729
+  reference_max_new_tokens: 64
+  minimum_reference_tokens: 8
+  self_check_tasks: 1
+  minimum_task_advantage_nll: 0.05
+  minimum_informative_tasks_per_split: 2
+  minimum_recovery: 0.10
+  maximum_self_nll_delta: 0.0001
+
+position_analysis:
+  prefix_token_counts: [1, 4, 8]
+  gate_prefix_token_count: 8
+  minimum_task_support_per_split: 2
+  estimator: "pooled_nll_ratio"
+
+output:
+  directory: "runs/LIP-PROTO-006/oracle-token-position"

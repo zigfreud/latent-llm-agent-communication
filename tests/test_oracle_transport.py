@@ -6,9 +6,11 @@ import torch
 
 from src.evaluation.oracle_transport import (
     continuation_token_metrics,
+    continuation_token_profile,
     normalize_layer_indices,
     recovery_fraction,
     summarize_packet_capacity,
+    summarize_packet_position_recovery,
     summarize_oracle_transport,
 )
 from src.pipelines.oracle_transport import (
@@ -69,6 +71,20 @@ def test_continuation_metrics_use_prompt_boundary_alignment():
     assert result["token_count"] == 2
     assert result["top1_accuracy"] == 1.0
     assert result["nll"] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_continuation_profile_preserves_relative_token_positions():
+    logits = torch.full((1, 6, 4), -10.0)
+    reference = torch.tensor([2, 1, 3])
+    logits[0, 2, 2] = 10.0
+    logits[0, 3, 0] = 10.0
+    logits[0, 4, 3] = 10.0
+    result = continuation_token_profile(logits, reference, prompt_length=3)
+    assert result["token_count"] == 3
+    assert result["token_top1_correct"] == [True, False, True]
+    assert result["token_nlls"][0] == pytest.approx(0.0, abs=1e-6)
+    assert result["token_nlls"][1] > 10.0
+    assert result["token_nlls"][2] == pytest.approx(0.0, abs=1e-6)
 
 
 def test_recovery_fraction_requires_task_prompt_advantage():
@@ -325,6 +341,86 @@ def test_packet_summary_without_selection_crossing_has_no_confirmation_gate():
     assert summary["gate"]["passed"] is False
 
 
+def test_position_summary_selects_on_prefix_instead_of_late_tokens():
+    task_ids = ["s1", "s2", "c1", "c2"]
+    rows = []
+    for packet_size in (1, 8):
+        for task_id in task_ids:
+            task = [1.0, 1.0, 1.0, 1.0]
+            neutral = [2.0, 2.0, 2.0, 2.0]
+            injected = (
+                [1.95, 1.95, 1.0, 1.0]
+                if packet_size == 1
+                else [1.5, 1.5, 1.5, 1.5]
+            )
+            rows.append(
+                {
+                    "task_id": task_id,
+                    "packet_size": packet_size,
+                    "task_token_nlls": task,
+                    "neutral_token_nlls": neutral,
+                    "injected_token_nlls": injected,
+                    "self_nll_delta": 0.0 if task_id == "s1" else None,
+                }
+            )
+    summary = summarize_packet_position_recovery(
+        rows,
+        task_ids=task_ids,
+        packet_sizes=[1, 8],
+        selection_task_count=2,
+        prefix_token_counts=[1, 2],
+        gate_prefix_token_count=2,
+        minimum_task_support_per_split=2,
+        minimum_task_advantage=0.05,
+        minimum_recovery=0.1,
+        maximum_self_nll_delta=0.0001,
+        run_scope="full",
+    )
+    assert summary["selected_packet_size"] == 8
+    assert summary["confirmation"]["recovery_fraction"] == pytest.approx(0.5)
+    assert summary["by_packet_size"]["1"]["selection"]["windows"][
+        "full_sequence"
+    ]["recovery_fraction"] > 0.1
+    assert summary["by_packet_size"]["1"]["selection"]["windows"][
+        "first_2_tokens"
+    ]["recovery_fraction"] == pytest.approx(0.05)
+    assert summary["gate"]["passed"] is True
+
+
+def test_position_summary_tracks_support_at_each_token_position():
+    rows = [
+        {
+            "task_id": task_id,
+            "packet_size": 1,
+            "task_token_nlls": [1.0] * length,
+            "neutral_token_nlls": [2.0] * length,
+            "injected_token_nlls": [1.5] * length,
+            "self_nll_delta": 0.0,
+        }
+        for task_id, length in (("s", 3), ("c", 2))
+    ]
+    summary = summarize_packet_position_recovery(
+        rows,
+        task_ids=["s", "c"],
+        packet_sizes=[1],
+        selection_task_count=1,
+        prefix_token_counts=[1, 2],
+        gate_prefix_token_count=2,
+        minimum_task_support_per_split=1,
+        minimum_task_advantage=0.05,
+        minimum_recovery=0.1,
+        maximum_self_nll_delta=0.0001,
+        run_scope="preflight",
+    )
+    selection_positions = summary["by_packet_size"]["1"]["selection"][
+        "by_token_position"
+    ]
+    assert selection_positions["3"]["task_support"] == 1
+    assert selection_positions["3"]["recovery_fraction"] == pytest.approx(0.5)
+    assert summary["claim_eligible"] is False
+    assert summary["gate"]["passed"] is False
+
+
 def test_packet_config_freezes_layer_capacity_axis_and_replication_anchor():
     config = protocol_config()
     config["experiment_id"] = "LIP-PROTO-004"
@@ -345,6 +441,41 @@ def test_packet_config_freezes_layer_capacity_axis_and_replication_anchor():
     validate_packet_config(config)
     config["audit"]["packet_sizes"] = [2, 4]
     with pytest.raises(ValueError, match="start at 1"):
+        validate_packet_config(config)
+
+
+def test_position_config_binds_prior_protocols_and_prefix_gate():
+    config = protocol_config()
+    config.update(
+        {
+            "experiment_id": "LIP-PROTO-006",
+            "layer_selection_experiment": "LIP-PROTO-003",
+            "capacity_source_experiment": "LIP-PROTO-004",
+            "functional_source_experiment": "LIP-PROTO-005",
+            "carrier": {"mode": "left_pad_masked_to_task_length"},
+            "position_analysis": {
+                "prefix_token_counts": [1, 4, 8],
+                "gate_prefix_token_count": 8,
+                "minimum_task_support_per_split": 1,
+                "estimator": "pooled_nll_ratio",
+            },
+        }
+    )
+    config["audit"] = {
+        "layer_idx": -16,
+        "packet_sizes": [1, 8],
+        "injection_mode": "replace",
+        "reference_max_new_tokens": 8,
+        "minimum_reference_tokens": 8,
+        "self_check_tasks": 1,
+        "minimum_task_advantage_nll": 0.05,
+        "minimum_informative_tasks_per_split": 1,
+        "minimum_recovery": 0.1,
+        "maximum_self_nll_delta": 0.0001,
+    }
+    validate_packet_config(config)
+    config["position_analysis"]["gate_prefix_token_count"] = 2
+    with pytest.raises(ValueError, match="must be a configured prefix"):
         validate_packet_config(config)
 
 

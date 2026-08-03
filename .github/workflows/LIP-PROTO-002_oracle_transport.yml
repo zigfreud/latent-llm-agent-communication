@@ -10,10 +10,12 @@ on:
       - "config/LIP-PROTO-003_length_controlled_oracle.yaml"
       - "config/LIP-PROTO-004_oracle_packet_capacity.yaml"
       - "config/LIP-PROTO-005_oracle_packet_functional.yaml"
+      - "config/LIP-PROTO-006_oracle_token_position.yaml"
       - "docs/LIP-PROTO-002_oracle_transport_audit.md"
       - "docs/LIP-PROTO-003_length_controlled_oracle.md"
       - "docs/LIP-PROTO-004_oracle_packet_capacity.md"
       - "docs/LIP-PROTO-005_oracle_packet_functional.md"
+      - "docs/LIP-PROTO-006_oracle_token_position.md"
       - "requirements-protocol.txt"
       - "src/core/prompt_protocol.py"
       - "src/core/utils.py"
@@ -75,6 +77,7 @@ jobs:
           python -c "import yaml; from src.scripts.run_oracle_transport_audit import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-002_oracle_transport.yaml')))"
           python -c "import yaml; from src.scripts.run_oracle_transport_audit import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-003_length_controlled_oracle.yaml')))"
           python -c "import yaml; from src.scripts.run_oracle_packet_audit import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-004_oracle_packet_capacity.yaml')))"
+          python -c "import yaml; from src.scripts.run_oracle_packet_audit import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-006_oracle_token_position.yaml')))"
           python -c "import yaml; from src.scripts.run_oracle_packet_functional import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-005_oracle_packet_functional.yaml')))"
 
       - name: Run oracle transport tests
