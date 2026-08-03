@@ -69,6 +69,11 @@ def materialize(config_path: Path, *, mock_data: bool) -> dict[str, Any]:
     include_entry_point = config.get("include_entry_point_in_prompt")
     if include_entry_point is not True:
         raise ValueError("LIP-PROTO-008 requires entry points in task prompts")
+    entry_point_resolution = required_string(config, "entry_point_resolution")
+    if entry_point_resolution != "tests_then_reference_code":
+        raise ValueError(
+            "LIP-PROTO-008 requires tests_then_reference_code entry-point resolution"
+        )
     tasks_path = Path(required_string(config, "tasks_jsonl"))
     manifest_path = Path(required_string(config, "task_manifest"))
     if tasks_path == manifest_path:
@@ -104,6 +109,7 @@ def materialize(config_path: Path, *, mock_data: bool) -> dict[str, Any]:
         ],
         "sampled_task_sha256": [task_sha256(item["task"]) for item in selected],
         "include_entry_point_in_prompt": True,
+        "entry_point_resolution": entry_point_resolution,
         "target_model": required_string(config, "target_model"),
         "target_model_revision": revision,
         "prompt_protocol": prompt_protocol,

@@ -1,4 +1,5 @@
 import argparse
+import ast
 import json
 import random
 from pathlib import Path
@@ -131,6 +132,64 @@ def make_mock_rows(split_name, prompt_field, count):
     return rows
 
 
+def infer_entry_point_from_reference_code(tests, reference_code):
+    """Resolve benchmark callables that intentionally shadow Python builtins.
+
+    The usual test-only inference excludes builtins so that wrappers such as
+    ``len(target(...))`` are not mistaken for the function under test. MBPP
+    nevertheless contains a task whose required callable is named ``sum``.
+    For that exceptional class, intersect names called by every test with
+    top-level functions declared by the benchmark reference implementation.
+    The reference implementation is used only for metadata resolution and is
+    never included in the transmitted prompt or frozen task specification.
+    """
+
+    if not isinstance(reference_code, str) or not reference_code.strip():
+        return None
+    try:
+        reference_tree = ast.parse(reference_code)
+    except SyntaxError as exc:
+        raise ValueError("cannot infer entry point from invalid reference code") from exc
+    declared = {
+        node.name
+        for node in reference_tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    if not declared:
+        return None
+
+    candidates_by_test = []
+    for test in tests:
+        if not isinstance(test, str) or not test.strip():
+            continue
+        try:
+            test_tree = ast.parse(test)
+        except SyntaxError as exc:
+            raise ValueError(
+                f"cannot infer entry point from invalid test: {test!r}"
+            ) from exc
+        candidates = {
+            node.func.id
+            for node in ast.walk(test_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in declared
+        }
+        if candidates:
+            candidates_by_test.append(candidates)
+
+    if not candidates_by_test:
+        return None
+    common = set.intersection(*candidates_by_test)
+    if len(common) != 1:
+        rendered = ", ".join(sorted(common)) or "none"
+        raise ValueError(
+            "tests and reference code do not identify one common entry point: "
+            f"{rendered}"
+        )
+    return next(iter(common))
+
+
 def normalize_row(
     row,
     prompt_field,
@@ -158,6 +217,8 @@ def normalize_row(
     if entry_point is not None and not isinstance(entry_point, str):
         entry_point = str(entry_point)
     entry_point = (entry_point or "").strip() or infer_entry_point_from_tests(tests)
+    if entry_point is None:
+        entry_point = infer_entry_point_from_reference_code(tests, row.get("code"))
     if include_entry_point:
         if entry_point is None:
             raise ValueError(f"task {sample_id!r} has no inferable entry point")

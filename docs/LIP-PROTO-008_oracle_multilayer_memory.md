@@ -65,6 +65,14 @@ only the benchmark entry-point name to each natural-language task, and freezes
 IDs and prompt hashes in a lightweight task manifest. No source/target latent
 bundle is extracted because this is a target-only oracle experiment.
 
+Entry points are inferred from tests without exposing assertions to the model.
+If a benchmark callable intentionally shadows a Python builtin (MBPP task 126
+uses `sum`), the resolver intersects names called by every test with top-level
+functions declared by the reference implementation. Reference code is used
+only to resolve that metadata and is never persisted in the task registry or
+transmitted to the model. This policy is frozen as
+`tests_then_reference_code` in the sampling configuration and manifest.
+
 The target revision is pinned to
 `53346005fb0ef11d3b6a83b12c895cca40156b6c`, exactly the revision recorded in
 the archived `LIP-PROTO-007` metadata. Model identity is therefore held fixed
