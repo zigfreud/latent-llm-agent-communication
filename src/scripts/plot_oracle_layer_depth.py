@@ -151,11 +151,18 @@ def plot_summary(
         axis.annotate(
             primary_annotations(summary)[depth],
             (depth, mean),
-            xytext=(0, 9),
+            xytext=(0, -15),
             textcoords="offset points",
             ha="center",
+            va="top",
             fontsize=6.8,
             color="#005A8C",
+            bbox={
+                "boxstyle": "round,pad=0.16",
+                "facecolor": "white",
+                "edgecolor": "none",
+                "alpha": 0.82,
+            },
         )
 
     axis.set_xticks(list(SCOPE_DEPTHS.values()))
@@ -170,7 +177,18 @@ def plot_summary(
     )
     axis.set_title(title, loc="left")
     axis.grid(axis="y", color="#e1e1e1", linewidth=0.6)
-    axis.legend(frameon=False, loc="upper left")
+    # The middle of the panel is deliberately data-free: matched replay is
+    # near the text ceiling and both negative controls sit at zero. Keeping a
+    # compact, two-column legend there avoids covering either the registered
+    # p-value annotations or the text-performance reference band.
+    axis.legend(
+        frameon=False,
+        loc="center",
+        bbox_to_anchor=(0.5, 0.42),
+        ncol=2,
+        columnspacing=1.0,
+        handlelength=2.0,
+    )
 
     written = []
     for extension in formats:
