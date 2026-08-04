@@ -33,6 +33,12 @@ from src.evaluation.oracle_capability_calibration import (
     design_fingerprint as capability_design_fingerprint,
     semantic_gate as capability_semantic_gate,
 )
+from src.evaluation.oracle_position_packet import (
+    ORACLE_POSITION_EXPERIMENT_ID,
+    ORACLE_POSITION_PROTOCOL_VERSION,
+    design_fingerprint as position_design_fingerprint,
+    semantic_gate as position_semantic_gate,
+)
 from src.evaluation.semantics import CandidateProcessPolicy, evaluate_generation
 from src.evaluation.statistics import summarize_fixed_sequence, summarize_metric
 from src.pipelines.oracle_experiment import (
@@ -49,6 +55,12 @@ DEFAULT_CONFIG = Path("config/LIP-PROTO-005_oracle_packet_functional.yaml")
 
 
 def evaluation_contract(config: Mapping[str, Any]):
+    if config.get("experiment_id") == ORACLE_POSITION_EXPERIMENT_ID:
+        return (
+            ORACLE_POSITION_PROTOCOL_VERSION,
+            position_design_fingerprint(config),
+            position_semantic_gate,
+        )
     if config.get("experiment_id") == ORACLE_CAPABILITY_EXPERIMENT_ID:
         return (
             ORACLE_CAPABILITY_PROTOCOL_VERSION,
@@ -268,6 +280,7 @@ def evaluate(
         if config.get("experiment_id") in {
             "LIP-PROTO-009",
             ORACLE_CAPABILITY_EXPERIMENT_ID,
+            ORACLE_POSITION_EXPERIMENT_ID,
         }:
             primary = evaluation_config["primary_testing"]
             primary_inference = summarize_fixed_sequence(
