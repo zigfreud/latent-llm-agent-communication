@@ -60,6 +60,14 @@ def test_summary_uses_paired_task_differences():
     assert comparison["p_value_holm"] == pytest.approx(0.125)
     assert comparison["p_value_method"] == "exact"
     assert comparison["by_training_seed"]["41"]["mean_difference"] == 1.0
+    assert summary["conditions"]["source_latent"]["by_generation_seed"] == {
+        "1": {"task_count": 4, "mean": 1.0},
+        "2": {"task_count": 4, "mean": 1.0},
+    }
+    assert comparison["by_generation_seed"] == {
+        "1": {"task_count": 4, "mean_difference": 1.0},
+        "2": {"task_count": 4, "mean_difference": 1.0},
+    }
 
 
 def test_sign_flip_requires_paired_tasks():

@@ -55,28 +55,45 @@ def task_means(
     return {task_id: mean(values) for task_id, values in grouped.items()}
 
 
-def _training_seed_values(
+def _seed_values(
     records: Sequence[Mapping],
     condition: str,
     metric: str,
+    seed_field: str,
 ) -> dict[str, dict[str, float]]:
     seeds = sorted(
         {
-            str(record["training_seed"])
+            str(record[seed_field])
             for record in records
             if record.get("condition") == condition
             and record.get(metric) is not None
-            and record.get("training_seed") is not None
+            and record.get(seed_field) is not None
         }
     )
     return {
         seed: task_means(
-            [record for record in records if str(record.get("training_seed")) == seed],
+            [record for record in records if str(record.get(seed_field)) == seed],
             condition,
             metric,
         )
         for seed in seeds
     }
+
+
+def _training_seed_values(
+    records: Sequence[Mapping],
+    condition: str,
+    metric: str,
+) -> dict[str, dict[str, float]]:
+    return _seed_values(records, condition, metric, "training_seed")
+
+
+def _generation_seed_values(
+    records: Sequence[Mapping],
+    condition: str,
+    metric: str,
+) -> dict[str, dict[str, float]]:
+    return _seed_values(records, condition, metric, "generation_seed")
 
 
 def bootstrap_mean_ci(
@@ -254,6 +271,7 @@ def summarize_metric(
         )
         cached[condition] = per_task
         per_seed = _training_seed_values(records, condition, metric)
+        per_generation_seed = _generation_seed_values(records, condition, metric)
         condition_summary[condition] = {
             "task_count": len(values),
             "observation_count": sum(
@@ -271,6 +289,14 @@ def summarize_metric(
                     "mean": mean(list(seed_tasks.values())),
                 }
                 for training_seed, seed_tasks in per_seed.items()
+                if seed_tasks
+            },
+            "by_generation_seed": {
+                generation_seed: {
+                    "task_count": len(seed_tasks),
+                    "mean": mean(list(seed_tasks.values())),
+                }
+                for generation_seed, seed_tasks in per_generation_seed.items()
                 if seed_tasks
             },
         }
@@ -300,6 +326,10 @@ def summarize_metric(
         p_value, method = sign_flip_p_value(differences, seed=seed + 2000 + offset)
         treatment_seeds = _training_seed_values(records, treatment, metric)
         control_seeds = _training_seed_values(records, control, metric)
+        treatment_generation_seeds = _generation_seed_values(
+            records, treatment, metric
+        )
+        control_generation_seeds = _generation_seed_values(records, control, metric)
         per_seed_differences = {}
         for training_seed in sorted(set(treatment_seeds).intersection(control_seeds)):
             shared_seed_tasks = sorted(
@@ -317,6 +347,25 @@ def summarize_metric(
                     "task_count": len(shared_seed_tasks),
                     "mean_difference": mean(seed_differences),
                 }
+        per_generation_seed_differences = {}
+        for generation_seed in sorted(
+            set(treatment_generation_seeds).intersection(control_generation_seeds)
+        ):
+            shared_seed_tasks = sorted(
+                set(treatment_generation_seeds[generation_seed]).intersection(
+                    control_generation_seeds[generation_seed]
+                )
+            )
+            if shared_seed_tasks:
+                seed_differences = [
+                    treatment_generation_seeds[generation_seed][task_id]
+                    - control_generation_seeds[generation_seed][task_id]
+                    for task_id in shared_seed_tasks
+                ]
+                per_generation_seed_differences[generation_seed] = {
+                    "task_count": len(shared_seed_tasks),
+                    "mean_difference": mean(seed_differences),
+                }
         comparison_summary.append(
             {
                 "treatment": treatment,
@@ -331,6 +380,7 @@ def summarize_metric(
                 "p_value_two_sided": p_value,
                 "p_value_method": method,
                 "by_training_seed": per_seed_differences,
+                "by_generation_seed": per_generation_seed_differences,
             }
         )
 
