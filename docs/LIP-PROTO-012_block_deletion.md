@@ -235,5 +235,121 @@ python -m src.scripts.plot_oracle_state_diagnostics \
 
 ## Result
 
-Pending preregistered execution. This section must be appended without changing
-the frozen design above.
+Execution completed on 2026-08-04. The selector restored and hash-verified all
+nine frozen inputs from the canonical `LIP-PROTO-010` and `LIP-PROTO-011`
+artifacts. It reproduced the 81-task eligible registry, proved that the first
+64 eligible tasks were exactly the two earlier latent cohorts, and selected
+every remaining eligible task at ranks `[64:81]`. The resulting 17-task
+registry was disjoint from both predecessors. Generation produced all 612
+registered records. Hardened scoring reported no missing cells, a validated
+Linux namespace sandbox, `claim_eligible=true`, and
+`semantic_transport_supported=true`.
+
+Task-clustered functional results were:
+
+| Condition | Passes | Rate | 95% task-bootstrap interval |
+|---|---:|---:|---:|
+| Neutral carrier | 0/51 | 0.00% | [0.00%, 0.00%] |
+| Task text | 46/51 | 90.20% | [82.35%, 96.08%] |
+| Matched full `K=32` | 42/51 | 82.35% | [66.67%, 96.08%] |
+| Shuffled full `K=32` | 0/51 | 0.00% | [0.00%, 0.00%] |
+| Matched drop octet 1, keep `-24 ... -1` | 43/51 | 84.31% | [66.67%, 100.00%] |
+| Shuffled drop octet 1 | 0/51 | 0.00% | [0.00%, 0.00%] |
+| Matched drop octet 2 | 29/51 | 56.86% | [35.29%, 76.47%] |
+| Shuffled drop octet 2 | 0/51 | 0.00% | [0.00%, 0.00%] |
+| Matched drop octet 3 | 17/51 | 33.33% | [13.73%, 54.90%] |
+| Shuffled drop octet 3 | 0/51 | 0.00% | [0.00%, 0.00%] |
+| Matched drop terminal octet 4, keep `-32 ... -9` | 1/51 | 1.96% | [0.00%, 5.88%] |
+| Shuffled drop octet 4 | 0/51 | 0.00% | [0.00%, 0.00%] |
+
+The preregistered replication anchor rejected. Full-`K=32`
+matched-minus-shuffled replay had mean task-level difference `0.823529`, 16
+nonzero task clusters, interval `[0.666667, 0.960784]`, and exact one-sided
+`p=0.0000152588`. Matched replay passed 42 programs while the equal-capacity
+task-shuffled control passed none. The known early-quarter channel therefore
+replicated on the final latent-unseen holdout and opened the four-member
+deletion family.
+
+Three deletion hypotheses survived Holm correction:
+
+| Deleted octet | Mean matched-minus-shuffled difference | Nonzero tasks | Raw exact `p` | Holm `p` | Confirmed dispensable in context |
+|---|---:|---:|---:|---:|---:|
+| 1: `-32 ... -25` | 0.843137 | 15 | 0.0000305176 | 0.0001220703 | yes |
+| 2: `-24 ... -17` | 0.568627 | 12 | 0.0002441406 | 0.0007324219 | yes |
+| 3: `-16 ... -9` | 0.333333 | 7 | 0.0078125 | 0.015625 | yes |
+| 4: `-8 ... -1` | 0.019608 | 1 | 0.5 | 0.5 | no |
+
+Thus a 24-vector packet is prospectively confirmed sufficient for bounded
+task-specific transport, and octets 1, 2, and 3 are each dispensable when the
+other 24 positions remain. The deletion outcomes are not exchangeable in
+practice: observed performance declines monotonically as the deleted block
+moves toward the prompt boundary, from 84.31% after deleting the earliest
+octet to 1.96% after deleting the terminal octet. Removing octet 1 happened to
+score slightly above full `K=32`, but the design did not register a superiority
+or non-inferiority claim for that contrast and the difference must not be
+interpreted as beneficial compression.
+
+Deleting octet 4 was not confirmed sufficient. Its near-zero observed rate is
+strong descriptive evidence that the tested complement `-32 ... -9` lacks the
+functional capacity retained by the other complements, but failure to reject
+does not by itself prove that every vector in octet 4 is necessary. A necessity
+claim requires a positive test that distinguishes the two task-dependent tail
+positions from the task-invariant generation boundary and resolves
+within-octet interactions.
+
+The positional gradient was stable across generation seeds. Full-`K=32` rates
+were 76.47%, 94.12%, and 76.47% for seeds 1103, 1217, and 1301. Drop-octet-1
+rates were 88.24%, 82.35%, and 82.35%; drop-octet-2 rates were 52.94%, 70.59%,
+and 47.06%; drop-octet-3 rates were 29.41%, 41.18%, and 29.41%; and
+drop-octet-4 rates were 0.00%, 5.88%, and 0.00%. Task text scored 88.24%,
+94.12%, and 88.24%. Neutral and every shuffled condition remained 0.00% under
+every seed.
+
+### Exploratory mechanism analysis
+
+The aggregate state maps do not rank causal necessity. Within the eight replay
+layers, residual-input task-signal fractions averaged `0.6500`, `0.7053`,
+`0.6012`, and only `0.2006` across octets 1 through 4. Corresponding angular
+separations were `0.6738`, `0.7404`, `0.6296`, and `0.2125`. Mean residual
+norms were nevertheless similar (`2.0999`, `2.2628`, `2.1527`, and `2.0718`).
+The lowest-energy, least-separated octet was therefore the one whose deletion
+most severely reduced function. This directly reinforces the `LIP-PROTO-011`
+result: local geometric salience is not a causal sufficiency or necessity
+score.
+
+A post-result tokenizer audit explains why the terminal octet deserves finer
+resolution. Offsets `-8` and `-7` contained task-dependent required-function
+name tokens, with 16 distinct token IDs at each position across the 17 tasks.
+Offsets `-6 ... -1` were identical across every task: the closing backtick and
+period, end-of-turn marker, assistant-header start, `assistant` role token,
+header end, and final newline. Their hidden states are still contextualized by
+the complete task even though their visible token IDs are constant. Octet 4
+therefore straddles the final task-specific identifiers and a fixed generation
+boundary that may act as a contextual integration site. This audit is
+exploratory and was not part of the primary family.
+
+The supported claim remains bounded. For this model revision, chat template,
+capability-calibrated final holdout, native oracle source, and replay through
+only the first eight decoder blocks, at least three distinct 24-position
+packets transmitted task identity above equal-capacity shuffled controls. The
+smallest confirmed packet size is 24 among the packet sizes tested here; it is
+not a mathematical minimum. The result does not establish non-inferiority to
+text, arbitrary task coverage, a learned sender-to-receiver bridge, cross-model
+interoperability, or that the terminal octet is uniformly necessary. The next
+prospective position experiment should decompose offsets `-8 ... -1`, while
+separating the two function-name positions from the six fixed chat-boundary
+positions on a newly frozen task population.
+
+The canonical artifact is stored at `lip-artifacts/LIP-PROTO-012` on Drive. It
+contains 17 payload files plus `SHA256SUMS`: the frozen config and source
+commit, selected task registry and selection report, generations and metadata,
+hardened scores and summary, aggregate state diagnostics, and raster/vector/PDF
+figures. All 17 manifest entries were verified after final rendering, and the
+folder was independently visible through the authenticated Drive API.
+
+- `SHA256SUMS`: `507b8a99255227999edd55475b25257332bd0798bd726a9d9d73e0b5bd2b8773`
+- `runs/generations.jsonl`: `0705a539ccb0cbede1312fadc8502c11c2558d6ef2af9d655f6c898f88d70f01`
+- `runs/functional-evaluation/summary.json`: `294abb90ee428fb6add650ce489cd910a611d93ff5147cca5a6babb817263533`
+- `runs/state-diagnostics.json`: `c109d9ef63d2e45ef04f1ef7bef4eafd598af8492317c71cc85d1e4d2a13760c`
+- `runs/LIP-PROTO-012_block_deletion.svg`: `9d9b85803f73bad0029a31377c73c46d9d9abc2d2ccdffbd3ba72b60ba04cbcc`
+- `runs/LIP-PROTO-012_state_diagnostics.svg`: `43d0270640297d1745099bcc0ab8e0e52d3ac4eeefc4c2940901aa0aaf026db7`
