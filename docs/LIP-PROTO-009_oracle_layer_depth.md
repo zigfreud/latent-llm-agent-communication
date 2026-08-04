@@ -136,6 +136,12 @@ match that capacity, all replay self-checks remain within `1e-4`, and the output
 grid and provenance pass inspection. It is not expected to pass the inferential
 fixed sequence.
 
+The executed preflight exposed a high-false-stop failure mode in that
+execution-only rule before any confirmation task was inspected. The original
+artifact and rule are preserved; the registered replacement authorization is
+documented in [LIP-PROTO-009 amendment 1](LIP-PROTO-009_amendment_1.md). The
+confirmation design and scientific claim gate remain unchanged.
+
 After authorization, execute the unchanged confirmation:
 
 ```bash

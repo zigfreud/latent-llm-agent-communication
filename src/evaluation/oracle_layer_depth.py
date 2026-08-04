@@ -182,6 +182,169 @@ def plan_as_dicts(plan: Iterable[OracleLayerDepthCondition]) -> list[dict]:
     return [asdict(item) for item in plan]
 
 
+def summarize_preflight_authorization(
+    records: Sequence[Mapping],
+    metadata: Mapping,
+    *,
+    maximum_self_logit_delta: float = 0.0001,
+) -> dict:
+    """Audit the pre-confirmation identity channel without making a claim.
+
+    Amendment 1 exists because a two-task functional-nonzero rule has a high
+    false-stop probability when the receiver's text-only capacity is modest.
+    This gate instead requires exact, paired program identity between text and
+    matched replay, and between shuffled replay and its registered source task.
+    The claim-oriented functional gate remains unchanged.
+    """
+
+    task_ids = [str(task_id) for task_id in metadata.get("task_ids", [])]
+    generation_seeds = [int(seed) for seed in metadata.get("generation_seeds", [])]
+    if len(task_ids) != 2 or len(set(task_ids)) != 2:
+        raise ValueError("preflight authorization requires exactly two unique tasks")
+    if len(generation_seeds) != 1:
+        raise ValueError("preflight authorization requires exactly one seed")
+
+    expected_keys = {
+        (task_id, condition, generation_seeds[0])
+        for task_id in task_ids
+        for condition in ORACLE_LAYER_DEPTH_CONDITIONS
+    }
+    by_key = {}
+    for row in records:
+        key = (
+            str(row.get("task_id", "")),
+            str(row.get("condition", "")),
+            int(row.get("generation_seed", -1)),
+        )
+        if key in by_key:
+            raise ValueError(f"duplicate preflight record: {key}")
+        by_key[key] = row
+    if set(by_key) != expected_keys:
+        missing = sorted(expected_keys.difference(by_key))
+        unexpected = sorted(set(by_key).difference(expected_keys))
+        raise ValueError(
+            f"preflight grid mismatch; missing={missing}, unexpected={unexpected}"
+        )
+
+    seed = generation_seeds[0]
+    text_rows = {
+        task_id: by_key[(task_id, "text_only_no_lip", seed)]
+        for task_id in task_ids
+    }
+    neutral_rows = {
+        task_id: by_key[(task_id, "neutral_no_lip", seed)]
+        for task_id in task_ids
+    }
+    matched_rows = []
+    shuffled_rows = []
+    for task_id in task_ids:
+        for scope in ORACLE_LAYER_DEPTH_SCOPE_ORDER:
+            matched_rows.append(
+                by_key[
+                    (
+                        task_id,
+                        f"oracle_{scope}_k{ORACLE_LAYER_DEPTH_PACKET_SIZE}",
+                        seed,
+                    )
+                ]
+            )
+            shuffled_rows.append(
+                by_key[
+                    (
+                        task_id,
+                        f"shuffled_oracle_{scope}_k{ORACLE_LAYER_DEPTH_PACKET_SIZE}",
+                        seed,
+                    )
+                ]
+            )
+
+    self_checks = metadata.get("self_checks", [])
+    self_deltas = [
+        float(item.get("maximum_absolute_logit_delta", float("inf")))
+        for item in self_checks
+        if isinstance(item, Mapping)
+    ]
+    expected_self_check_scopes = set(ORACLE_LAYER_DEPTH_SCOPE_ORDER)
+    actual_self_check_scopes = {
+        str(item.get("scope", ""))
+        for item in self_checks
+        if isinstance(item, Mapping)
+    }
+
+    design_sha256 = str(metadata.get("design_sha256", ""))
+    provenance_valid = bool(
+        metadata.get("experiment_id") == "LIP-PROTO-009"
+        and metadata.get("protocol_version") == ORACLE_LAYER_DEPTH_PROTOCOL_VERSION
+        and metadata.get("run_scope") == "preflight"
+        and metadata.get("complete") is True
+        and int(metadata.get("records", -1)) == len(expected_keys)
+        and int(metadata.get("expected_records", -1)) == len(expected_keys)
+        and len(design_sha256) == 64
+        and all(
+            row.get("experiment_id") == "LIP-PROTO-009"
+            and row.get("protocol_version") == ORACLE_LAYER_DEPTH_PROTOCOL_VERSION
+            and row.get("run_scope") == "preflight"
+            and row.get("design_sha256") == design_sha256
+            for row in records
+        )
+    )
+    self_checks_valid = bool(
+        len(self_deltas) == len(ORACLE_LAYER_DEPTH_SCOPE_ORDER)
+        and actual_self_check_scopes == expected_self_check_scopes
+        and max(self_deltas, default=float("inf")) <= maximum_self_logit_delta
+    )
+    text_entrypoints_valid = all(
+        row.get("entry_point_declared") is True for row in text_rows.values()
+    )
+    neutral_entrypoints_absent = all(
+        row.get("entry_point_declared") is False for row in neutral_rows.values()
+    )
+    matched_program_identity = all(
+        row.get("oracle_task_id") == str(row.get("task_id"))
+        and row.get("entry_point_declared") is True
+        and row.get("extracted_code")
+        == text_rows[str(row.get("task_id"))].get("extracted_code")
+        for row in matched_rows
+    )
+    shuffled_program_identity = all(
+        str(row.get("oracle_task_id", "")) in text_rows
+        and str(row.get("oracle_task_id")) != str(row.get("task_id"))
+        and row.get("entry_point_declared") is False
+        and row.get("extracted_code")
+        == text_rows[str(row.get("oracle_task_id"))].get("extracted_code")
+        for row in shuffled_rows
+    )
+
+    checks = {
+        "grid_and_provenance_valid": provenance_valid,
+        "self_checks_within_tolerance": self_checks_valid,
+        "text_entrypoints_declared": text_entrypoints_valid,
+        "neutral_entrypoints_absent": neutral_entrypoints_absent,
+        "matched_programs_equal_text": matched_program_identity,
+        "shuffled_programs_equal_registered_source": shuffled_program_identity,
+    }
+    functional_counts = {
+        condition: sum(
+            bool(by_key[(task_id, condition, seed)].get("functional_pass"))
+            for task_id in task_ids
+        )
+        for condition in ("text_only_no_lip", "oracle_all_layer_input_k32")
+    }
+    return {
+        "experiment_id": "LIP-PROTO-009",
+        "amendment": "preconfirmation-authorization-v1",
+        "claim_eligible": False,
+        "authorization_scope": "execution_only",
+        "confirmation_design_changed": False,
+        "task_ids": task_ids,
+        "generation_seed": seed,
+        "maximum_self_logit_delta": max(self_deltas, default=None),
+        "functional_pass_counts": functional_counts,
+        "checks": checks,
+        "passed": all(checks.values()),
+    }
+
+
 def primary_fixed_sequence() -> tuple[tuple[str, str], ...]:
     """Return the preregistered descending-depth primary hypothesis order."""
 
