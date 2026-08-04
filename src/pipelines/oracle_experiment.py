@@ -91,10 +91,10 @@ def bind_tasks_to_manifest(
         experiment_id = config.get("experiment_id")
         if experiment_id and manifest.get("experiment_id") != experiment_id:
             raise ValueError("task manifest belongs to a different experiment")
-        if experiment_id == "LIP-PROTO-009" and not manifest.get(
+        if experiment_id in {"LIP-PROTO-009", "LIP-PROTO-010"} and not manifest.get(
             "sampled_ids_disjoint_from_exclusions"
         ):
-            raise ValueError("LIP-PROTO-009 task manifest lacks exclusion proof")
+            raise ValueError(f"{experiment_id} task manifest lacks exclusion proof")
         tasks_path = Path(str(data["tasks_jsonl"]))
         if manifest.get("tasks_jsonl_sha256") != sha256_path(tasks_path):
             raise ValueError("task file digest does not match the task manifest")

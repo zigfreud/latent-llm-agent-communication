@@ -24,12 +24,22 @@ from src.evaluation.oracle_layer_depth import (
     design_fingerprint as layer_depth_design_fingerprint,
     semantic_gate as layer_depth_semantic_gate,
 )
+from src.evaluation.oracle_capability_calibration import (
+    ORACLE_CAPABILITY_CANDIDATE_COUNT,
+    ORACLE_CAPABILITY_EXPERIMENT_ID,
+    ORACLE_CAPABILITY_PROTOCOL_VERSION,
+    ORACLE_CAPABILITY_SCREENING_CONDITION,
+    ORACLE_CAPABILITY_SCREENING_SCOPE,
+    design_fingerprint as capability_design_fingerprint,
+    semantic_gate as capability_semantic_gate,
+)
 from src.evaluation.semantics import CandidateProcessPolicy, evaluate_generation
 from src.evaluation.statistics import summarize_fixed_sequence, summarize_metric
 from src.pipelines.oracle_experiment import (
     load_json_object,
     load_yaml,
     prepare_output_dir,
+    sha256_path,
     write_json,
     write_jsonl,
 )
@@ -39,6 +49,12 @@ DEFAULT_CONFIG = Path("config/LIP-PROTO-005_oracle_packet_functional.yaml")
 
 
 def evaluation_contract(config: Mapping[str, Any]):
+    if config.get("experiment_id") == ORACLE_CAPABILITY_EXPERIMENT_ID:
+        return (
+            ORACLE_CAPABILITY_PROTOCOL_VERSION,
+            capability_design_fingerprint(config),
+            capability_semantic_gate,
+        )
     if config.get("experiment_id") == "LIP-PROTO-009":
         return (
             ORACLE_LAYER_DEPTH_PROTOCOL_VERSION,
@@ -98,7 +114,15 @@ def validate_generation_grid(
     if metadata.get("design_sha256") != design_sha256:
         raise ValueError("generation metadata does not match the frozen config")
     task_ids = [str(task_id) for task_id in metadata.get("task_ids", [])]
-    conditions = [str(condition) for condition in config["conditions"]]
+    screening = bool(
+        config.get("experiment_id") == ORACLE_CAPABILITY_EXPERIMENT_ID
+        and metadata.get("run_scope") == ORACLE_CAPABILITY_SCREENING_SCOPE
+    )
+    conditions = (
+        [ORACLE_CAPABILITY_SCREENING_CONDITION]
+        if screening
+        else [str(condition) for condition in config["conditions"]]
+    )
     generation_seeds = [int(seed) for seed in metadata.get("generation_seeds", [])]
     if not task_ids or len(set(task_ids)) != len(task_ids):
         raise ValueError("metadata task IDs must be a non-empty unique sequence")
@@ -140,9 +164,12 @@ def validate_generation_grid(
         raise ValueError(f"generation grid has {len(unexpected)} unexpected records")
     if missing and not allow_incomplete:
         raise ValueError(f"generation grid is missing {len(missing)} records")
-    complete = not missing and len(task_ids) == int(
-        config["data"]["functional_task_count"]
+    expected_task_count = (
+        ORACLE_CAPABILITY_CANDIDATE_COUNT
+        if screening
+        else int(config["data"]["functional_task_count"])
     )
+    complete = not missing and len(task_ids) == expected_task_count
     if not allow_incomplete and not complete:
         raise ValueError("only the full frozen task slice is claim-eligible")
     return {
@@ -153,6 +180,7 @@ def validate_generation_grid(
         "expected_record_count": len(expected),
         "missing_record_count": len(missing),
         "design_sha256": design_sha256,
+        "screening": screening,
     }
 
 
@@ -193,8 +221,13 @@ def evaluate(
             row["task_spec"].get("entry_point"),
         )
         scored.append(scored_row)
-    conditions = list(config["conditions"])
-    comparisons = list(evaluation_config["comparisons"])
+    screening = bool(design_validation["screening"])
+    conditions = (
+        [ORACLE_CAPABILITY_SCREENING_CONDITION]
+        if screening
+        else list(config["conditions"])
+    )
+    comparisons = [] if screening else list(evaluation_config["comparisons"])
     statistics_kwargs = {
         "bootstrap_iterations": int(evaluation_config["bootstrap_iterations"]),
         "confidence": float(evaluation_config["confidence"]),
@@ -226,13 +259,16 @@ def evaluate(
         )
     primary_inference = None
     gate = None
-    if functional:
+    if functional and not screening:
         condition_means = {
             condition: values["mean"]
             for condition, values in metrics["functional_pass"]["conditions"].items()
         }
         _, _, memory_gate = evaluation_contract(config)
-        if config.get("experiment_id") == "LIP-PROTO-009":
+        if config.get("experiment_id") in {
+            "LIP-PROTO-009",
+            ORACLE_CAPABILITY_EXPERIMENT_ID,
+        }:
             primary = evaluation_config["primary_testing"]
             primary_inference = summarize_fixed_sequence(
                 scored,
@@ -290,7 +326,9 @@ def evaluate(
     }
     if security_context is not None:
         summary["sandbox"] = dict(security_context)
-    write_jsonl(output_dir / "scored_generations.jsonl", scored)
+    scored_path = output_dir / "scored_generations.jsonl"
+    write_jsonl(scored_path, scored)
+    summary["scored_jsonl_sha256"] = sha256_path(scored_path)
     write_json(output_dir / "summary.json", summary)
     return summary
 
