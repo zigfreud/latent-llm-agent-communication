@@ -236,5 +236,88 @@ python -m src.scripts.plot_oracle_state_diagnostics \
 
 ## Result
 
-Pending preregistered execution. This section must be appended without changing
-the frozen design above.
+Execution completed on 2026-08-04. Screening produced all 384 registered text
+records. Of the 192 fresh candidates, 81 satisfied the frozen eligibility rule:
+70 passed under both screening seeds and 11 under one. The first 32 eligible
+tasks in manifest order were selected without expanding or reordering the
+candidate registry. Confirmation then produced and hardened-scored all 960
+registered records. Design validation reported 32 tasks, 960/960 records, no
+missing cells, a validated Linux namespace sandbox, and `claim_eligible=true`.
+
+Task-clustered functional results were:
+
+| Condition | Passes | Rate | 95% task-bootstrap interval |
+|---|---:|---:|---:|
+| Neutral carrier | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Matched early quarter, blocks `0:8` | 85/96 | 88.54% | [78.12%, 96.88%] |
+| Shuffled early quarter | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Matched early half, blocks `0:16` | 87/96 | 90.62% | [81.25%, 97.92%] |
+| Shuffled early half | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Matched early three quarters, blocks `0:24` | 87/96 | 90.62% | [80.21%, 98.96%] |
+| Shuffled early three quarters | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Matched all-layer input, blocks `0:32` | 87/96 | 90.62% | [80.21%, 98.96%] |
+| Shuffled all-layer input | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Task text | 90/96 | 93.75% | [87.50%, 100.00%] |
+
+All three prospective fixed-sequence hypotheses rejected in their registered
+order. The 24-, 16-, and 8-layer matched-minus-shuffled task-level mean
+differences were respectively `0.90625`, `0.90625`, and `0.885417`, with 30,
+31, and 31 nonzero task clusters. Each one-sided registered sign-flip test used
+the Monte Carlo branch and returned `p=0.0000099999`, the minimum nonzero
+plus-one estimate at 100,000 samples. Because 24 and 16 layers rejected, the
+sequence licensed testing of 8 layers; it rejected as well. The semantic gate
+therefore passed and reported `smallest_confirmed_scope=early_quarter_input`.
+This is the shortest scope tested, not proof of a mathematical minimum.
+
+The descriptive all-layer positive anchor also passed. In the broader
+matched-versus-shuffled comparison family, all four depth contrasts had raw
+two-sided `p=0.0000099999` and Holm-adjusted `p=0.000119999`. The zero result in
+every shuffled condition is central: tensor count, shape, hook boundary, norm
+scale, carrier, and generation seed were preserved, while only task identity
+was deranged. Matched replay therefore carried task-specific functional
+information rather than merely increasing activation or perturbing decoding.
+
+The pattern was stable across confirmation seeds. Matched 8-layer pass rates
+were 87.50%, 90.62%, and 87.50% for seeds 401, 509, and 631. The corresponding
+16-layer rates were 84.38%, 90.62%, and 96.88%; 24-layer and all-layer rates
+were each 87.50%, 93.75%, and 90.62%. Task text scored 100.00%, 90.62%, and
+90.62%. Neutral and every shuffled depth remained 0.00% under every seed. The
+per-generation-seed fields were added after the primary result solely to expose
+this already-recorded stability view; re-evaluation preserved the scored
+records and all inferential results.
+
+The aggregate state maps provide a descriptive geometric complement. Averaged
+over all decoder layers and packet positions, task-centered energy was `0.5912`
+in values before cache construction, `0.4828` in residual inputs, and `0.1726`
+in keys before RoPE. Corresponding angular separation (`1 - cosine`) was
+`0.6060`, `0.4955`, and `0.1768`; normalized task effective rank was `0.4983`,
+`0.5207`, and `0.4011`. Suffix position `-22` had the highest layer-averaged
+task-centered energy for all three state types. These diagnostics localize
+between-task geometry but are not themselves a communication test; causal
+task identity comes from matched versus task-shuffled functional behavior.
+
+The supported claim remains deliberately bounded. For this model revision,
+prompt protocol, capability-calibrated task population, and oracle source,
+`K=32` task-specific latent states replayed only into the first 8 of 32 decoder
+blocks were sufficient for 88.54% functional success, compared with 93.75%
+from task text and 0% from equal-capacity task-shuffled replay. This does not
+establish non-inferiority to text, generalization to arbitrary MBPP tasks, a
+learned cross-model bridge, or compression to eight vectors. Replay depth and
+packet length are different axes: this experiment reduced the number of
+decoder blocks receiving a still-32-position packet. The next ablation should
+prospectively reduce packet positions while retaining the confirmed early-depth
+scope and task-shuffled controls.
+
+The canonical artifact is stored at `lip-artifacts/LIP-PROTO-010` on Drive. It
+contains 29 payload files plus `SHA256SUMS`: exclusion-bound candidate and
+selected registries, screening and confirmation outputs, hardened sandbox
+reports, aggregate state diagnostics, configs including amendment A1, source
+commit records, and vector/raster figures. Every manifest entry was verified
+after the final render.
+
+- `SHA256SUMS`: `80ea9320defa471a69b891affd8b58f761daffef94d64b95a5abec2419a4016c`
+- `runs/generations.jsonl`: `d3ed5ce633c89895a26a1765c87db219efb6bec33bab8abd9c47b80a82512a3f`
+- `runs/functional-evaluation/summary.json`: `0d36fcd10b48d09e5d836f49e3f68dfe5050f9ee13ffaccd4d08149e1dfb7b19`
+- `runs/state-diagnostics.json`: `23e1b1052f1865d8572a84e9d9d9df553a15efb38b575a1a90adb8e957f2fef2`
+- `runs/LIP-PROTO-010_functional_layer_depth.svg`: `650beef9008a2617112ab8ca97b6627f1f1bd54595bbc3f4961576e2533862ba`
+- `runs/LIP-PROTO-010_state_diagnostics.svg`: `1cbe609ffad9091355a9ab18f77412dc1af5410836251eff4ce7823251d70f30`
