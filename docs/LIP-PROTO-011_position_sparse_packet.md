@@ -204,5 +204,94 @@ python -m src.scripts.plot_oracle_state_diagnostics \
 
 ## Result
 
-Pending preregistered execution. This section must be appended without changing
-the frozen design above.
+Execution completed on 2026-08-04. The selector restored the hash-bound
+`LIP-PROTO-010` registries and screening results, reproduced eligible ranks
+`[32:64]`, and confirmed that the 32 selected tasks were disjoint from the
+predecessor confirmation set. The persistent registry was reused without
+reordering or expansion. Generation and hardened scoring then produced all 960
+registered records. Design validation reported 32 tasks, 10 conditions, three
+seeds, no missing cells, a validated Linux namespace sandbox, and
+`claim_eligible=true`.
+
+Task-clustered functional results were:
+
+| Condition | Passes | Rate | 95% task-bootstrap interval |
+|---|---:|---:|---:|
+| Neutral carrier | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Matched full `K=32` | 82/96 | 85.42% | [73.96%, 94.79%] |
+| Shuffled full `K=32` | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Matched diagnostic top `K=8` | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Shuffled diagnostic top `K=8` | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Matched peak-window `K=8` | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Shuffled peak-window `K=8` | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Matched suffix `K=8` | 10/96 | 10.42% | [1.04%, 21.88%] |
+| Shuffled suffix `K=8` | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Task text | 88/96 | 91.67% | [82.29%, 98.96%] |
+
+The fixed sequence first confirmed the fresh-task `K=32` replication. Its
+matched-minus-shuffled task-level mean difference was `0.854167`, with 29
+nonzero task clusters and a 95% task-bootstrap interval of
+`[0.739583, 0.947917]`. The registered one-sided Monte Carlo sign-flip test
+returned `p=0.0000099999`, so the replication anchor rejected. This isolates
+task identity again: matched and shuffled packets had identical tensor count,
+shape, offsets, replay depth, carrier, norm treatment, and generation seed, yet
+matched replay passed 82 records and shuffled replay passed none.
+
+The second fixed-sequence hypothesis did not reject. Both the matched and
+shuffled diagnostic top-`K=8` conditions passed 0/96, giving a mean difference
+of zero, a `[0, 0]` interval, and exact one-sided `p=1`. Gatekeeping therefore
+stopped, as preregistered. The peak-window and suffix hypotheses were not
+formally tested in the primary sequence, and the sparse semantic gate reported
+`position_sparse_transport_supported=false`. This is a negative result for the
+registered eight-vector sufficiency claim, not a failure to replicate the
+32-vector latent channel.
+
+The remaining layouts are descriptive. The peak-window `K=8` condition was
+also 0/96. The terminal suffix `K=8` condition passed 10/96 across four task
+clusters, while its shuffled control remained 0/96. Its effect was `0.104167`
+with interval `[0.010417, 0.218750]`; the exact one-sided sign-flip value was
+`p=0.0625` and the broader two-sided value was `p=0.125` before Holm adjustment.
+With only four positive task signs, `1/16=0.0625` is the smallest attainable
+one-sided exact value. Thus the suffix observation is a weak exploratory signal,
+not confirmation, and it cannot be promoted past the stopped fixed sequence.
+
+The result was stable across generation seeds. Full-`K=32` rates were 90.62%,
+81.25%, and 84.38% for seeds 743, 887, and 991. Task text scored 93.75%, 93.75%,
+and 87.50%; suffix `K=8` scored 9.38%, 12.50%, and 9.38%. Neutral, every
+shuffled condition, diagnostic top `K=8`, and peak-window `K=8` remained zero
+under every seed.
+
+The aggregate state maps sharpen the interpretation. The high task-centered
+energy band in earlier and middle suffix positions reproduced descriptively,
+but neither the eight individually highest-energy positions nor the strongest
+contiguous energy window preserved function. Geometric separability at a
+position is therefore not a causal sufficiency score for that position. The
+joint pattern is consistent with information distributed across positions or
+with positional synergy: a vector can become useful only together with other
+parts of the 32-position packet. This experiment does not yet distinguish a
+smooth capacity threshold from specific higher-order position interactions.
+
+The supported claim remains bounded. For this model revision, prompt protocol,
+capability-calibrated latent-unseen task population, and native oracle source,
+a 32-position packet replayed through only the first eight decoder blocks
+preserved task-specific functional information at 85.42%, compared with 91.67%
+from task text and 0% from equal-capacity shuffled replay. None of the three
+eight-position layouts established sufficient transport. This does not prove
+that all `K=8` packets fail, that 32 is minimal, that the channel is
+non-inferior to text, or that a learned cross-model bridge exists. The next
+capacity experiment should prospectively separate packet-size threshold from
+position interaction, for example by testing intermediate `K` values and
+structured complementary deletions under the same matched/shuffled design.
+
+The canonical artifact is stored at `lip-artifacts/LIP-PROTO-011` on Drive. It
+contains 17 payload files plus `SHA256SUMS`: the frozen config and source commit,
+selected task registry and selection report, generations and metadata, hardened
+scores and summary, aggregate state diagnostics, and raster/vector/PDF figures.
+All 17 manifest entries were verified after the final render.
+
+- `SHA256SUMS`: `5ee64230177e7fe8f09d3c643d9fb7ba5a1f5d7399965f4af85862079e6aabe9`
+- `runs/generations.jsonl`: `bd04628369c7469b527689e794eee1cc79d4ca7e2434e479853bbd92dc8c2aa6`
+- `runs/functional-evaluation/summary.json`: `ae3a9a8c66c7935fa4797b1d4ff645c7c231d7274f18af7406eb47dd57bddee6`
+- `runs/state-diagnostics.json`: `0091902177140953431b8ed79a5654348e6adc3ff907cf62907e0749fa768782`
+- `runs/LIP-PROTO-011_position_sparse_packet.svg`: `b4297e81703be012efa7b54363cd601f941b84759245d5585942c04f5c7e0963`
+- `runs/LIP-PROTO-011_state_diagnostics.svg`: `11c618405133f6e4c06b9d588730aec4ed6dc5d2568548d25c82dc96226e0095`
