@@ -106,23 +106,31 @@ def bootstrap_mean_ci(
 def sign_flip_p_value(
     differences: Sequence[float],
     *,
+    alternative: str = "two-sided",
     monte_carlo_samples: int = 100_000,
     seed: int = 2718,
 ) -> tuple[float, str]:
-    """Two-sided paired randomization test over task-level differences."""
+    """Paired randomization test over task-level differences."""
 
     if not differences:
         raise ValueError("paired test requires at least one task")
-    observed = abs(mean(differences))
+    if alternative not in {"two-sided", "greater"}:
+        raise ValueError("alternative must be 'two-sided' or 'greater'")
+    observed_mean = mean(differences)
+    observed = abs(observed_mean) if alternative == "two-sided" else observed_mean
     tolerance = 1e-15
     count = len(differences)
+
+    def is_extreme(statistic: float) -> bool:
+        value = abs(statistic) if alternative == "two-sided" else statistic
+        return value + tolerance >= observed
 
     if count <= 20:
         total = 1 << count
         extreme = 0
         for signs in itertools.product((-1.0, 1.0), repeat=count):
-            statistic = abs(mean([d * sign for d, sign in zip(differences, signs)]))
-            extreme += int(statistic + tolerance >= observed)
+            statistic = mean([d * sign for d, sign in zip(differences, signs)])
+            extreme += int(is_extreme(statistic))
         return extreme / total, "exact"
 
     if monte_carlo_samples <= 0:
@@ -130,11 +138,87 @@ def sign_flip_p_value(
     rng = random.Random(seed)
     extreme = 0
     for _ in range(monte_carlo_samples):
-        statistic = abs(
-            mean([value if rng.getrandbits(1) else -value for value in differences])
+        statistic = mean(
+            [value if rng.getrandbits(1) else -value for value in differences]
         )
-        extreme += int(statistic + tolerance >= observed)
+        extreme += int(is_extreme(statistic))
     return (extreme + 1) / (monte_carlo_samples + 1), "monte_carlo"
+
+
+def summarize_fixed_sequence(
+    records: Sequence[Mapping],
+    metric: str,
+    hypotheses: Sequence[Sequence[str]],
+    *,
+    alpha: float = 0.05,
+    alternative: str = "greater",
+    bootstrap_iterations: int = 10_000,
+    confidence: float = 0.95,
+    seed: int = 1729,
+) -> dict:
+    """Test an ordered family, stopping confirmatory rejection at first failure."""
+
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be between zero and one")
+    if not hypotheses:
+        raise ValueError("fixed sequence requires at least one hypothesis")
+    cached: dict[str, dict[str, float]] = {}
+    results = []
+    sequence_active = True
+    for offset, hypothesis in enumerate(hypotheses):
+        if len(hypothesis) != 2:
+            raise ValueError("each hypothesis must contain [treatment, control]")
+        treatment, control = (str(value) for value in hypothesis)
+        treatment_tasks = cached.setdefault(
+            treatment, task_means(records, treatment, metric)
+        )
+        control_tasks = cached.setdefault(control, task_means(records, control, metric))
+        shared = sorted(set(treatment_tasks).intersection(control_tasks))
+        if not shared:
+            raise ValueError(f"hypothesis {treatment} vs {control} has no shared tasks")
+        differences = [
+            treatment_tasks[task_id] - control_tasks[task_id] for task_id in shared
+        ]
+        lower, upper = bootstrap_mean_ci(
+            differences,
+            iterations=bootstrap_iterations,
+            confidence=confidence,
+            seed=seed + 3000 + offset,
+        )
+        p_value, method = sign_flip_p_value(
+            differences,
+            alternative=alternative,
+            seed=seed + 4000 + offset,
+        )
+        tested = sequence_active
+        rejected = bool(tested and p_value <= alpha)
+        results.append(
+            {
+                "sequence_index": offset,
+                "treatment": treatment,
+                "control": control,
+                "task_count": len(shared),
+                "mean_difference": mean(differences),
+                "ci_lower": lower,
+                "ci_upper": upper,
+                "p_value": p_value,
+                "p_value_method": method,
+                "alternative": alternative,
+                "tested": tested,
+                "rejected": rejected,
+            }
+        )
+        sequence_active = bool(sequence_active and rejected)
+    return {
+        "metric": metric,
+        "method": "fixed_sequence_gatekeeping",
+        "familywise_alpha": alpha,
+        "alternative": alternative,
+        "cluster_unit": "task_id",
+        "replicates_within_task": "averaged before task-level test",
+        "stopping_rule": "stop confirmatory testing after the first non-rejection",
+        "hypotheses": results,
+    }
 
 
 def summarize_metric(
@@ -169,7 +253,8 @@ def summarize_metric(
             "observation_count": sum(
                 1
                 for record in records
-                if record.get("condition") == condition and record.get(metric) is not None
+                if record.get("condition") == condition
+                and record.get(metric) is not None
             ),
             "mean": mean(values),
             "ci_lower": lower,
@@ -189,7 +274,9 @@ def summarize_metric(
         if len(comparison) != 2:
             raise ValueError("each comparison must contain [treatment, control]")
         treatment, control = comparison
-        treatment_tasks = cached.get(treatment) or task_means(records, treatment, metric)
+        treatment_tasks = cached.get(treatment) or task_means(
+            records, treatment, metric
+        )
         control_tasks = cached.get(control) or task_means(records, control, metric)
         shared = sorted(set(treatment_tasks).intersection(control_tasks))
         if not shared:
