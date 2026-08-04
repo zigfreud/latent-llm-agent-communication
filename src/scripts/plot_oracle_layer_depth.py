@@ -22,8 +22,8 @@ SCOPE_DEPTHS = dict(zip(ORACLE_LAYER_DEPTH_SCOPE_ORDER, (8, 16, 24, 32)))
 def load_summary(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         summary = json.load(handle)
-    if summary.get("experiment_id") != "LIP-PROTO-009":
-        raise ValueError("summary must come from LIP-PROTO-009")
+    if summary.get("experiment_id") not in {"LIP-PROTO-009", "LIP-PROTO-010"}:
+        raise ValueError("summary must come from LIP-PROTO-009 or LIP-PROTO-010")
     if summary.get("execution_mode") != "functional_hardened_namespace":
         raise ValueError("summary must come from the hardened evaluator")
     if not summary.get("claim_eligible"):
@@ -64,7 +64,7 @@ def control_interval(
 
 
 def primary_annotations(summary: Mapping[str, Any]) -> dict[int, str]:
-    annotations = {}
+    annotations = {depth: "descriptive" for depth in SCOPE_DEPTHS.values()}
     for hypothesis in summary["primary_inference"]["hypotheses"]:
         treatment = str(hypothesis["treatment"])
         scope = treatment.removeprefix("oracle_").removesuffix("_k32")
@@ -163,7 +163,12 @@ def plot_summary(
     axis.set_ylim(-0.05, 1.05)
     axis.set_xlabel("Decoder blocks receiving the K=32 latent packet")
     axis.set_ylabel("Task-clustered functional pass rate")
-    axis.set_title("Functional capacity by replay depth", loc="left")
+    title = (
+        "Capability-calibrated functional capacity by replay depth"
+        if summary.get("experiment_id") == "LIP-PROTO-010"
+        else "Functional capacity by replay depth"
+    )
+    axis.set_title(title, loc="left")
     axis.grid(axis="y", color="#e1e1e1", linewidth=0.6)
     axis.legend(frameon=False, loc="upper left")
 

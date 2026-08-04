@@ -36,6 +36,22 @@ from src.evaluation.oracle_layer_depth import (
     primary_fixed_sequence,
     validate_layer_depth_contract,
 )
+from src.evaluation.oracle_capability_calibration import (
+    ORACLE_CAPABILITY_CONDITIONS,
+    ORACLE_CAPABILITY_CONFIRMATION_SEEDS,
+    ORACLE_CAPABILITY_EXPERIMENT_ID,
+    ORACLE_CAPABILITY_LAYER_COUNT,
+    ORACLE_CAPABILITY_PACKET_SIZE,
+    ORACLE_CAPABILITY_PROTOCOL_VERSION,
+    ORACLE_CAPABILITY_SCOPE_ORDER,
+    ORACLE_CAPABILITY_SELECTED_COUNT,
+    build_condition_plan as build_capability_condition_plan,
+    design_fingerprint as capability_design_fingerprint,
+    plan_as_dicts as capability_plan_as_dicts,
+    primary_fixed_sequence as capability_primary_fixed_sequence,
+    validate_capability_memory_contract,
+    validate_selected_task_manifest,
+)
 from src.evaluation.oracle_state_diagnostics import (
     validate_state_diagnostics_contract,
     summarize_state_diagnostics,
@@ -102,6 +118,22 @@ def experiment_contract(config: Mapping[str, Any]) -> dict[str, Any]:
             "plan_as_dicts": layer_depth_plan_as_dicts,
             "validate_memory_contract": validate_layer_depth_contract,
             "predecessor_field": "predecessor_experiment",
+            "supports_preflight": True,
+        }
+    if experiment_id == ORACLE_CAPABILITY_EXPERIMENT_ID:
+        return {
+            "experiment_id": experiment_id,
+            "protocol_version": ORACLE_CAPABILITY_PROTOCOL_VERSION,
+            "packet_size": ORACLE_CAPABILITY_PACKET_SIZE,
+            "layer_count": ORACLE_CAPABILITY_LAYER_COUNT,
+            "conditions": ORACLE_CAPABILITY_CONDITIONS,
+            "scope_order": ORACLE_CAPABILITY_SCOPE_ORDER,
+            "build_condition_plan": build_capability_condition_plan,
+            "design_fingerprint": capability_design_fingerprint,
+            "plan_as_dicts": capability_plan_as_dicts,
+            "validate_memory_contract": validate_capability_memory_contract,
+            "predecessor_field": "predecessor_experiment",
+            "supports_preflight": False,
         }
     raise ValueError("unsupported oracle memory experiment_id")
 
@@ -379,6 +411,139 @@ def _validate_proto009_config(config: Mapping[str, Any]) -> None:
         raise ValueError("output paths must be configured")
 
 
+def _validate_proto010_config(config: Mapping[str, Any]) -> None:
+    expected_top_level = {
+        "experiment_id",
+        "predecessor_experiment",
+        "models",
+        "prompt_protocol",
+        "runtime",
+        "data",
+        "screening",
+        "neutral_target_prompt",
+        "carrier",
+        "memory",
+        "diagnostics",
+        "conditions",
+        "controls",
+        "generation",
+        "evaluation",
+        "output",
+    }
+    unknown = sorted(set(config).difference(expected_top_level))
+    if unknown:
+        raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
+    if config.get("predecessor_experiment") != "LIP-PROTO-009":
+        raise ValueError("predecessor_experiment must bind LIP-PROTO-009")
+    protocol = protocol_metadata(config.get("prompt_protocol"))
+    if protocol["mode"] != "chat_template" or not protocol["add_generation_prompt"]:
+        raise ValueError("capability-calibrated replay requires the generation boundary")
+    if not str(config.get("neutral_target_prompt", "")).strip():
+        raise ValueError("neutral_target_prompt must be non-empty")
+    if config.get("carrier") != {"mode": "left_pad_masked_to_task_length"}:
+        raise ValueError("LIP-PROTO-010 freezes the length-controlled carrier")
+
+    data = config.get("data", {})
+    screening = config.get("screening", {})
+    runtime = config.get("runtime", {})
+    controls = config.get("controls", {})
+    generation = config.get("generation", {})
+    evaluation = config.get("evaluation", {})
+    output = config.get("output", {})
+    diagnostics = config.get("diagnostics", {})
+    for name, value in (
+        ("data", data),
+        ("screening", screening),
+        ("runtime", runtime),
+        ("controls", controls),
+        ("generation", generation),
+        ("evaluation", evaluation),
+        ("output", output),
+        ("diagnostics", diagnostics),
+    ):
+        if not isinstance(value, Mapping):
+            raise ValueError(f"{name} must be a mapping")
+
+    required_data_paths = (
+        "candidate_tasks_jsonl",
+        "candidate_task_manifest",
+        "tasks_jsonl",
+        "task_manifest",
+    )
+    if any(not str(data.get(field, "")).strip() for field in required_data_paths):
+        raise ValueError("data must configure candidate and selected task paths")
+    frozen_data = {
+        "candidate_task_count": 192,
+        "task_count": ORACLE_CAPABILITY_SELECTED_COUNT,
+        "functional_task_start": 0,
+        "functional_task_count": ORACLE_CAPABILITY_SELECTED_COUNT,
+        "functional_split": "mbpp_test_capability_calibrated_32",
+    }
+    if any(data.get(field) != value for field, value in frozen_data.items()):
+        raise ValueError("LIP-PROTO-010 freezes candidate and confirmation task counts")
+
+    expected_screening = {
+        "condition": "text_only_no_lip",
+        "seeds": [17, 29],
+        "eligibility_rule": "any_functional_pass_across_screening_seeds",
+        "selected_task_count": ORACLE_CAPABILITY_SELECTED_COUNT,
+        "generation": {
+            "max_new_tokens": 256,
+            "do_sample": True,
+            "temperature": 0.2,
+            "top_p": 0.95,
+            "repetition_penalty": 1.0,
+        },
+    }
+    if screening != expected_screening:
+        raise ValueError("screening must match the frozen capability calibration")
+    if not isinstance(runtime.get("load_4bit"), bool):
+        raise ValueError("runtime.load_4bit must be a boolean")
+    validate_capability_memory_contract(config.get("memory", {}))
+    validate_state_diagnostics_contract(diagnostics)
+    if list(config.get("conditions", [])) != list(ORACLE_CAPABILITY_CONDITIONS):
+        raise ValueError("conditions must match the frozen calibrated-depth design")
+    if controls != {
+        "shuffled_oracle_memory": {
+            "permutation": "sattolo_derangement",
+            "seed": 1729,
+        }
+    }:
+        raise ValueError("shuffled memory control must use the frozen derangement")
+    if generation.get("seeds") != list(ORACLE_CAPABILITY_CONFIRMATION_SEEDS):
+        raise ValueError("LIP-PROTO-010 freezes generation seeds [401, 509, 631]")
+    if int(generation.get("max_new_tokens", 0)) != 256:
+        raise ValueError("LIP-PROTO-010 freezes max_new_tokens=256")
+    if not isinstance(generation.get("do_sample"), bool):
+        raise ValueError("generation.do_sample must be a boolean")
+    if bool(generation["do_sample"]) and float(generation.get("temperature", 0)) <= 0:
+        raise ValueError("temperature must be positive when sampling")
+    if evaluation.get("comparisons") != expected_layer_depth_comparisons():
+        raise ValueError("evaluation.comparisons must match frozen secondary contrasts")
+    primary = evaluation.get("primary_testing")
+    if primary != {
+        "method": "fixed_sequence_gatekeeping",
+        "alternative": "greater",
+        "alpha": 0.05,
+        "sequence": [list(pair) for pair in capability_primary_fixed_sequence()],
+    }:
+        raise ValueError("evaluation.primary_testing must match the frozen 24 -> 16 -> 8 order")
+    if int(evaluation.get("bootstrap_iterations", 0)) <= 0:
+        raise ValueError("evaluation.bootstrap_iterations must be positive")
+    if any(
+        not str(output.get(field, "")).strip()
+        for field in (
+            "screening_generations_jsonl",
+            "screening_evaluation_dir",
+            "selection_report_json",
+            "generations_jsonl",
+            "evaluation_dir",
+            "state_diagnostics_json",
+        )
+    ):
+        raise ValueError("output paths must be configured")
+
+
 def validate_config(config: Mapping[str, Any]) -> None:
     experiment_id = config.get("experiment_id")
     if experiment_id == "LIP-PROTO-008":
@@ -386,6 +551,9 @@ def validate_config(config: Mapping[str, Any]) -> None:
         return
     if experiment_id == "LIP-PROTO-009":
         _validate_proto009_config(config)
+        return
+    if experiment_id == ORACLE_CAPABILITY_EXPERIMENT_ID:
+        _validate_proto010_config(config)
         return
     raise ValueError("unsupported oracle memory experiment_id")
 
@@ -450,8 +618,12 @@ def run_generation(
     protocol_version = contract["protocol_version"]
     packet_size = int(contract["packet_size"])
     layer_count = int(contract["layer_count"])
+    if preflight and not contract.get("supports_preflight", True):
+        raise ValueError(f"{experiment_id} does not define a sacrificial preflight")
     all_tasks = load_tasks(Path(str(config["data"]["tasks_jsonl"])))
     bound_tasks, manifest, manifest_path = bind_tasks_to_manifest(config, all_tasks)
+    if experiment_id == ORACLE_CAPABILITY_EXPERIMENT_ID:
+        validate_selected_task_manifest(config, manifest, manifest_path)
     if preflight:
         start = int(config["data"]["preflight_task_start"])
         count = int(config["data"]["preflight_task_count"])

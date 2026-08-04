@@ -28,7 +28,7 @@ from src.scripts.materialize_mbpp_prompt_configs import (
 
 DEFAULT_CONFIG = Path("config/LIP-PROTO-008_mbpp_test_sampling.yaml")
 MANIFEST_KIND = "lip_oracle_task_manifest"
-SUPPORTED_EXPERIMENTS = {"LIP-PROTO-008", "LIP-PROTO-009"}
+SUPPORTED_EXPERIMENTS = {"LIP-PROTO-008", "LIP-PROTO-009", "LIP-PROTO-010"}
 
 
 def parse_args() -> argparse.Namespace:

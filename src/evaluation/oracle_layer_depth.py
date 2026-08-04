@@ -63,18 +63,22 @@ def expected_layer_depth_conditions(
 ORACLE_LAYER_DEPTH_CONDITIONS = expected_layer_depth_conditions()
 
 
-def validate_layer_depth_contract(memory: Mapping) -> tuple[dict, ...]:
+def validate_layer_depth_contract(
+    memory: Mapping,
+    *,
+    experiment_id: str = "LIP-PROTO-009",
+) -> tuple[dict, ...]:
     if not isinstance(memory, Mapping):
         raise ValueError("memory must be a mapping")
     if int(memory.get("packet_size", 0)) != ORACLE_LAYER_DEPTH_PACKET_SIZE:
-        raise ValueError("LIP-PROTO-009 freezes memory.packet_size=32")
+        raise ValueError(f"{experiment_id} freezes memory.packet_size=32")
     if int(memory.get("decoder_layer_count", 0)) != ORACLE_LAYER_DEPTH_LAYER_COUNT:
-        raise ValueError("LIP-PROTO-009 freezes a 32-layer target decoder")
+        raise ValueError(f"{experiment_id} freezes a 32-layer target decoder")
     if int(memory.get("self_check_tasks", 0)) != 1:
-        raise ValueError("LIP-PROTO-009 freezes memory.self_check_tasks=1")
+        raise ValueError(f"{experiment_id} freezes memory.self_check_tasks=1")
     if float(memory.get("maximum_self_logit_delta", -1.0)) != 0.0001:
         raise ValueError(
-            "LIP-PROTO-009 freezes memory.maximum_self_logit_delta=0.0001"
+            f"{experiment_id} freezes memory.maximum_self_logit_delta=0.0001"
         )
     scopes = memory.get("scopes")
     if not isinstance(scopes, list):

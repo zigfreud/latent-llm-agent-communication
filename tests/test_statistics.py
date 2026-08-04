@@ -55,6 +55,7 @@ def test_summary_uses_paired_task_differences():
     comparison = summary["comparisons"][0]
     assert comparison["mean_difference"] == 1.0
     assert comparison["task_count"] == 4
+    assert comparison["nonzero_task_count"] == 4
     assert comparison["p_value_two_sided"] == pytest.approx(0.125)
     assert comparison["p_value_holm"] == pytest.approx(0.125)
     assert comparison["p_value_method"] == "exact"
@@ -69,6 +70,15 @@ def test_sign_flip_requires_paired_tasks():
 def test_one_sided_sign_flip_uses_registered_direction():
     p_value, method = sign_flip_p_value([1.0] * 8, alternative="greater")
     assert p_value == pytest.approx(1.0 / 256.0)
+    assert method == "exact"
+
+
+def test_sign_flip_ignores_zero_difference_clusters_for_exact_enumeration():
+    p_value, method = sign_flip_p_value(
+        [1.0] * 5 + [0.0] * 27,
+        alternative="greater",
+    )
+    assert p_value == pytest.approx(1.0 / 32.0)
     assert method == "exact"
 
 
@@ -97,6 +107,7 @@ def test_fixed_sequence_stops_confirmatory_rejection_after_first_failure():
         seed=9,
     )
     hypotheses = summary["hypotheses"]
+    assert hypotheses[1]["nonzero_task_count"] == 0
     assert hypotheses[0]["tested"] is True
     assert hypotheses[0]["rejected"] is True
     assert hypotheses[1]["tested"] is True

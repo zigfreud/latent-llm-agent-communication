@@ -116,10 +116,13 @@ def sign_flip_p_value(
         raise ValueError("paired test requires at least one task")
     if alternative not in {"two-sided", "greater"}:
         raise ValueError("alternative must be 'two-sided' or 'greater'")
-    observed_mean = mean(differences)
-    observed = abs(observed_mean) if alternative == "two-sided" else observed_mean
     tolerance = 1e-15
-    count = len(differences)
+    nonzero = [float(value) for value in differences if abs(float(value)) > tolerance]
+    if not nonzero:
+        return 1.0, "exact"
+    observed_mean = mean(nonzero)
+    observed = abs(observed_mean) if alternative == "two-sided" else observed_mean
+    count = len(nonzero)
 
     def is_extreme(statistic: float) -> bool:
         value = abs(statistic) if alternative == "two-sided" else statistic
@@ -129,7 +132,7 @@ def sign_flip_p_value(
         total = 1 << count
         extreme = 0
         for signs in itertools.product((-1.0, 1.0), repeat=count):
-            statistic = mean([d * sign for d, sign in zip(differences, signs)])
+            statistic = mean([d * sign for d, sign in zip(nonzero, signs)])
             extreme += int(is_extreme(statistic))
         return extreme / total, "exact"
 
@@ -139,7 +142,7 @@ def sign_flip_p_value(
     extreme = 0
     for _ in range(monte_carlo_samples):
         statistic = mean(
-            [value if rng.getrandbits(1) else -value for value in differences]
+            [value if rng.getrandbits(1) else -value for value in nonzero]
         )
         extreme += int(is_extreme(statistic))
     return (extreme + 1) / (monte_carlo_samples + 1), "monte_carlo"
@@ -198,6 +201,9 @@ def summarize_fixed_sequence(
                 "treatment": treatment,
                 "control": control,
                 "task_count": len(shared),
+                "nonzero_task_count": sum(
+                    abs(difference) > 1e-15 for difference in differences
+                ),
                 "mean_difference": mean(differences),
                 "ci_lower": lower,
                 "ci_upper": upper,
@@ -316,6 +322,9 @@ def summarize_metric(
                 "treatment": treatment,
                 "control": control,
                 "task_count": len(shared),
+                "nonzero_task_count": sum(
+                    abs(difference) > 1e-15 for difference in differences
+                ),
                 "mean_difference": mean(differences),
                 "ci_lower": lower,
                 "ci_upper": upper,

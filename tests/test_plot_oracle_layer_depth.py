@@ -64,3 +64,12 @@ def test_layer_depth_controls_and_fixed_sequence_annotations():
         16: "gate stopped",
         8: "gate stopped",
     }
+
+
+def test_calibrated_primary_annotations_leave_all_layer_descriptive():
+    summary = functional_summary()
+    summary["primary_inference"]["hypotheses"] = summary["primary_inference"][
+        "hypotheses"
+    ][1:]
+    annotations = primary_annotations(summary)
+    assert annotations[32] == "descriptive"
