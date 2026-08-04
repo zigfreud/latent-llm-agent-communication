@@ -1,8 +1,10 @@
 import pytest
 
 from src.evaluation.statistics import (
+    holm_adjust,
     sign_flip_p_value,
     summarize_fixed_sequence,
+    summarize_gatekept_holm,
     summarize_metric,
     task_means,
 )
@@ -88,6 +90,61 @@ def test_sign_flip_ignores_zero_difference_clusters_for_exact_enumeration():
     )
     assert p_value == pytest.approx(1.0 / 32.0)
     assert method == "exact"
+
+
+def test_holm_adjust_preserves_input_order_and_step_down_monotonicity():
+    assert holm_adjust([0.04, 0.01, 0.03]) == pytest.approx([0.06, 0.03, 0.06])
+    with pytest.raises(ValueError, match="between zero and one"):
+        holm_adjust([1.1])
+
+
+def test_gatekept_holm_opens_family_only_after_anchor_rejection():
+    records = []
+    for task_index in range(8):
+        task_id = f"task-{task_index}"
+        for condition, value in (
+            ("anchor", 1),
+            ("anchor_control", 0),
+            ("a", 1),
+            ("a_control", 0),
+            ("b", int(task_index < 2)),
+            ("b_control", 0),
+        ):
+            records.append(
+                {"task_id": task_id, "condition": condition, "score": value}
+            )
+    summary = summarize_gatekept_holm(
+        records,
+        "score",
+        ["anchor", "anchor_control"],
+        [["a", "a_control"], ["b", "b_control"]],
+        bootstrap_iterations=100,
+    )
+    assert summary["anchor"]["rejected"] is True
+    assert summary["family"][0]["tested"] is True
+    assert summary["family"][0]["p_value_holm"] == pytest.approx(2 / 256)
+    assert summary["family"][0]["rejected"] is True
+    assert summary["family"][1]["rejected"] is False
+
+    failed_anchor = summarize_gatekept_holm(
+        [
+            {
+                "task_id": record["task_id"],
+                "condition": record["condition"],
+                "score": (
+                    0 if record["condition"] == "anchor" else record["score"]
+                ),
+            }
+            for record in records
+        ],
+        "score",
+        ["anchor", "anchor_control"],
+        [["a", "a_control"]],
+        bootstrap_iterations=100,
+    )
+    assert failed_anchor["anchor"]["rejected"] is False
+    assert failed_anchor["family"][0]["tested"] is False
+    assert failed_anchor["family"][0]["rejected"] is False
 
 
 def test_fixed_sequence_stops_confirmatory_rejection_after_first_failure():

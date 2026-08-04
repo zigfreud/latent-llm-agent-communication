@@ -165,6 +165,22 @@ def sign_flip_p_value(
     return (extreme + 1) / (monte_carlo_samples + 1), "monte_carlo"
 
 
+def holm_adjust(p_values: Sequence[float]) -> list[float]:
+    """Return Holm step-down adjusted p-values in the input order."""
+
+    values = [float(value) for value in p_values]
+    if any(not math.isfinite(value) or not 0.0 <= value <= 1.0 for value in values):
+        raise ValueError("p-values must be finite and between zero and one")
+    ordered = sorted(range(len(values)), key=values.__getitem__)
+    adjusted = [0.0] * len(values)
+    running_max = 0.0
+    count = len(values)
+    for rank, index in enumerate(ordered):
+        running_max = max(running_max, min(1.0, (count - rank) * values[index]))
+        adjusted[index] = running_max
+    return adjusted
+
+
 def summarize_fixed_sequence(
     records: Sequence[Mapping],
     metric: str,
@@ -241,6 +257,97 @@ def summarize_fixed_sequence(
         "replicates_within_task": "averaged before task-level test",
         "stopping_rule": "stop confirmatory testing after the first non-rejection",
         "hypotheses": results,
+    }
+
+
+def summarize_gatekept_holm(
+    records: Sequence[Mapping],
+    metric: str,
+    anchor: Sequence[str],
+    family: Sequence[Sequence[str]],
+    *,
+    alpha: float = 0.05,
+    alternative: str = "greater",
+    bootstrap_iterations: int = 10_000,
+    confidence: float = 0.95,
+    seed: int = 1729,
+) -> dict:
+    """Gate a Holm-adjusted hypothesis family behind one anchor contrast."""
+
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be between zero and one")
+    hypotheses = [anchor, *family]
+    if len(anchor) != 2 or not family or any(len(pair) != 2 for pair in family):
+        raise ValueError(
+            "anchor and family hypotheses must contain [treatment, control]"
+        )
+
+    cached: dict[str, dict[str, float]] = {}
+    results = []
+    for offset, hypothesis in enumerate(hypotheses):
+        treatment, control = (str(value) for value in hypothesis)
+        treatment_tasks = cached.setdefault(
+            treatment, task_means(records, treatment, metric)
+        )
+        control_tasks = cached.setdefault(control, task_means(records, control, metric))
+        shared = sorted(set(treatment_tasks).intersection(control_tasks))
+        if not shared:
+            raise ValueError(f"hypothesis {treatment} vs {control} has no shared tasks")
+        differences = [
+            treatment_tasks[task_id] - control_tasks[task_id] for task_id in shared
+        ]
+        lower, upper = bootstrap_mean_ci(
+            differences,
+            iterations=bootstrap_iterations,
+            confidence=confidence,
+            seed=seed + 3000 + offset,
+        )
+        p_value, method = sign_flip_p_value(
+            differences,
+            alternative=alternative,
+            seed=seed + 4000 + offset,
+        )
+        results.append(
+            {
+                "treatment": treatment,
+                "control": control,
+                "task_count": len(shared),
+                "nonzero_task_count": sum(
+                    abs(difference) > 1e-15 for difference in differences
+                ),
+                "mean_difference": mean(differences),
+                "ci_lower": lower,
+                "ci_upper": upper,
+                "p_value": p_value,
+                "p_value_method": method,
+                "alternative": alternative,
+            }
+        )
+
+    anchor_result = results[0]
+    anchor_result["tested"] = True
+    anchor_result["rejected"] = bool(anchor_result["p_value"] <= alpha)
+    adjusted = holm_adjust([item["p_value"] for item in results[1:]])
+    family_results = []
+    for item, adjusted_p in zip(results[1:], adjusted):
+        item["p_value_holm"] = adjusted_p
+        item["tested"] = anchor_result["rejected"]
+        item["rejected"] = bool(item["tested"] and adjusted_p <= alpha)
+        family_results.append(item)
+
+    return {
+        "metric": metric,
+        "method": "anchor_gate_then_holm",
+        "familywise_alpha": alpha,
+        "alternative": alternative,
+        "cluster_unit": "task_id",
+        "replicates_within_task": "averaged before task-level test",
+        "stopping_rule": (
+            "test the anchor first; open the Holm-adjusted family only after "
+            "anchor rejection"
+        ),
+        "anchor": anchor_result,
+        "family": family_results,
     }
 
 
@@ -385,17 +492,11 @@ def summarize_metric(
         )
 
     if comparison_summary:
-        ordered = sorted(
-            range(len(comparison_summary)),
-            key=lambda index: comparison_summary[index]["p_value_two_sided"],
+        adjusted = holm_adjust(
+            [item["p_value_two_sided"] for item in comparison_summary]
         )
-        running_max = 0.0
-        comparison_count = len(comparison_summary)
-        for rank, index in enumerate(ordered):
-            raw = comparison_summary[index]["p_value_two_sided"]
-            adjusted = min(1.0, (comparison_count - rank) * raw)
-            running_max = max(running_max, adjusted)
-            comparison_summary[index]["p_value_holm"] = running_max
+        for item, adjusted_p in zip(comparison_summary, adjusted):
+            item["p_value_holm"] = adjusted_p
 
     return {
         "metric": metric,
