@@ -159,6 +159,10 @@ python -m src.scripts.run_hardened_oracle_evaluation \
   --generations runs/LIP-PROTO-009/generations.jsonl \
   --output-dir runs/LIP-PROTO-009/functional-evaluation \
   --overwrite
+
+python -m src.scripts.plot_oracle_layer_depth \
+  --summary runs/LIP-PROTO-009/functional-evaluation/summary.json \
+  --output-stem runs/LIP-PROTO-009/LIP-PROTO-009_functional_layer_depth
 ```
 
 ## Result
