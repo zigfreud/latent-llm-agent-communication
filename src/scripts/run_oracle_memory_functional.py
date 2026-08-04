@@ -79,6 +79,7 @@ from src.pipelines.oracle_transport import (
     forward_with_packet_capture,
     forward_with_packet_replacement,
     generate_with_optional_packet,
+    validate_neutral_carrier_task_lengths,
 )
 
 
@@ -415,6 +416,7 @@ def _validate_proto010_config(config: Mapping[str, Any]) -> None:
     expected_top_level = {
         "experiment_id",
         "predecessor_experiment",
+        "amendment",
         "models",
         "prompt_protocol",
         "runtime",
@@ -435,11 +437,34 @@ def _validate_proto010_config(config: Mapping[str, Any]) -> None:
         raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
     if config.get("predecessor_experiment") != "LIP-PROTO-009":
         raise ValueError("predecessor_experiment must bind LIP-PROTO-009")
+    amendment = config.get("amendment")
+    expected_amendment = {
+        "id": "LIP-PROTO-010-A1",
+        "date": "2026-08-04",
+        "scope": "confirmation_only",
+        "reason": (
+            "shorten the neutral prompt so every selected task admits a "
+            "length-matched masked carrier"
+        ),
+        "screening_config": (
+            "config/LIP-PROTO-010_capability_calibrated_depth.yaml"
+        ),
+    }
+    if amendment is not None and amendment != expected_amendment:
+        raise ValueError("amendment must match the frozen LIP-PROTO-010-A1 record")
     protocol = protocol_metadata(config.get("prompt_protocol"))
     if protocol["mode"] != "chat_template" or not protocol["add_generation_prompt"]:
         raise ValueError("capability-calibrated replay requires the generation boundary")
-    if not str(config.get("neutral_target_prompt", "")).strip():
-        raise ValueError("neutral_target_prompt must be non-empty")
+    expected_neutral_prompt = (
+        "Use the latent signal."
+        if amendment is not None
+        else (
+            "Infer the requested task from the supplied latent signal. "
+            "Implement the required Python function."
+        )
+    )
+    if config.get("neutral_target_prompt") != expected_neutral_prompt:
+        raise ValueError("neutral_target_prompt does not match the frozen design")
     if config.get("carrier") != {"mode": "left_pad_masked_to_task_length"}:
         raise ValueError("LIP-PROTO-010 freezes the length-controlled carrier")
 
@@ -713,21 +738,46 @@ def run_generation(
     if packet_size > native_neutral_length:
         raise ValueError("K=32 does not fit visible neutral carrier tokens")
 
+    prepared_tasks = []
+    for task in tasks:
+        formatted, inputs = encode_prompt(
+            task["prompt"], tokenizer, protocol, device
+        )
+        prepared_tasks.append(
+            {
+                "task": task,
+                "formatted": formatted,
+                "inputs": inputs,
+                "prompt_length": int(inputs["input_ids"].shape[1]),
+            }
+        )
+    carrier_mode = str(config["carrier"]["mode"])
+    validate_neutral_carrier_task_lengths(
+        native_neutral_inputs,
+        {
+            str(prepared["task"]["task_id"]): prepared["prompt_length"]
+            for prepared in prepared_tasks
+        },
+        mode=carrier_mode,
+    )
+
     task_inputs = []
     carrier_inputs = []
     formatted_task_prompts = []
     anchor_packets = []
     state_memories = []
     self_checks = []
-    for task_index, task in enumerate(tasks):
+    for task_index, prepared in enumerate(prepared_tasks):
+        task = prepared["task"]
         print(f"Capturing memory {task_index + 1}/{len(tasks)}: {task['task_id']}")
-        formatted, inputs = encode_prompt(task["prompt"], tokenizer, protocol, device)
-        prompt_length = int(inputs["input_ids"].shape[1])
+        formatted = prepared["formatted"]
+        inputs = prepared["inputs"]
+        prompt_length = prepared["prompt_length"]
         carrier = build_neutral_carrier(
             native_neutral_inputs,
             task_prompt_length=prompt_length,
             pad_token_id=tokenizer.pad_token_id,
-            mode=str(config["carrier"]["mode"]),
+            mode=carrier_mode,
         )
         positions = torch.arange(
             prompt_length - packet_size,

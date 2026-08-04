@@ -81,6 +81,35 @@ def build_neutral_carrier(
     }
 
 
+def validate_neutral_carrier_task_lengths(
+    neutral_inputs: Mapping[str, torch.Tensor],
+    task_prompt_lengths: Mapping[str, int],
+    *,
+    mode: str,
+) -> None:
+    """Reject an incompatible task registry before expensive state capture."""
+
+    if mode == "native":
+        return
+    if mode != "left_pad_masked_to_task_length":
+        raise ValueError(f"unsupported neutral carrier mode: {mode}")
+    native_length = int(neutral_inputs["input_ids"].shape[1])
+    incompatible = {
+        str(task_id): int(prompt_length)
+        for task_id, prompt_length in task_prompt_lengths.items()
+        if int(prompt_length) < native_length
+    }
+    if incompatible:
+        details = ", ".join(
+            f"{task_id}={prompt_length}"
+            for task_id, prompt_length in incompatible.items()
+        )
+        raise ValueError(
+            "neutral carrier is longer than selected task prompts "
+            f"(neutral={native_length}; tasks: {details})"
+        )
+
+
 def forward_with_optional_replacement(
     model,
     inputs: Mapping[str, torch.Tensor],

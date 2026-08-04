@@ -19,6 +19,7 @@ from src.pipelines.oracle_transport import (
     forward_with_layer_capture,
     forward_with_packet_capture,
     forward_with_packet_replacement,
+    validate_neutral_carrier_task_lengths,
 )
 from src.scripts.run_oracle_packet_audit import validate_config as validate_packet_config
 from src.scripts.plot_oracle_token_position import (
@@ -270,6 +271,22 @@ def test_masked_left_padding_matches_task_length_without_visible_tokens():
     )
     assert carrier["input_ids"].tolist() == [[0, 0, 7, 8, 9]]
     assert carrier["attention_mask"].tolist() == [[0, 0, 1, 1, 1]]
+
+
+def test_carrier_length_preflight_reports_every_incompatible_task():
+    neutral = {
+        "input_ids": torch.tensor([[7, 8, 9]]),
+        "attention_mask": torch.ones(1, 3, dtype=torch.long),
+    }
+    with pytest.raises(
+        ValueError,
+        match=r"neutral=3; tasks: short-a=2, short-b=1",
+    ):
+        validate_neutral_carrier_task_lengths(
+            neutral,
+            {"long": 4, "short-a": 2, "short-b": 1},
+            mode="left_pad_masked_to_task_length",
+        )
 
 
 def test_length_controlled_experiment_requires_masked_carrier():

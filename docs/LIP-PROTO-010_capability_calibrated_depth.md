@@ -85,6 +85,34 @@ before selection. Consequently, selection and confirmation randomness are
 disjoint, while the estimand remains explicitly conditional on demonstrated
 text capability.
 
+## Pre-confirmation operational amendment A1
+
+The screening completed on 2026-08-04 with 81 eligible candidates (70 passed
+both screening seeds and 11 passed one). The deterministic eligible prefix
+therefore selected 32 tasks without expanding or reordering the candidate pool.
+
+The first confirmation invocation stopped before writing any confirmation
+record. The formatted neutral prompt contained 51 tokens, while selected tasks
+`257` and `263` each contained 50. A masked length-matched carrier can add
+invisible left padding, but cannot remove a visible neutral token without
+truncating the prompt. This was an input-compatibility failure, not an observed
+confirmation outcome.
+
+Amendment `LIP-PROTO-010-A1` replaces only the confirmation neutral user text
+with `Use the latent signal.`. Under the pinned tokenizer this formats to 39
+tokens; the selected task range is 50--78 tokens, leaving every carrier valid
+and preserving the last 32 visible positions used by `K=32`. Task selection,
+conditions, layer scopes, shuffled permutation, seeds, generation settings,
+inference, and output paths are unchanged. Screening and selection retain the
+original frozen configuration and hashes. Confirmation uses the separately
+versioned
+`config/LIP-PROTO-010_capability_calibrated_depth_confirmation.yaml`.
+
+This amendment was fixed after inspecting only prompt lengths and the thrown
+compatibility error. No matched, shuffled, neutral, text, or confirmation-seed
+generation existed when it was recorded. The runner now checks the entire
+registry for carrier compatibility before any expensive state capture.
+
 ## Primary estimand and inference
 
 For selected task `i`, depth `d`, and confirmation seed `s`, let `Y(i,d,s)` be
@@ -185,10 +213,10 @@ Only after selection succeeds, run confirmation and hardened scoring:
 
 ```bash
 python -m src.scripts.run_oracle_memory_functional \
-  --config config/LIP-PROTO-010_capability_calibrated_depth.yaml
+  --config config/LIP-PROTO-010_capability_calibrated_depth_confirmation.yaml
 
 python -m src.scripts.run_hardened_oracle_evaluation \
-  --config config/LIP-PROTO-010_capability_calibrated_depth.yaml \
+  --config config/LIP-PROTO-010_capability_calibrated_depth_confirmation.yaml \
   --generations runs/LIP-PROTO-010/generations.jsonl \
   --output-dir runs/LIP-PROTO-010/functional-evaluation \
   --overwrite

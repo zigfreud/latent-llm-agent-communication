@@ -28,6 +28,9 @@ from src.scripts.select_oracle_capability_tasks import select_tasks
 
 
 CONFIG_PATH = Path("config/LIP-PROTO-010_capability_calibrated_depth.yaml")
+CONFIRMATION_CONFIG_PATH = Path(
+    "config/LIP-PROTO-010_capability_calibrated_depth_confirmation.yaml"
+)
 
 
 def load_registered_config():
@@ -37,6 +40,19 @@ def load_registered_config():
 
 def test_registered_proto010_config_matches_frozen_contract():
     validate_config(load_registered_config())
+
+
+def test_confirmation_amendment_changes_only_the_neutral_prompt():
+    base = load_registered_config()
+    with CONFIRMATION_CONFIG_PATH.open(encoding="utf-8") as handle:
+        confirmation = yaml.safe_load(handle)
+    validate_config(confirmation)
+    amendment = confirmation.pop("amendment")
+    assert amendment["id"] == "LIP-PROTO-010-A1"
+    assert base.pop("neutral_target_prompt") != confirmation.pop(
+        "neutral_target_prompt"
+    )
+    assert base == confirmation
 
 
 def test_primary_sequence_starts_with_the_prospective_24_layer_hypothesis():
