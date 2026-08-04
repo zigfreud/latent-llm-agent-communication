@@ -39,8 +39,18 @@ from src.evaluation.oracle_position_packet import (
     design_fingerprint as position_design_fingerprint,
     semantic_gate as position_semantic_gate,
 )
+from src.evaluation.oracle_block_deletion import (
+    ORACLE_DELETION_EXPERIMENT_ID,
+    ORACLE_DELETION_PROTOCOL_VERSION,
+    design_fingerprint as deletion_design_fingerprint,
+    semantic_gate as deletion_semantic_gate,
+)
 from src.evaluation.semantics import CandidateProcessPolicy, evaluate_generation
-from src.evaluation.statistics import summarize_fixed_sequence, summarize_metric
+from src.evaluation.statistics import (
+    summarize_fixed_sequence,
+    summarize_gatekept_holm,
+    summarize_metric,
+)
 from src.pipelines.oracle_experiment import (
     load_json_object,
     load_yaml,
@@ -55,6 +65,12 @@ DEFAULT_CONFIG = Path("config/LIP-PROTO-005_oracle_packet_functional.yaml")
 
 
 def evaluation_contract(config: Mapping[str, Any]):
+    if config.get("experiment_id") == ORACLE_DELETION_EXPERIMENT_ID:
+        return (
+            ORACLE_DELETION_PROTOCOL_VERSION,
+            deletion_design_fingerprint(config),
+            deletion_semantic_gate,
+        )
     if config.get("experiment_id") == ORACLE_POSITION_EXPERIMENT_ID:
         return (
             ORACLE_POSITION_PROTOCOL_VERSION,
@@ -277,7 +293,19 @@ def evaluate(
             for condition, values in metrics["functional_pass"]["conditions"].items()
         }
         _, _, memory_gate = evaluation_contract(config)
-        if config.get("experiment_id") in {
+        if config.get("experiment_id") == ORACLE_DELETION_EXPERIMENT_ID:
+            primary = evaluation_config["primary_testing"]
+            primary_inference = summarize_gatekept_holm(
+                scored,
+                "functional_pass",
+                primary["anchor"],
+                primary["family"],
+                alpha=float(primary["alpha"]),
+                alternative=str(primary["alternative"]),
+                **statistics_kwargs,
+            )
+            gate = memory_gate(condition_means, primary_inference)
+        elif config.get("experiment_id") in {
             "LIP-PROTO-009",
             ORACLE_CAPABILITY_EXPERIMENT_ID,
             ORACLE_POSITION_EXPERIMENT_ID,

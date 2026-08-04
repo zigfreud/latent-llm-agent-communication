@@ -72,6 +72,27 @@ from src.evaluation.oracle_position_packet import (
     validate_position_selection_contract,
     validate_selected_task_manifest as validate_position_task_manifest,
 )
+from src.evaluation.oracle_block_deletion import (
+    ORACLE_DELETION_CAPTURE_LAYERS,
+    ORACLE_DELETION_CAPTURE_SIZE,
+    ORACLE_DELETION_CONDITIONS,
+    ORACLE_DELETION_CONFIRMATION_SEEDS,
+    ORACLE_DELETION_EXPERIMENT_ID,
+    ORACLE_DELETION_LAYER_COUNT,
+    ORACLE_DELETION_PATTERN_ORDER,
+    ORACLE_DELETION_PROTOCOL_VERSION,
+    ORACLE_DELETION_SCOPE_NAME,
+    ORACLE_DELETION_SELECTED_COUNT,
+    build_condition_plan as build_deletion_condition_plan,
+    deletion_patterns,
+    design_fingerprint as deletion_design_fingerprint,
+    plan_as_dicts as deletion_plan_as_dicts,
+    primary_anchor as deletion_primary_anchor,
+    primary_family as deletion_primary_family,
+    validate_deletion_design,
+    validate_deletion_memory_contract,
+    validate_selected_task_manifest as validate_deletion_task_manifest,
+)
 from src.evaluation.oracle_state_diagnostics import (
     validate_state_diagnostics_contract,
     summarize_state_diagnostics,
@@ -172,6 +193,23 @@ def experiment_contract(config: Mapping[str, Any]) -> dict[str, Any]:
             "supports_preflight": False,
             "state_capture_layers": ORACLE_POSITION_CAPTURE_LAYERS,
             "position_patterns": position_patterns(config["memory"]),
+        }
+    if experiment_id == ORACLE_DELETION_EXPERIMENT_ID:
+        return {
+            "experiment_id": experiment_id,
+            "protocol_version": ORACLE_DELETION_PROTOCOL_VERSION,
+            "packet_size": ORACLE_DELETION_CAPTURE_SIZE,
+            "layer_count": ORACLE_DELETION_LAYER_COUNT,
+            "conditions": ORACLE_DELETION_CONDITIONS,
+            "scope_order": (ORACLE_DELETION_SCOPE_NAME,),
+            "build_condition_plan": build_deletion_condition_plan,
+            "design_fingerprint": deletion_design_fingerprint,
+            "plan_as_dicts": deletion_plan_as_dicts,
+            "validate_memory_contract": validate_deletion_memory_contract,
+            "predecessor_field": "predecessor_experiment",
+            "supports_preflight": False,
+            "state_capture_layers": ORACLE_DELETION_CAPTURE_LAYERS,
+            "position_patterns": deletion_patterns(config["memory"]),
         }
     raise ValueError("unsupported oracle memory experiment_id")
 
@@ -362,6 +400,26 @@ def expected_position_packet_comparisons() -> list[list[str]]:
             ["text_only_no_lip", "neutral_no_lip"],
         )
     )
+    return comparisons
+
+
+def expected_block_deletion_comparisons() -> list[list[str]]:
+    prefix = f"oracle_{ORACLE_DELETION_SCOPE_NAME}_"
+    shuffled_prefix = f"shuffled_oracle_{ORACLE_DELETION_SCOPE_NAME}_"
+    comparisons = []
+    for pattern_name in ORACLE_DELETION_PATTERN_ORDER:
+        matched = f"{prefix}{pattern_name}"
+        comparisons.extend(
+            (
+                [matched, "neutral_no_lip"],
+                [matched, f"{shuffled_prefix}{pattern_name}"],
+            )
+        )
+    comparisons.extend(
+        [f"{prefix}full_k32", f"{prefix}{pattern_name}"]
+        for pattern_name in ORACLE_DELETION_PATTERN_ORDER[1:]
+    )
+    comparisons.append(["text_only_no_lip", "neutral_no_lip"])
     return comparisons
 
 
@@ -778,6 +836,161 @@ def _validate_proto011_config(config: Mapping[str, Any]) -> None:
         raise ValueError("output paths must be configured")
 
 
+def _validate_proto012_config(config: Mapping[str, Any]) -> None:
+    expected_top_level = {
+        "experiment_id",
+        "predecessor_experiment",
+        "calibration_source",
+        "predecessor_source",
+        "models",
+        "prompt_protocol",
+        "runtime",
+        "data",
+        "deletion_design",
+        "neutral_target_prompt",
+        "carrier",
+        "memory",
+        "diagnostics",
+        "conditions",
+        "controls",
+        "generation",
+        "evaluation",
+        "output",
+    }
+    unknown = sorted(set(config).difference(expected_top_level))
+    if unknown:
+        raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
+    if config.get("predecessor_experiment") != "LIP-PROTO-011":
+        raise ValueError("predecessor_experiment must bind LIP-PROTO-011")
+    protocol = protocol_metadata(config.get("prompt_protocol"))
+    if protocol["mode"] != "chat_template" or not protocol[
+        "add_generation_prompt"
+    ]:
+        raise ValueError("block-deletion replay requires the generation boundary")
+    if config.get("neutral_target_prompt") != "Use the latent signal.":
+        raise ValueError("LIP-PROTO-012 freezes the shortened neutral carrier")
+    if config.get("carrier") != {"mode": "left_pad_masked_to_task_length"}:
+        raise ValueError("LIP-PROTO-012 freezes the length-controlled carrier")
+
+    calibration = config.get("calibration_source", {})
+    predecessor = config.get("predecessor_source", {})
+    data = config.get("data", {})
+    runtime = config.get("runtime", {})
+    controls = config.get("controls", {})
+    generation = config.get("generation", {})
+    evaluation = config.get("evaluation", {})
+    output = config.get("output", {})
+    diagnostics = config.get("diagnostics", {})
+    for name, value in (
+        ("calibration_source", calibration),
+        ("predecessor_source", predecessor),
+        ("data", data),
+        ("runtime", runtime),
+        ("controls", controls),
+        ("generation", generation),
+        ("evaluation", evaluation),
+        ("output", output),
+        ("diagnostics", diagnostics),
+    ):
+        if not isinstance(value, Mapping):
+            raise ValueError(f"{name} must be a mapping")
+
+    calibration_fields = (
+        "candidate_tasks_jsonl",
+        "candidate_task_manifest",
+        "screening_scored_jsonl",
+        "screening_summary",
+        "selection_report",
+    )
+    predecessor_fields = (
+        "selected_tasks_jsonl",
+        "selected_task_manifest",
+        "selection_report",
+        "functional_summary",
+    )
+    for name, source, fields in (
+        ("calibration_source", calibration, calibration_fields),
+        ("predecessor_source", predecessor, predecessor_fields),
+    ):
+        if any(not str(source.get(field, "")).strip() for field in fields):
+            raise ValueError(f"{name} must configure every reused artifact")
+        hashes = ("artifact_manifest_sha256",) + tuple(
+            f"{field}_sha256" for field in fields
+        )
+        if any(len(str(source.get(field, ""))) != 64 for field in hashes):
+            raise ValueError(f"{name} hashes must be SHA-256 digests")
+    expected_calibration = {
+        "eligible_task_count": 81,
+        "eligible_rank_start_zero_based": 64,
+        "eligible_rank_stop_exclusive": 81,
+    }
+    if any(
+        calibration.get(field) != value
+        for field, value in expected_calibration.items()
+    ) or len(str(calibration.get("eligible_ids_sha256", ""))) != 64:
+        raise ValueError("calibration_source must freeze the eligible 65-81 holdout")
+
+    frozen_data = {
+        "task_count": ORACLE_DELETION_SELECTED_COUNT,
+        "functional_task_start": 0,
+        "functional_task_count": ORACLE_DELETION_SELECTED_COUNT,
+        "functional_split": (
+            "mbpp_test_capability_calibrated_final_latent_unseen_65_81"
+        ),
+    }
+    if any(
+        not str(data.get(field, "")).strip()
+        for field in ("tasks_jsonl", "task_manifest")
+    ) or any(data.get(field) != value for field, value in frozen_data.items()):
+        raise ValueError("LIP-PROTO-012 freezes the final 17-task eligible slice")
+    validate_deletion_design(config.get("deletion_design", {}))
+    if not isinstance(runtime.get("load_4bit"), bool):
+        raise ValueError("runtime.load_4bit must be a boolean")
+    validate_deletion_memory_contract(config.get("memory", {}))
+    validate_state_diagnostics_contract(diagnostics)
+    if list(config.get("conditions", [])) != list(ORACLE_DELETION_CONDITIONS):
+        raise ValueError("conditions must match the frozen block-deletion design")
+    if controls != {
+        "shuffled_oracle_memory": {
+            "permutation": "sattolo_derangement",
+            "seed": 2711,
+        }
+    }:
+        raise ValueError("shuffled memory control must use derangement seed 2711")
+    if generation != {
+        "seeds": list(ORACLE_DELETION_CONFIRMATION_SEEDS),
+        "max_new_tokens": 256,
+        "do_sample": True,
+        "temperature": 0.2,
+        "top_p": 0.95,
+        "repetition_penalty": 1.0,
+    }:
+        raise ValueError("generation must match the frozen LIP-PROTO-012 contract")
+    if evaluation.get("comparisons") != expected_block_deletion_comparisons():
+        raise ValueError("evaluation.comparisons must match deletion contrasts")
+    primary = evaluation.get("primary_testing")
+    if primary != {
+        "method": "anchor_gate_then_holm",
+        "alternative": "greater",
+        "alpha": 0.05,
+        "anchor": list(deletion_primary_anchor()),
+        "family": [list(pair) for pair in deletion_primary_family()],
+    }:
+        raise ValueError("primary_testing must gate the Holm deletion family")
+    if int(evaluation.get("bootstrap_iterations", 0)) <= 0:
+        raise ValueError("evaluation.bootstrap_iterations must be positive")
+    if any(
+        not str(output.get(field, "")).strip()
+        for field in (
+            "selection_report_json",
+            "generations_jsonl",
+            "evaluation_dir",
+            "state_diagnostics_json",
+        )
+    ):
+        raise ValueError("output paths must be configured")
+
+
 def validate_config(config: Mapping[str, Any]) -> None:
     experiment_id = config.get("experiment_id")
     if experiment_id == "LIP-PROTO-008":
@@ -791,6 +1004,9 @@ def validate_config(config: Mapping[str, Any]) -> None:
         return
     if experiment_id == ORACLE_POSITION_EXPERIMENT_ID:
         _validate_proto011_config(config)
+        return
+    if experiment_id == ORACLE_DELETION_EXPERIMENT_ID:
+        _validate_proto012_config(config)
         return
     raise ValueError("unsupported oracle memory experiment_id")
 
@@ -892,6 +1108,8 @@ def run_generation(
         validate_selected_task_manifest(config, manifest, manifest_path)
     elif experiment_id == ORACLE_POSITION_EXPERIMENT_ID:
         validate_position_task_manifest(config, manifest, manifest_path)
+    elif experiment_id == ORACLE_DELETION_EXPERIMENT_ID:
+        validate_deletion_task_manifest(config, manifest, manifest_path)
     if preflight:
         start = int(config["data"]["preflight_task_start"])
         count = int(config["data"]["preflight_task_count"])

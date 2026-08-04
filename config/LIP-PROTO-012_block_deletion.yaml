@@ -1,0 +1,165 @@
+experiment_id: "LIP-PROTO-012"
+predecessor_experiment: "LIP-PROTO-011"
+
+calibration_source:
+  artifact_manifest_sha256: "80ea9320defa471a69b891affd8b58f761daffef94d64b95a5abec2419a4016c"
+  candidate_tasks_jsonl: "datasets/LIP-PROTO-010/candidate_tasks.jsonl"
+  candidate_tasks_jsonl_sha256: "6e738746889b4026a6da45ed1c20d8704f9753a36933749eb2a9ab30a8ed5af2"
+  candidate_task_manifest: "datasets/LIP-PROTO-010/candidate_task_manifest.json"
+  candidate_task_manifest_sha256: "1e85242211a21f63acd78d3bb4876a09028e3bcff5d82fa32f5eaef284767916"
+  screening_scored_jsonl: "runs/LIP-PROTO-010/screening/functional-evaluation/scored_generations.jsonl"
+  screening_scored_jsonl_sha256: "ed4bee0bcc6aeaa992528c61df7ce426ed4ddc450d6a7b0f55c9eec1f885ca3f"
+  screening_summary: "runs/LIP-PROTO-010/screening/functional-evaluation/summary.json"
+  screening_summary_sha256: "9a8131172d9c058a1b6a1bbef572a3d388b4dfed83307e2199f0b33b9382f081"
+  selection_report: "runs/LIP-PROTO-010/screening/selection-report.json"
+  selection_report_sha256: "25ab4985caf40f834fed081a9c6eedb9506c43753b152cdac139490ca312e595"
+  eligible_task_count: 81
+  eligible_ids_sha256: "b6f66368d981fefab33b39ede8f6f98c4bcf8694a84aa0b66d3ffaca680ddf43"
+  eligible_rank_start_zero_based: 64
+  eligible_rank_stop_exclusive: 81
+
+predecessor_source:
+  artifact_manifest_sha256: "5ee64230177e7fe8f09d3c643d9fb7ba5a1f5d7399965f4af85862079e6aabe9"
+  selected_tasks_jsonl: "datasets/LIP-PROTO-011/selected_tasks.jsonl"
+  selected_tasks_jsonl_sha256: "3f67cda6e1abf58a9d0faebce06f73228dc91275e31c61be34f044084b76a1a7"
+  selected_task_manifest: "datasets/LIP-PROTO-011/selected_task_manifest.json"
+  selected_task_manifest_sha256: "1fa7e59e6d880dd95edb13ae0422b4e5a0e95c53b493de4706f9d8efe806bd92"
+  selection_report: "runs/LIP-PROTO-011/selection-report.json"
+  selection_report_sha256: "2fee9b66d48d8ebc4d8902306bee224c2e5aa49736c18882342826c5a54f6988"
+  functional_summary: "runs/LIP-PROTO-011/functional-evaluation/summary.json"
+  functional_summary_sha256: "ae3a9a8c66c7935fa4797b1d4ff645c7c231d7274f18af7406eb47dd57bddee6"
+
+models:
+  target_model: "NousResearch/Meta-Llama-3-8B-Instruct"
+
+prompt_protocol:
+  version: "lip-prompt-v1"
+  mode: "chat_template"
+  add_generation_prompt: true
+  system_prompt: "You are a Python code generator. Return only Python code and define exactly the required function name."
+
+runtime:
+  device: "auto"
+  load_4bit: true
+
+data:
+  tasks_jsonl: "datasets/LIP-PROTO-012/selected_tasks.jsonl"
+  task_manifest: "datasets/LIP-PROTO-012/selected_task_manifest.json"
+  task_count: 17
+  functional_task_start: 0
+  functional_task_count: 17
+  functional_split: "mbpp_test_capability_calibrated_final_latent_unseen_65_81"
+
+deletion_design:
+  method: "leave_one_contiguous_octet_out"
+  partition:
+    - [-32, -31, -30, -29, -28, -27, -26, -25]
+    - [-24, -23, -22, -21, -20, -19, -18, -17]
+    - [-16, -15, -14, -13, -12, -11, -10, -9]
+    - [-8, -7, -6, -5, -4, -3, -2, -1]
+  kept_packet_size: 24
+  interpretation_unit: "deleted_octet"
+
+neutral_target_prompt: "Use the latent signal."
+
+carrier:
+  mode: "left_pad_masked_to_task_length"
+
+memory:
+  packet_size: 32
+  decoder_layer_count: 32
+  self_check_tasks: 1
+  maximum_self_logit_delta: 0.0001
+  state_capture_layers: [-32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  replay_scope:
+    name: "early_quarter_input"
+    boundary: "block_input"
+    layers: [-32, -31, -30, -29, -28, -27, -26, -25]
+  position_patterns:
+    - name: "full_k32"
+      packet_offsets: [-32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+    - name: "drop_octet_1_k24"
+      packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+    - name: "drop_octet_2_k24"
+      packet_offsets: [-32, -31, -30, -29, -28, -27, -26, -25, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+    - name: "drop_octet_3_k24"
+      packet_offsets: [-32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -8, -7, -6, -5, -4, -3, -2, -1]
+    - name: "drop_octet_4_k24"
+      packet_offsets: [-32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9]
+
+diagnostics:
+  protocol_version: "lip-oracle-state-diagnostics-v1"
+  state_types: ["residual_input", "key_pre_rope", "value_pre_cache"]
+  metrics:
+    - "mean_l2_norm"
+    - "task_signal_fraction"
+    - "mean_pairwise_cosine"
+    - "task_effective_rank"
+    - "task_effective_rank_fraction"
+  store_raw_states: false
+
+conditions:
+  - "neutral_no_lip"
+  - "text_only_no_lip"
+  - "oracle_early_quarter_input_full_k32"
+  - "shuffled_oracle_early_quarter_input_full_k32"
+  - "oracle_early_quarter_input_drop_octet_1_k24"
+  - "shuffled_oracle_early_quarter_input_drop_octet_1_k24"
+  - "oracle_early_quarter_input_drop_octet_2_k24"
+  - "shuffled_oracle_early_quarter_input_drop_octet_2_k24"
+  - "oracle_early_quarter_input_drop_octet_3_k24"
+  - "shuffled_oracle_early_quarter_input_drop_octet_3_k24"
+  - "oracle_early_quarter_input_drop_octet_4_k24"
+  - "shuffled_oracle_early_quarter_input_drop_octet_4_k24"
+
+controls:
+  shuffled_oracle_memory:
+    permutation: "sattolo_derangement"
+    seed: 2711
+
+generation:
+  seeds: [1103, 1217, 1301]
+  max_new_tokens: 256
+  do_sample: true
+  temperature: 0.2
+  top_p: 0.95
+  repetition_penalty: 1.0
+
+evaluation:
+  timeout_seconds: 5.0
+  memory_mb: 512
+  confidence: 0.95
+  bootstrap_iterations: 10000
+  statistics_seed: 2711
+  comparisons:
+    - ["oracle_early_quarter_input_full_k32", "neutral_no_lip"]
+    - ["oracle_early_quarter_input_full_k32", "shuffled_oracle_early_quarter_input_full_k32"]
+    - ["oracle_early_quarter_input_drop_octet_1_k24", "neutral_no_lip"]
+    - ["oracle_early_quarter_input_drop_octet_1_k24", "shuffled_oracle_early_quarter_input_drop_octet_1_k24"]
+    - ["oracle_early_quarter_input_drop_octet_2_k24", "neutral_no_lip"]
+    - ["oracle_early_quarter_input_drop_octet_2_k24", "shuffled_oracle_early_quarter_input_drop_octet_2_k24"]
+    - ["oracle_early_quarter_input_drop_octet_3_k24", "neutral_no_lip"]
+    - ["oracle_early_quarter_input_drop_octet_3_k24", "shuffled_oracle_early_quarter_input_drop_octet_3_k24"]
+    - ["oracle_early_quarter_input_drop_octet_4_k24", "neutral_no_lip"]
+    - ["oracle_early_quarter_input_drop_octet_4_k24", "shuffled_oracle_early_quarter_input_drop_octet_4_k24"]
+    - ["oracle_early_quarter_input_full_k32", "oracle_early_quarter_input_drop_octet_1_k24"]
+    - ["oracle_early_quarter_input_full_k32", "oracle_early_quarter_input_drop_octet_2_k24"]
+    - ["oracle_early_quarter_input_full_k32", "oracle_early_quarter_input_drop_octet_3_k24"]
+    - ["oracle_early_quarter_input_full_k32", "oracle_early_quarter_input_drop_octet_4_k24"]
+    - ["text_only_no_lip", "neutral_no_lip"]
+  primary_testing:
+    method: "anchor_gate_then_holm"
+    alternative: "greater"
+    alpha: 0.05
+    anchor: ["oracle_early_quarter_input_full_k32", "shuffled_oracle_early_quarter_input_full_k32"]
+    family:
+      - ["oracle_early_quarter_input_drop_octet_1_k24", "shuffled_oracle_early_quarter_input_drop_octet_1_k24"]
+      - ["oracle_early_quarter_input_drop_octet_2_k24", "shuffled_oracle_early_quarter_input_drop_octet_2_k24"]
+      - ["oracle_early_quarter_input_drop_octet_3_k24", "shuffled_oracle_early_quarter_input_drop_octet_3_k24"]
+      - ["oracle_early_quarter_input_drop_octet_4_k24", "shuffled_oracle_early_quarter_input_drop_octet_4_k24"]
+
+output:
+  selection_report_json: "runs/LIP-PROTO-012/selection-report.json"
+  generations_jsonl: "runs/LIP-PROTO-012/generations.jsonl"
+  evaluation_dir: "runs/LIP-PROTO-012/evaluation"
+  state_diagnostics_json: "runs/LIP-PROTO-012/state-diagnostics.json"
