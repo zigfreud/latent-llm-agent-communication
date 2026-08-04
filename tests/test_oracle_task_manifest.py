@@ -47,6 +47,38 @@ def test_materializer_writes_prompt_bound_task_manifest(tmp_path):
     assert manifest["entry_point_resolution"] == "tests_then_reference_code"
 
 
+def test_materializer_excludes_every_task_bound_by_prior_manifests(tmp_path):
+    config = sampling_config(tmp_path)
+    config["experiment_id"] = "LIP-PROTO-009"
+    exclusion_path = tmp_path / "prior_manifest.json"
+    exclusion_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "lip_oracle_task_manifest",
+                "schema_version": 1,
+                "experiment_id": "LIP-PROTO-008",
+                "dataset_name": config["dataset_name"],
+                "dataset_config": config["dataset_config"],
+                "dataset_split": config["split"],
+                "sampled_ids": ["mock-test-000", "mock-test-001"],
+                "mock_data": False,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    config["exclude_task_manifests"] = [str(exclusion_path)]
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    result = materialize(config_path, mock_data=True)
+    manifest = json.loads(result["task_manifest"].read_text(encoding="utf-8"))
+    assert manifest["excluded_task_count"] == 2
+    assert manifest["sampled_ids_disjoint_from_exclusions"] is True
+    assert not {"mock-test-000", "mock-test-001"}.intersection(
+        manifest["sampled_ids"]
+    )
+
+
 def test_builtin_shadow_entry_point_uses_reference_code_without_persisting_it():
     reference_code = "def sum(a, b):\n    return a + b\n"
     normalized = normalize_row(

@@ -24,6 +24,18 @@ from src.evaluation.oracle_memory import (
     plan_as_dicts,
     validate_memory_contract,
 )
+from src.evaluation.oracle_layer_depth import (
+    ORACLE_LAYER_DEPTH_CONDITIONS,
+    ORACLE_LAYER_DEPTH_LAYER_COUNT,
+    ORACLE_LAYER_DEPTH_PACKET_SIZE,
+    ORACLE_LAYER_DEPTH_PROTOCOL_VERSION,
+    ORACLE_LAYER_DEPTH_SCOPE_ORDER,
+    build_condition_plan as build_layer_depth_condition_plan,
+    design_fingerprint as layer_depth_design_fingerprint,
+    plan_as_dicts as layer_depth_plan_as_dicts,
+    primary_fixed_sequence,
+    validate_layer_depth_contract,
+)
 from src.evaluation.oracle_state_diagnostics import (
     validate_state_diagnostics_contract,
     summarize_state_diagnostics,
@@ -55,6 +67,43 @@ from src.pipelines.oracle_transport import (
 
 
 DEFAULT_CONFIG = Path("config/LIP-PROTO-008_oracle_multilayer_memory.yaml")
+
+
+def experiment_contract(config: Mapping[str, Any]) -> dict[str, Any]:
+    experiment_id = str(config.get("experiment_id", ""))
+    if experiment_id == "LIP-PROTO-008":
+        return {
+            "experiment_id": experiment_id,
+            "protocol_version": ORACLE_MEMORY_PROTOCOL_VERSION,
+            "packet_size": ORACLE_MEMORY_PACKET_SIZE,
+            "layer_count": ORACLE_MEMORY_LAYER_COUNT,
+            "conditions": ORACLE_MEMORY_CONDITIONS,
+            "scope_order": (
+                "single_layer_output",
+                "late_half_input",
+                "all_layer_input",
+            ),
+            "build_condition_plan": build_condition_plan,
+            "design_fingerprint": design_fingerprint,
+            "plan_as_dicts": plan_as_dicts,
+            "validate_memory_contract": validate_memory_contract,
+            "predecessor_field": "functional_capacity_experiment",
+        }
+    if experiment_id == "LIP-PROTO-009":
+        return {
+            "experiment_id": experiment_id,
+            "protocol_version": ORACLE_LAYER_DEPTH_PROTOCOL_VERSION,
+            "packet_size": ORACLE_LAYER_DEPTH_PACKET_SIZE,
+            "layer_count": ORACLE_LAYER_DEPTH_LAYER_COUNT,
+            "conditions": ORACLE_LAYER_DEPTH_CONDITIONS,
+            "scope_order": ORACLE_LAYER_DEPTH_SCOPE_ORDER,
+            "build_condition_plan": build_layer_depth_condition_plan,
+            "design_fingerprint": layer_depth_design_fingerprint,
+            "plan_as_dicts": layer_depth_plan_as_dicts,
+            "validate_memory_contract": validate_layer_depth_contract,
+            "predecessor_field": "predecessor_experiment",
+        }
+    raise ValueError("unsupported oracle memory experiment_id")
 
 
 def parse_args() -> argparse.Namespace:
@@ -95,7 +144,7 @@ def expected_comparisons() -> list[list[str]]:
     return comparisons
 
 
-def validate_config(config: Mapping[str, Any]) -> None:
+def _validate_proto008_config(config: Mapping[str, Any]) -> None:
     if config.get("experiment_id") != "LIP-PROTO-008":
         raise ValueError("experiment_id must be LIP-PROTO-008")
     expected_top_level = {
@@ -192,6 +241,155 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ValueError("output paths must be configured")
 
 
+def expected_layer_depth_comparisons() -> list[list[str]]:
+    comparisons = []
+    for scope in ORACLE_LAYER_DEPTH_SCOPE_ORDER:
+        matched = f"oracle_{scope}_k{ORACLE_LAYER_DEPTH_PACKET_SIZE}"
+        comparisons.extend(
+            [
+                [matched, "neutral_no_lip"],
+                [
+                    matched,
+                    f"shuffled_oracle_{scope}_k{ORACLE_LAYER_DEPTH_PACKET_SIZE}",
+                ],
+            ]
+        )
+    comparisons.extend(
+        [
+            ["oracle_early_half_input_k32", "oracle_early_quarter_input_k32"],
+            [
+                "oracle_early_three_quarters_input_k32",
+                "oracle_early_half_input_k32",
+            ],
+            [
+                "oracle_all_layer_input_k32",
+                "oracle_early_three_quarters_input_k32",
+            ],
+            ["text_only_no_lip", "neutral_no_lip"],
+        ]
+    )
+    return comparisons
+
+
+def _validate_proto009_config(config: Mapping[str, Any]) -> None:
+    expected_top_level = {
+        "experiment_id",
+        "predecessor_experiment",
+        "models",
+        "prompt_protocol",
+        "runtime",
+        "data",
+        "neutral_target_prompt",
+        "carrier",
+        "memory",
+        "diagnostics",
+        "conditions",
+        "controls",
+        "generation",
+        "evaluation",
+        "output",
+    }
+    unknown = sorted(set(config).difference(expected_top_level))
+    if unknown:
+        raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
+    if config.get("predecessor_experiment") != "LIP-PROTO-008":
+        raise ValueError("predecessor_experiment must bind LIP-PROTO-008")
+    protocol = protocol_metadata(config.get("prompt_protocol"))
+    if protocol["mode"] != "chat_template" or not protocol["add_generation_prompt"]:
+        raise ValueError("layer-depth replay requires the target generation boundary")
+    if not str(config.get("neutral_target_prompt", "")).strip():
+        raise ValueError("neutral_target_prompt must be non-empty")
+    if config.get("carrier") != {"mode": "left_pad_masked_to_task_length"}:
+        raise ValueError("LIP-PROTO-009 freezes the length-controlled carrier")
+
+    data = config.get("data", {})
+    runtime = config.get("runtime", {})
+    controls = config.get("controls", {})
+    generation = config.get("generation", {})
+    evaluation = config.get("evaluation", {})
+    output = config.get("output", {})
+    diagnostics = config.get("diagnostics", {})
+    for name, value in (
+        ("data", data),
+        ("runtime", runtime),
+        ("controls", controls),
+        ("generation", generation),
+        ("evaluation", evaluation),
+        ("output", output),
+        ("diagnostics", diagnostics),
+    ):
+        if not isinstance(value, Mapping):
+            raise ValueError(f"{name} must be a mapping")
+    if any(
+        not str(data.get(field, "")).strip()
+        for field in ("tasks_jsonl", "task_manifest")
+    ):
+        raise ValueError("data must configure tasks_jsonl and task_manifest")
+    frozen_data = {
+        "task_count": 18,
+        "preflight_task_start": 0,
+        "preflight_task_count": 2,
+        "functional_task_start": 2,
+        "functional_task_count": 16,
+        "functional_split": "mbpp_test_fresh_2_18",
+    }
+    if any(data.get(field) != value for field, value in frozen_data.items()):
+        raise ValueError("LIP-PROTO-009 freezes disjoint preflight/functional slices")
+    if not isinstance(runtime.get("load_4bit"), bool):
+        raise ValueError("runtime.load_4bit must be a boolean")
+    validate_layer_depth_contract(config.get("memory", {}))
+    validate_state_diagnostics_contract(diagnostics)
+    if list(config.get("conditions", [])) != list(ORACLE_LAYER_DEPTH_CONDITIONS):
+        raise ValueError("conditions must match the frozen layer-depth design")
+    if controls != {
+        "shuffled_oracle_memory": {
+            "permutation": "sattolo_derangement",
+            "seed": 1729,
+        }
+    }:
+        raise ValueError("shuffled memory control must use the frozen derangement")
+    if generation.get("seeds") != [101, 202, 303]:
+        raise ValueError("LIP-PROTO-009 freezes generation seeds [101, 202, 303]")
+    if int(generation.get("max_new_tokens", 0)) != 256:
+        raise ValueError("LIP-PROTO-009 freezes max_new_tokens=256")
+    if not isinstance(generation.get("do_sample"), bool):
+        raise ValueError("generation.do_sample must be a boolean")
+    if bool(generation["do_sample"]) and float(generation.get("temperature", 0)) <= 0:
+        raise ValueError("temperature must be positive when sampling")
+    if evaluation.get("comparisons") != expected_layer_depth_comparisons():
+        raise ValueError("evaluation.comparisons must match frozen secondary contrasts")
+    primary = evaluation.get("primary_testing")
+    if primary != {
+        "method": "fixed_sequence_gatekeeping",
+        "alternative": "greater",
+        "alpha": 0.05,
+        "sequence": [list(pair) for pair in primary_fixed_sequence()],
+    }:
+        raise ValueError("evaluation.primary_testing must match the frozen depth order")
+    if int(evaluation.get("bootstrap_iterations", 0)) <= 0:
+        raise ValueError("evaluation.bootstrap_iterations must be positive")
+    if any(
+        not str(output.get(field, "")).strip()
+        for field in (
+            "generations_jsonl",
+            "evaluation_dir",
+            "state_diagnostics_json",
+        )
+    ):
+        raise ValueError("output paths must be configured")
+
+
+def validate_config(config: Mapping[str, Any]) -> None:
+    experiment_id = config.get("experiment_id")
+    if experiment_id == "LIP-PROTO-008":
+        _validate_proto008_config(config)
+        return
+    if experiment_id == "LIP-PROTO-009":
+        _validate_proto009_config(config)
+        return
+    raise ValueError("unsupported oracle memory experiment_id")
+
+
 def read_existing(path: Path) -> tuple[set[tuple[str, str, int]], list[dict]]:
     keys = set()
     rows = []
@@ -247,6 +445,11 @@ def run_generation(
     overwrite: bool,
 ) -> dict[str, Any]:
     validate_config(config)
+    contract = experiment_contract(config)
+    experiment_id = contract["experiment_id"]
+    protocol_version = contract["protocol_version"]
+    packet_size = int(contract["packet_size"])
+    layer_count = int(contract["layer_count"])
     all_tasks = load_tasks(Path(str(config["data"]["tasks_jsonl"])))
     bound_tasks, manifest, manifest_path = bind_tasks_to_manifest(config, all_tasks)
     if preflight:
@@ -264,14 +467,16 @@ def run_generation(
         if not 2 <= max_tasks <= len(tasks):
             raise ValueError("--max-tasks must fit the selected task slice")
         tasks = tasks[:max_tasks]
-        run_scope = "full" if max_tasks == count and not preflight else "diagnostic_subset"
+        run_scope = (
+            "full" if max_tasks == count and not preflight else "diagnostic_subset"
+        )
 
     if output_path.exists() and not (resume or overwrite):
         raise FileExistsError(f"output already exists: {output_path}")
     if overwrite and output_path.exists():
         output_path.unlink()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    design_sha256 = design_fingerprint(config)
+    design_sha256 = contract["design_fingerprint"](config)
     conditions = list(config["conditions"])
     expected_keys = {
         (str(task["task_id"]), condition, seed)
@@ -286,7 +491,7 @@ def run_generation(
         if existing_keys.difference(expected_keys):
             raise ValueError("existing generations do not belong to this run scope")
         if any(
-            row.get("protocol_version") != ORACLE_MEMORY_PROTOCOL_VERSION
+            row.get("protocol_version") != protocol_version
             or row.get("design_sha256") != design_sha256
             or row.get("run_scope") != run_scope
             for row in existing_rows
@@ -302,9 +507,9 @@ def run_generation(
         revision=target_revision,
     )
     device = model_input_device(model)
-    if len(model.model.layers) != ORACLE_MEMORY_LAYER_COUNT:
+    if len(model.model.layers) != layer_count:
         raise ValueError("target model does not have the frozen 32 decoder layers")
-    scope_specs = validate_memory_contract(config["memory"])
+    scope_specs = contract["validate_memory_contract"](config["memory"])
     normalized_scopes = {
         scope["name"]: {
             **scope,
@@ -314,14 +519,26 @@ def run_generation(
         }
         for scope in scope_specs
     }
-    anchor_layer = normalized_scopes["single_layer_output"]["normalized_layers"][0]
+    output_scope_names = [
+        name
+        for name in contract["scope_order"]
+        if normalized_scopes[name]["boundary"] == "block_output"
+    ]
+    if len(output_scope_names) > 1:
+        raise ValueError("only one block-output anchor scope is supported")
+    anchor_scope_name = output_scope_names[0] if output_scope_names else None
+    anchor_layer = (
+        normalized_scopes[anchor_scope_name]["normalized_layers"][0]
+        if anchor_scope_name is not None
+        else None
+    )
     all_input_layers = normalized_scopes["all_layer_input"]["normalized_layers"]
     protocol = protocol_metadata(config.get("prompt_protocol"))
     neutral_formatted, native_neutral_inputs = encode_prompt(
         str(config["neutral_target_prompt"]), tokenizer, protocol, device
     )
     native_neutral_length = int(native_neutral_inputs["input_ids"].shape[1])
-    if ORACLE_MEMORY_PACKET_SIZE > native_neutral_length:
+    if packet_size > native_neutral_length:
         raise ValueError("K=32 does not fit visible neutral carrier tokens")
 
     task_inputs = []
@@ -341,18 +558,21 @@ def run_generation(
             mode=str(config["carrier"]["mode"]),
         )
         positions = torch.arange(
-            prompt_length - ORACLE_MEMORY_PACKET_SIZE,
+            prompt_length - packet_size,
             prompt_length,
             device=device,
         )
         if not bool(torch.all(carrier["attention_mask"][0, positions] == 1).item()):
             raise RuntimeError("selected memory overlaps masked carrier positions")
-        outputs, anchor = forward_with_packet_capture(
-            model,
-            inputs,
-            layer_idx=anchor_layer,
-            positions=positions,
-        )
+        outputs = None
+        anchor = None
+        if anchor_layer is not None:
+            outputs, anchor = forward_with_packet_capture(
+                model,
+                inputs,
+                layer_idx=anchor_layer,
+                positions=positions,
+            )
         memory_outputs, captured_states = forward_with_layer_state_capture(
             model,
             inputs,
@@ -362,27 +582,30 @@ def run_generation(
         memory = captured_states["residual_input"]
         if task_index < int(config["memory"]["self_check_tasks"]):
             threshold = float(config["memory"]["maximum_self_logit_delta"])
-            anchor_replayed = forward_with_packet_replacement(
-                model,
-                inputs,
-                layer_idx=anchor_layer,
-                positions=positions,
-                vectors=anchor,
-            )
-            anchor_delta = float(
-                (anchor_replayed.logits - outputs.logits).abs().max().item()
-            )
-            self_checks.append(
-                {
-                    "task_id": str(task["task_id"]),
-                    "scope": "single_layer_output",
-                    "maximum_absolute_logit_delta": anchor_delta,
-                }
-            )
-            if anchor_delta > threshold:
-                raise RuntimeError("single-layer output self-replay check failed")
-            del anchor_replayed
-            for scope_name in ("late_half_input", "all_layer_input"):
+            if anchor_layer is not None:
+                anchor_replayed = forward_with_packet_replacement(
+                    model,
+                    inputs,
+                    layer_idx=anchor_layer,
+                    positions=positions,
+                    vectors=anchor,
+                )
+                anchor_delta = float(
+                    (anchor_replayed.logits - outputs.logits).abs().max().item()
+                )
+                self_checks.append(
+                    {
+                        "task_id": str(task["task_id"]),
+                        "scope": anchor_scope_name,
+                        "maximum_absolute_logit_delta": anchor_delta,
+                    }
+                )
+                if anchor_delta > threshold:
+                    raise RuntimeError("block-output self-replay check failed")
+                del anchor_replayed
+            for scope_name in contract["scope_order"]:
+                if normalized_scopes[scope_name]["boundary"] != "block_input":
+                    continue
                 scope_layers = normalized_scopes[scope_name]["normalized_layers"]
                 replayed = forward_with_layer_input_replay(
                     model,
@@ -408,7 +631,8 @@ def run_generation(
         task_inputs.append(inputs)
         carrier_inputs.append(carrier)
         formatted_task_prompts.append(formatted)
-        anchor_packets.append(anchor.detach().cpu())
+        if anchor is not None:
+            anchor_packets.append(anchor.detach().cpu())
         state_memories.append(
             {
                 state_type: {
@@ -427,12 +651,12 @@ def run_generation(
         state_memories,
         task_ids=[str(task["task_id"]) for task in tasks],
         layer_indices=all_input_layers,
-        packet_size=ORACLE_MEMORY_PACKET_SIZE,
+        packet_size=packet_size,
         run_scope=run_scope,
     )
     state_diagnostics.update(
         {
-            "experiment_id": "LIP-PROTO-008",
+            "experiment_id": experiment_id,
             "design_sha256": design_sha256,
             "target_model": config["models"]["target_model"],
             "target_model_revision": target_revision,
@@ -441,7 +665,7 @@ def run_generation(
     )
     write_json(diagnostics_path, state_diagnostics)
 
-    plan = build_condition_plan(
+    plan = contract["build_condition_plan"](
         [str(task["task_id"]) for task in tasks],
         conditions,
         shuffle_seed=int(config["controls"]["shuffled_oracle_memory"]["seed"]),
@@ -463,7 +687,7 @@ def run_generation(
                 )
                 prompt_length = int(inputs["input_ids"].shape[1])
                 positions = torch.arange(
-                    prompt_length - ORACLE_MEMORY_PACKET_SIZE,
+                    prompt_length - packet_size,
                     prompt_length,
                     device=device,
                 )
@@ -491,16 +715,17 @@ def run_generation(
                     oracle_task_id = str(tasks[item.oracle_index]["task_id"])
                     packet = anchor_packets[item.oracle_index]
                     injected_layers = list(scope["normalized_layers"])
+                    replay_layer = injected_layers[0]
                     boundary = "block_output"
-                    bundle_sha256 = state_bundle_sha256({anchor_layer: packet})
-                    bundle_norm = state_bundle_norm({anchor_layer: packet})
+                    bundle_sha256 = state_bundle_sha256({replay_layer: packet})
+                    bundle_norm = state_bundle_norm({replay_layer: packet})
                     scalar_count = int(packet.numel())
                     output_text = generate_with_optional_packet(
                         model,
                         tokenizer,
                         inputs,
                         generation_kwargs=gen_kwargs,
-                        layer_idx=anchor_layer,
+                        layer_idx=replay_layer,
                         positions=positions,
                         vectors=packet,
                     )
@@ -516,7 +741,9 @@ def run_generation(
                     boundary = "block_input"
                     bundle_sha256 = state_bundle_sha256(packets)
                     bundle_norm = state_bundle_norm(packets)
-                    scalar_count = sum(int(packet.numel()) for packet in packets.values())
+                    scalar_count = sum(
+                        int(packet.numel()) for packet in packets.values()
+                    )
                     output_text = generate_with_layer_input_replay(
                         model,
                         tokenizer,
@@ -531,9 +758,9 @@ def run_generation(
                     else neutral_formatted
                 )
                 record = {
-                    "protocol_version": ORACLE_MEMORY_PROTOCOL_VERSION,
+                    "protocol_version": protocol_version,
                     "design_sha256": design_sha256,
-                    "experiment_id": "LIP-PROTO-008",
+                    "experiment_id": experiment_id,
                     "run_scope": run_scope,
                     "claim_eligible": run_scope == "full",
                     "task_id": item.task_id,
@@ -563,7 +790,7 @@ def run_generation(
                     "memory_layer_indices": injected_layers,
                     "memory_layer_count": len(injected_layers),
                     "memory_packet_size": (
-                        ORACLE_MEMORY_PACKET_SIZE if scope is not None else None
+                        packet_size if scope is not None else None
                     ),
                     "memory_scalar_count": scalar_count,
                     "oracle_task_id": oracle_task_id,
@@ -580,11 +807,12 @@ def run_generation(
                 new_records += 1
 
     complete = existing_keys == expected_keys
+    predecessor_field = contract["predecessor_field"]
     metadata = {
-        "protocol_version": ORACLE_MEMORY_PROTOCOL_VERSION,
+        "protocol_version": protocol_version,
         "design_sha256": design_sha256,
-        "experiment_id": "LIP-PROTO-008",
-        "functional_capacity_experiment": config["functional_capacity_experiment"],
+        "experiment_id": experiment_id,
+        predecessor_field: config[predecessor_field],
         "config": str(config_path),
         "config_sha256": sha256_path(config_path),
         "generations_jsonl": str(output_path),
@@ -594,7 +822,7 @@ def run_generation(
         "task_ids": [str(task["task_id"]) for task in tasks],
         "task_count": len(tasks),
         "conditions": conditions,
-        "condition_plan": plan_as_dicts(plan),
+        "condition_plan": contract["plan_as_dicts"](plan),
         "generation_seeds": generation_seeds,
         "expected_records": len(expected_keys),
         "records": len(existing_keys),

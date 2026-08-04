@@ -19,8 +19,13 @@ from src.evaluation.oracle_memory import (
     design_fingerprint as memory_design_fingerprint,
     semantic_gate as memory_semantic_gate,
 )
+from src.evaluation.oracle_layer_depth import (
+    ORACLE_LAYER_DEPTH_PROTOCOL_VERSION,
+    design_fingerprint as layer_depth_design_fingerprint,
+    semantic_gate as layer_depth_semantic_gate,
+)
 from src.evaluation.semantics import CandidateProcessPolicy, evaluate_generation
-from src.evaluation.statistics import summarize_metric
+from src.evaluation.statistics import summarize_fixed_sequence, summarize_metric
 from src.pipelines.oracle_experiment import (
     load_json_object,
     load_yaml,
@@ -34,6 +39,12 @@ DEFAULT_CONFIG = Path("config/LIP-PROTO-005_oracle_packet_functional.yaml")
 
 
 def evaluation_contract(config: Mapping[str, Any]):
+    if config.get("experiment_id") == "LIP-PROTO-009":
+        return (
+            ORACLE_LAYER_DEPTH_PROTOCOL_VERSION,
+            layer_depth_design_fingerprint(config),
+            layer_depth_semantic_gate,
+        )
     if config.get("experiment_id") == "LIP-PROTO-008":
         return (
             ORACLE_MEMORY_PROTOCOL_VERSION,
@@ -92,7 +103,9 @@ def validate_generation_grid(
     if not task_ids or len(set(task_ids)) != len(task_ids):
         raise ValueError("metadata task IDs must be a non-empty unique sequence")
     if not generation_seeds or len(set(generation_seeds)) != len(generation_seeds):
-        raise ValueError("metadata generation seeds must be a non-empty unique sequence")
+        raise ValueError(
+            "metadata generation seeds must be a non-empty unique sequence"
+        )
 
     expected = {
         (task_id, condition, seed)
@@ -211,6 +224,7 @@ def evaluate(
             comparisons,
             **statistics_kwargs,
         )
+    primary_inference = None
     gate = None
     if functional:
         condition_means = {
@@ -218,7 +232,18 @@ def evaluate(
             for condition, values in metrics["functional_pass"]["conditions"].items()
         }
         _, _, memory_gate = evaluation_contract(config)
-        if memory_gate is not None:
+        if config.get("experiment_id") == "LIP-PROTO-009":
+            primary = evaluation_config["primary_testing"]
+            primary_inference = summarize_fixed_sequence(
+                scored,
+                "functional_pass",
+                primary["sequence"],
+                alpha=float(primary["alpha"]),
+                alternative=str(primary["alternative"]),
+                **statistics_kwargs,
+            )
+            gate = memory_gate(condition_means, primary_inference)
+        elif memory_gate is not None:
             gate = memory_gate(condition_means)
         else:
             packet_sizes, replication_size = packet_contract(config)
@@ -252,6 +277,7 @@ def evaluate(
             and design_validation["run_scope"] == "full"
         ),
         "semantic_gate": gate,
+        "primary_inference": primary_inference,
         "semantic_transport_supported": bool(
             functional
             and design_validation["complete"]
