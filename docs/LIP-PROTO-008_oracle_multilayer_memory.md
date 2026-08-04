@@ -79,7 +79,7 @@ tests task-specific causal control.
 
 The two-task preflight validates capture and plotting only. Its centered task
 matrix has rank at most one, so effective-rank maps become scientifically
-interpretable only in the frozen 32-task confirmation run.
+interpretable only in the frozen 16-task confirmation run.
 
 ## Fresh task registry
 
@@ -176,10 +176,98 @@ python -m src.scripts.plot_oracle_state_diagnostics \
   --output-stem runs/LIP-PROTO-008/preflight/LIP-PROTO-008_state_diagnostics
 ```
 
-The full confirmation command remains intentionally unexecuted until the
-preflight verifies capture/replay provenance and at least partial task-text
-capacity.
+After the preflight verifies capture/replay provenance and at least partial
+task-text capacity, run the frozen confirmation and claim-oriented scoring:
+
+```bash
+python -m src.scripts.run_oracle_memory_functional \
+  --config config/LIP-PROTO-008_oracle_multilayer_memory.yaml
+
+python -m src.scripts.evaluate_oracle_packet_semantics \
+  --config config/LIP-PROTO-008_oracle_multilayer_memory.yaml \
+  --generations runs/LIP-PROTO-008/generations.jsonl \
+  --output-dir runs/LIP-PROTO-008/evaluation \
+  --overwrite
+
+python -m src.scripts.run_hardened_oracle_evaluation \
+  --config config/LIP-PROTO-008_oracle_multilayer_memory.yaml \
+  --generations runs/LIP-PROTO-008/generations.jsonl \
+  --output-dir runs/LIP-PROTO-008/functional-evaluation \
+  --overwrite
+
+python -m src.scripts.plot_oracle_state_diagnostics \
+  --diagnostics runs/LIP-PROTO-008/state-diagnostics.json \
+  --output-stem runs/LIP-PROTO-008/LIP-PROTO-008_state_diagnostics
+```
 
 ## Result
 
-Pending frozen preflight.
+The preflight completed all 16 expected records and passed its internal
+authorization gate: text, single-layer output replay, and all-layer input
+replay each achieved a task-clustered functional mean of `0.5`, while their
+neutral or shuffled controls remained at zero. It was not claim-eligible and
+was used only to authorize the already frozen confirmation.
+
+The 16-task confirmation completed all `384/384` registered generations. The
+hardened namespace evaluator validated the complete grid and marked the run
+claim-eligible. The preregistered semantic gate passed, with
+`all_layer_input` as the only supported scope.
+
+| Condition | Functional passes | Task-clustered mean | 95% task-bootstrap CI | Entry point declared |
+|---|---:|---:|---:|---:|
+| Neutral carrier | 0/48 | 0.00% | [0.00%, 0.00%] | 0/48 |
+| Matched single-layer output | 0/48 | 0.00% | [0.00%, 0.00%] | 5/48 |
+| Shuffled single-layer output | 0/48 | 0.00% | [0.00%, 0.00%] | 0/48 |
+| Matched late-half input | 0/48 | 0.00% | [0.00%, 0.00%] | 3/48 |
+| Shuffled late-half input | 0/48 | 0.00% | [0.00%, 0.00%] | 0/48 |
+| Matched all-layer input | 22/48 | 45.83% | [22.92%, 68.75%] | 48/48 |
+| Shuffled all-layer input | 0/48 | 0.00% | [0.00%, 0.00%] | 0/48 |
+| Task text | 21/48 | 43.75% | [18.75%, 68.75%] | 48/48 |
+
+Matched all-layer replay exceeded both neutral and its task-shuffled control
+by `0.4583`. The paired task-bootstrap intervals were `[0.2083, 0.6875]`
+against neutral and `[0.2292, 0.6875]` against shuffled. Both exact two-sided
+sign-flip tests gave `p=0.0078125`; Holm adjustment across all nine registered
+contrasts gave `p=0.0703125`. The raw preregistered gate therefore passes, but
+no all-layer contrast crosses a family-wise `alpha=0.05` threshold after the
+conservative multiplicity adjustment. Both facts are part of the result.
+
+The effect is stable at the task level rather than dispersed across lucky
+samples. Seven tasks passed all three seeds under both task text and matched
+all-layer replay; the same nine tasks failed all text seeds. All-layer replay
+added one isolated success for task `409` at seed `202`, producing 22 rather
+than 21 total passes. Every all-layer generation declared the required entry
+point, whereas every equal-capacity shuffled generation failed to do so.
+
+The 16-task diagnostic maps localize substantial task variation before cache
+construction. Averaged over all layers and suffix positions, task-centered
+energy was `0.5697` for `value_pre_cache`, `0.4604` for `residual_input`, and
+`0.1647` for `key_pre_rope`; normalized task effective rank was respectively
+`0.6392`, `0.6553`, and `0.5524`. Value-state signal peaked over suffix
+positions `-23`, `-22`, `-17`, and `-16` at `0.755--0.765`, with normalized
+effective-rank fractions `0.816--0.877`. These maps are descriptive
+localization evidence; the matched-versus-shuffled functional result supplies
+the causal evidence.
+
+This confirms the narrow mechanistic hypothesis left open by
+`LIP-PROTO-007`: exact target-model prompt state can replace task text for
+functional control, but only when replayed persistently at the input of every
+decoder layer under this carrier. A one-layer packet or replay limited to the
+late half is insufficient. The result establishes feasibility of a latent
+control channel in this target-only oracle setting; it does not yet establish
+source-to-target bridge learnability, compression, or arbitrary agent
+communication. The next bridge should target the all-layer input memory
+interface and treat layer/position reduction as a new registered ablation.
+
+The canonical artifact is stored at `lip-artifacts/LIP-PROTO-008` on Drive.
+It contains the task registry, preflight and full outputs, hardened sandbox
+reports, three vector/raster diagnostic figures, frozen configs, source commit,
+and a verified manifest covering every payload without duplicating run data.
+Its provenance binds Git commit
+`1e3cbc7dcf0ee0ab5694a5a8b382a43ac4a15143`.
+
+- `SHA256SUMS`: `1499340005988082c7a535339e44cde8817e07848c355b5afa03c058d394cf53`
+- `runs/generations.jsonl`: `c95bf45befed4608f03d9141c5d444f3e21a35ddc2be14c3c61feeb559856c5b`
+- `runs/functional-evaluation/summary.json`: `7ec537a49ca2fcde4450c28b54e03aa2f96d69b93c26a45919a9fe9fad302349`
+- `runs/state-diagnostics.json`: `f9c52595f9a40d2ead048989d0acfe2ee204eec7ac534991ee0d086b37635ed0`
+- `runs/LIP-PROTO-008_state_diagnostics.svg`: `8a9a6d6783f8608ea7123c89fc7496e0343413d3efe2299b87b1c4335ac80c0d`
