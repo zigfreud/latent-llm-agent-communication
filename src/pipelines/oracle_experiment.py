@@ -32,6 +32,16 @@ def prompt_sha256(prompt: str) -> str:
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
 
 
+def task_sha256(task: Mapping[str, Any]) -> str:
+    canonical = json.dumps(
+        task,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def load_json_object(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -64,12 +74,24 @@ def bind_tasks_to_manifest(
     config: Mapping[str, Any],
     tasks: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], dict[str, Any], Path]:
-    """Bind task order, prompts, target, and protocol to an immutable real bundle."""
+    """Bind task order, prompts, target, and protocol to an immutable manifest."""
 
     data = config["data"]
-    manifest_path = Path(str(data["heldout_bundle_manifest"]))
+    task_manifest = data.get("task_manifest")
+    manifest_value = task_manifest or data.get("heldout_bundle_manifest")
+    if not isinstance(manifest_value, str) or not manifest_value.strip():
+        raise ValueError("data must configure task_manifest or heldout_bundle_manifest")
+    manifest_path = Path(manifest_value)
     manifest = load_json_object(manifest_path)
-    if bool(data.get("require_real_bundle", True)) and manifest.get(
+    if task_manifest is not None:
+        if manifest.get("manifest_kind") != "lip_oracle_task_manifest":
+            raise ValueError("task manifest has the wrong manifest_kind")
+        if manifest.get("schema_version") != 1 or manifest.get("mock_data"):
+            raise ValueError("oracle audit requires a real schema-v1 task manifest")
+        tasks_path = Path(str(data["tasks_jsonl"]))
+        if manifest.get("tasks_jsonl_sha256") != sha256_path(tasks_path):
+            raise ValueError("task file digest does not match the task manifest")
+    elif bool(data.get("require_real_bundle", True)) and manifest.get(
         "extraction_mode"
     ) != "real":
         raise ValueError("oracle audit requires a real held-out bundle")
@@ -95,15 +117,24 @@ def bind_tasks_to_manifest(
         raise ValueError("held-out manifest needs sampled IDs and prompt hashes")
     if len(sampled_ids) != len(prompt_hashes):
         raise ValueError("held-out sampled IDs and prompt hashes have different lengths")
+    task_hashes = manifest.get("sampled_task_sha256")
+    if task_manifest is not None and (
+        not isinstance(task_hashes, list) or len(task_hashes) != len(sampled_ids)
+    ):
+        raise ValueError("task manifest needs one full task hash per sampled ID")
 
     by_id = {task["task_id"]: task for task in tasks}
     bound = []
-    for task_id, expected_hash in zip(sampled_ids, prompt_hashes):
+    for task_index, (task_id, expected_hash) in enumerate(
+        zip(sampled_ids, prompt_hashes)
+    ):
         task = by_id.get(str(task_id))
         if task is None:
             raise ValueError(f"held-out task is missing from task file: {task_id}")
         if prompt_sha256(task["prompt"]) != expected_hash:
             raise ValueError(f"held-out prompt digest mismatch for task {task_id}")
+        if task_hashes is not None and task_sha256(task) != task_hashes[task_index]:
+            raise ValueError(f"held-out task digest mismatch for task {task_id}")
         bound.append(task)
 
     task_count = int(data["task_count"])
@@ -131,3 +162,24 @@ def prepare_output_dir(path: Path, *, overwrite: bool) -> None:
             raise FileExistsError(f"output directory already exists: {path}")
         shutil.rmtree(path)
     path.mkdir(parents=True)
+
+
+def generation_kwargs(config: Mapping[str, Any], tokenizer) -> dict[str, Any]:
+    """Build the shared deterministic/sampling contract for target generation."""
+
+    do_sample = bool(config["do_sample"])
+    kwargs = {
+        "max_new_tokens": int(config["max_new_tokens"]),
+        "do_sample": do_sample,
+        "repetition_penalty": float(config.get("repetition_penalty", 1.0)),
+        "pad_token_id": tokenizer.eos_token_id,
+        "eos_token_id": tokenizer.eos_token_id,
+    }
+    if do_sample:
+        kwargs.update(
+            {
+                "temperature": float(config["temperature"]),
+                "top_p": float(config.get("top_p", 1.0)),
+            }
+        )
+    return kwargs

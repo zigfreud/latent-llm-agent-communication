@@ -9,10 +9,15 @@ from typing import Any, Mapping, Sequence
 
 from src.evaluation.oracle_functional import (
     declares_entry_point,
-    design_fingerprint,
+    design_fingerprint as packet_design_fingerprint,
     packet_contract,
     protocol_version_for_config,
-    semantic_gate,
+    semantic_gate as packet_semantic_gate,
+)
+from src.evaluation.oracle_memory import (
+    ORACLE_MEMORY_PROTOCOL_VERSION,
+    design_fingerprint as memory_design_fingerprint,
+    semantic_gate as memory_semantic_gate,
 )
 from src.evaluation.semantics import CandidateProcessPolicy, evaluate_generation
 from src.evaluation.statistics import summarize_metric
@@ -26,6 +31,20 @@ from src.pipelines.oracle_experiment import (
 
 
 DEFAULT_CONFIG = Path("config/LIP-PROTO-005_oracle_packet_functional.yaml")
+
+
+def evaluation_contract(config: Mapping[str, Any]):
+    if config.get("experiment_id") == "LIP-PROTO-008":
+        return (
+            ORACLE_MEMORY_PROTOCOL_VERSION,
+            memory_design_fingerprint(config),
+            memory_semantic_gate,
+        )
+    return (
+        protocol_version_for_config(config),
+        packet_design_fingerprint(dict(config)),
+        None,
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,8 +81,7 @@ def validate_generation_grid(
     *,
     allow_incomplete: bool,
 ) -> dict[str, Any]:
-    design_sha256 = design_fingerprint(dict(config))
-    protocol_version = protocol_version_for_config(config)
+    protocol_version, design_sha256, _ = evaluation_contract(config)
     if metadata.get("protocol_version") != protocol_version:
         raise ValueError("generation metadata uses the wrong protocol version")
     if metadata.get("design_sha256") != design_sha256:
@@ -195,20 +213,24 @@ def evaluate(
         )
     gate = None
     if functional:
-        packet_sizes, replication_size = packet_contract(config)
-        gate = semantic_gate(
-            {
-                condition: values["mean"]
-                for condition, values in metrics["functional_pass"][
-                    "conditions"
-                ].items()
-            },
-            packet_sizes=packet_sizes,
-            replication_size=replication_size,
-        )
+        condition_means = {
+            condition: values["mean"]
+            for condition, values in metrics["functional_pass"]["conditions"].items()
+        }
+        _, _, memory_gate = evaluation_contract(config)
+        if memory_gate is not None:
+            gate = memory_gate(condition_means)
+        else:
+            packet_sizes, replication_size = packet_contract(config)
+            gate = packet_semantic_gate(
+                condition_means,
+                packet_sizes=packet_sizes,
+                replication_size=replication_size,
+            )
+    protocol_version, _, _ = evaluation_contract(config)
     summary = {
         "experiment_id": config["experiment_id"],
-        "protocol_version": protocol_version_for_config(config),
+        "protocol_version": protocol_version,
         "generations_jsonl": str(generations_path),
         "generation_metadata": str(metadata_path),
         "scored_jsonl": str(output_dir / "scored_generations.jsonl"),
