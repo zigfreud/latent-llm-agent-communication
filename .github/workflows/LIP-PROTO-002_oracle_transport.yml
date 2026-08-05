@@ -16,6 +16,7 @@ on:
       - "config/LIP-PROTO-008_oracle_multilayer_memory.yaml"
       - "config/LIP-PROTO-011_position_sparse_packet.yaml"
       - "config/LIP-PROTO-012_block_deletion.yaml"
+      - "config/LIP-PROTO-013_terminal_source_factorial.yaml"
       - "docs/LIP-PROTO-002_oracle_transport_audit.md"
       - "docs/LIP-PROTO-003_length_controlled_oracle.md"
       - "docs/LIP-PROTO-004_oracle_packet_capacity.md"
@@ -25,6 +26,7 @@ on:
       - "docs/LIP-PROTO-008_oracle_multilayer_memory.md"
       - "docs/LIP-PROTO-011_position_sparse_packet.md"
       - "docs/LIP-PROTO-012_block_deletion.md"
+      - "docs/LIP-PROTO-013_terminal_source_factorial.md"
       - "requirements-protocol.txt"
       - "src/core/prompt_protocol.py"
       - "src/core/utils.py"
@@ -33,6 +35,7 @@ on:
       - "src/evaluation/oracle_memory.py"
       - "src/evaluation/oracle_position_packet.py"
       - "src/evaluation/oracle_block_deletion.py"
+      - "src/evaluation/oracle_terminal_factorial.py"
       - "src/evaluation/statistics.py"
       - "src/evaluation/oracle_state_diagnostics.py"
       - "src/evaluation/linux_sandbox.py"
@@ -51,6 +54,10 @@ on:
       - "src/scripts/select_oracle_position_tasks.py"
       - "src/scripts/plot_oracle_block_deletion.py"
       - "src/scripts/select_oracle_block_deletion_tasks.py"
+      - "src/scripts/materialize_oracle_terminal_candidates.py"
+      - "src/scripts/run_oracle_terminal_factorial_screen.py"
+      - "src/scripts/select_oracle_terminal_factorial_tasks.py"
+      - "src/scripts/plot_oracle_terminal_factorial.py"
       - "src/scripts/evaluate_oracle_packet_semantics.py"
       - "src/scripts/run_hardened_oracle_evaluation.py"
       - "src/scripts/run_oracle_transport_audit.py"
@@ -62,6 +69,7 @@ on:
       - "tests/test_linux_sandbox.py"
       - "tests/test_oracle_position_packet.py"
       - "tests/test_oracle_block_deletion.py"
+      - "tests/test_oracle_terminal_factorial.py"
       - "tests/test_statistics.py"
   workflow_dispatch:
 
@@ -96,6 +104,7 @@ jobs:
             src/evaluation/oracle_memory.py \
             src/evaluation/oracle_position_packet.py \
             src/evaluation/oracle_block_deletion.py \
+            src/evaluation/oracle_terminal_factorial.py \
             src/evaluation/statistics.py \
             src/evaluation/oracle_state_diagnostics.py \
             src/evaluation/linux_sandbox.py \
@@ -112,16 +121,21 @@ jobs:
             src/scripts/select_oracle_position_tasks.py \
             src/scripts/plot_oracle_block_deletion.py \
             src/scripts/select_oracle_block_deletion_tasks.py \
+            src/scripts/materialize_oracle_terminal_candidates.py \
+            src/scripts/run_oracle_terminal_factorial_screen.py \
+            src/scripts/select_oracle_terminal_factorial_tasks.py \
+            src/scripts/plot_oracle_terminal_factorial.py \
             src/scripts/evaluate_oracle_packet_semantics.py \
             src/scripts/run_hardened_oracle_evaluation.py \
             src/scripts/run_oracle_transport_audit.py \
             tests/test_oracle_transport.py \
             tests/test_oracle_position_packet.py \
             tests/test_oracle_block_deletion.py \
+            tests/test_oracle_terminal_factorial.py \
             tests/test_statistics.py
 
       - name: Import audit entry points
-        run: python -c "import src.scripts.run_oracle_transport_audit; import src.scripts.run_oracle_packet_audit; import src.scripts.run_oracle_packet_functional; import src.scripts.run_oracle_memory_functional; import src.scripts.materialize_oracle_tasks; import src.scripts.evaluate_oracle_packet_semantics; import src.scripts.run_hardened_oracle_evaluation; import src.scripts.select_oracle_position_tasks; import src.scripts.plot_oracle_position_packet; import src.scripts.select_oracle_block_deletion_tasks; import src.scripts.plot_oracle_block_deletion"
+        run: python -c "import src.scripts.run_oracle_transport_audit; import src.scripts.run_oracle_packet_audit; import src.scripts.run_oracle_packet_functional; import src.scripts.run_oracle_memory_functional; import src.scripts.materialize_oracle_tasks; import src.scripts.evaluate_oracle_packet_semantics; import src.scripts.run_hardened_oracle_evaluation; import src.scripts.select_oracle_position_tasks; import src.scripts.plot_oracle_position_packet; import src.scripts.select_oracle_block_deletion_tasks; import src.scripts.plot_oracle_block_deletion; import src.scripts.materialize_oracle_terminal_candidates; import src.scripts.run_oracle_terminal_factorial_screen; import src.scripts.select_oracle_terminal_factorial_tasks; import src.scripts.plot_oracle_terminal_factorial"
 
       - name: Validate frozen audit configuration
         run: |
@@ -134,9 +148,10 @@ jobs:
           python -c "import yaml; from src.scripts.run_oracle_memory_functional import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-008_oracle_multilayer_memory.yaml')))"
           python -c "import yaml; from src.scripts.run_oracle_memory_functional import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-011_position_sparse_packet.yaml')))"
           python -c "import yaml; from src.scripts.run_oracle_memory_functional import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-012_block_deletion.yaml')))"
+          python -c "import yaml; from src.scripts.run_oracle_memory_functional import validate_config; validate_config(yaml.safe_load(open('config/LIP-PROTO-013_terminal_source_factorial.yaml')))"
 
       - name: Run oracle transport tests
-        run: python -m pytest -q tests/test_oracle_transport.py tests/test_oracle_functional.py tests/test_oracle_memory.py tests/test_oracle_task_manifest.py tests/test_plot_oracle_state_diagnostics.py tests/test_oracle_position_packet.py tests/test_oracle_block_deletion.py tests/test_statistics.py tests/test_linux_sandbox.py tests/test_hooks.py tests/test_prompt_protocol.py
+        run: python -m pytest -q tests/test_oracle_transport.py tests/test_oracle_functional.py tests/test_oracle_memory.py tests/test_oracle_task_manifest.py tests/test_plot_oracle_state_diagnostics.py tests/test_oracle_position_packet.py tests/test_oracle_block_deletion.py tests/test_oracle_terminal_factorial.py tests/test_statistics.py tests/test_linux_sandbox.py tests/test_hooks.py tests/test_prompt_protocol.py
 
       - name: Materialize mock oracle task registry
         run: |

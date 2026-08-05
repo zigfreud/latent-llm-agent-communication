@@ -1,0 +1,185 @@
+experiment_id: "LIP-PROTO-013"
+predecessor_experiment: "LIP-PROTO-012"
+
+population_source:
+  source_experiment: "LIP-PROTO-010"
+  candidate_task_manifest: "datasets/LIP-PROTO-010/candidate_task_manifest.json"
+  candidate_task_manifest_sha256: "1e85242211a21f63acd78d3bb4876a09028e3bcff5d82fa32f5eaef284767916"
+  candidate_manifest_task_count: 192
+  legacy_excluded_task_count: 50
+  legacy_excluded_ids_sha256: "557a70da9dbd099c8fc4bd3db44e0b2622220c61f8e93aa4cc621ee715485481"
+  total_excluded_task_count: 242
+  remaining_task_count: 258
+  preflight_report: "runs/LIP-PROTO-013/preflight/terminal_tail_layout_audit.json"
+  preflight_report_sha256: "07e6098f567e21654d04fecbd7d665cd7f24fce467ea97bad93917b78b57a416"
+  preflight_source_commit: "d9f44c3d4526a46f389dd61f8e13ff784f4c145d"
+  structural_candidate_count: 179
+  structural_strata:
+    "2": 83
+    "3": 96
+  candidate_order_method: "sha256_within_tokenizer_stratum"
+  candidate_order_salt: "LIP-PROTO-013-terminal-stratified-v1"
+
+models:
+  target_model: "NousResearch/Meta-Llama-3-8B-Instruct"
+  target_model_revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+
+prompt_protocol:
+  version: "lip-prompt-v1"
+  mode: "chat_template"
+  add_generation_prompt: true
+  system_prompt: "You are a Python code generator. Return only Python code and define exactly the required function name."
+
+runtime:
+  device: "auto"
+  load_4bit: true
+
+data:
+  candidate_tasks_jsonl: "datasets/LIP-PROTO-013/candidate_tasks.jsonl"
+  candidate_task_manifest: "datasets/LIP-PROTO-013/candidate_task_manifest.json"
+  candidate_task_count: 179
+  tasks_jsonl: "datasets/LIP-PROTO-013/selected_tasks.jsonl"
+  task_manifest: "datasets/LIP-PROTO-013/selected_task_manifest.json"
+  task_count: 32
+  functional_task_start: 0
+  functional_task_count: 32
+  functional_split: "mbpp_test_terminal_layout_stratified_32"
+
+screening:
+  condition: "text_only_no_lip"
+  seeds: [1423, 1559]
+  eligibility_rule: "any_functional_pass_across_screening_seeds"
+  selected_task_count_per_stratum: 16
+  generation:
+    max_new_tokens: 256
+    do_sample: true
+    temperature: 0.2
+    top_p: 0.95
+    repetition_penalty: 1.0
+
+terminal_factorial:
+  method: "constant_capacity_source_identity_factorial"
+  factors: ["core", "name", "boundary"]
+  levels:
+    m: "matched_task"
+    s: "same_stratum_donor"
+  assignments: ["mmm", "smm", "msm", "mms", "ssm", "sms", "mss", "sss"]
+  packet_size: 24
+  same_donor_across_s_components: true
+  strata:
+    - name_token_count: 2
+      selected_task_count: 16
+      components:
+        core: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9]
+        name: [-8, -7]
+        boundary: [-6, -5, -4, -3, -2, -1]
+    - name_token_count: 3
+      selected_task_count: 16
+      components:
+        core: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10]
+        name: [-9, -8, -7]
+        boundary: [-6, -5, -4, -3, -2, -1]
+
+neutral_target_prompt: "Use the latent signal."
+
+carrier:
+  mode: "left_pad_masked_to_task_length"
+
+memory:
+  packet_size: 32
+  decoder_layer_count: 32
+  self_check_tasks: 1
+  maximum_self_logit_delta: 0.0001
+  state_capture_layers: [-32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  replay_scope:
+    name: "early_quarter_input"
+    boundary: "block_input"
+    layers: [-32, -31, -30, -29, -28, -27, -26, -25]
+  position_patterns:
+    - name: "full_k32"
+      packet_offsets: [-32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+    - name: "terminal_k24"
+      packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+
+diagnostics:
+  protocol_version: "lip-oracle-state-diagnostics-v1"
+  state_types: ["residual_input", "key_pre_rope", "value_pre_cache"]
+  metrics:
+    - "mean_l2_norm"
+    - "task_signal_fraction"
+    - "mean_pairwise_cosine"
+    - "task_effective_rank"
+    - "task_effective_rank_fraction"
+  store_raw_states: false
+
+conditions:
+  - "neutral_no_lip"
+  - "text_only_no_lip"
+  - "oracle_early_quarter_input_full_k32"
+  - "shuffled_oracle_early_quarter_input_full_k32"
+  - "oracle_early_quarter_input_terminal_k24_mmm"
+  - "oracle_early_quarter_input_terminal_k24_smm"
+  - "oracle_early_quarter_input_terminal_k24_msm"
+  - "oracle_early_quarter_input_terminal_k24_mms"
+  - "oracle_early_quarter_input_terminal_k24_ssm"
+  - "oracle_early_quarter_input_terminal_k24_sms"
+  - "oracle_early_quarter_input_terminal_k24_mss"
+  - "oracle_early_quarter_input_terminal_k24_sss"
+
+controls:
+  same_stratum_donor_memory:
+    permutation: "sattolo_derangement"
+    seed: 3137
+    same_donor_across_s_components: true
+
+generation:
+  seeds: [1667, 1789, 1901]
+  max_new_tokens: 256
+  do_sample: true
+  temperature: 0.2
+  top_p: 0.95
+  repetition_penalty: 1.0
+
+evaluation:
+  timeout_seconds: 5.0
+  memory_mb: 512
+  confidence: 0.95
+  bootstrap_iterations: 10000
+  statistics_seed: 3203
+  comparisons:
+    - ["oracle_early_quarter_input_full_k32", "shuffled_oracle_early_quarter_input_full_k32"]
+    - ["oracle_early_quarter_input_terminal_k24_mmm", "oracle_early_quarter_input_terminal_k24_sss"]
+    - ["oracle_early_quarter_input_terminal_k24_mmm", "oracle_early_quarter_input_terminal_k24_smm"]
+    - ["oracle_early_quarter_input_terminal_k24_mmm", "oracle_early_quarter_input_terminal_k24_msm"]
+    - ["oracle_early_quarter_input_terminal_k24_mmm", "oracle_early_quarter_input_terminal_k24_mms"]
+    - ["oracle_early_quarter_input_terminal_k24_mss", "oracle_early_quarter_input_terminal_k24_sss"]
+    - ["oracle_early_quarter_input_terminal_k24_sms", "oracle_early_quarter_input_terminal_k24_sss"]
+    - ["oracle_early_quarter_input_terminal_k24_ssm", "oracle_early_quarter_input_terminal_k24_sss"]
+    - ["oracle_early_quarter_input_terminal_k24_smm", "oracle_early_quarter_input_terminal_k24_sss"]
+    - ["oracle_early_quarter_input_full_k32", "neutral_no_lip"]
+    - ["oracle_early_quarter_input_terminal_k24_mmm", "neutral_no_lip"]
+    - ["text_only_no_lip", "neutral_no_lip"]
+  primary_testing:
+    method: "two_gate_then_holm"
+    alternative: "greater"
+    alpha: 0.05
+    gates:
+      - ["oracle_early_quarter_input_full_k32", "shuffled_oracle_early_quarter_input_full_k32"]
+      - ["oracle_early_quarter_input_terminal_k24_mmm", "oracle_early_quarter_input_terminal_k24_sss"]
+    family:
+      - ["oracle_early_quarter_input_terminal_k24_mmm", "oracle_early_quarter_input_terminal_k24_smm"]
+      - ["oracle_early_quarter_input_terminal_k24_mmm", "oracle_early_quarter_input_terminal_k24_msm"]
+      - ["oracle_early_quarter_input_terminal_k24_mmm", "oracle_early_quarter_input_terminal_k24_mms"]
+      - ["oracle_early_quarter_input_terminal_k24_mss", "oracle_early_quarter_input_terminal_k24_sss"]
+      - ["oracle_early_quarter_input_terminal_k24_sms", "oracle_early_quarter_input_terminal_k24_sss"]
+      - ["oracle_early_quarter_input_terminal_k24_ssm", "oracle_early_quarter_input_terminal_k24_sss"]
+      - ["oracle_early_quarter_input_terminal_k24_smm", "oracle_early_quarter_input_terminal_k24_sss"]
+
+output:
+  candidate_registry_report_json: "runs/LIP-PROTO-013/candidate-registry-report.json"
+  screening_generations_jsonl: "runs/LIP-PROTO-013/screening/generations.jsonl"
+  screening_evaluation_dir: "runs/LIP-PROTO-013/screening/functional-evaluation"
+  selection_report_json: "runs/LIP-PROTO-013/screening/selection-report.json"
+  generations_jsonl: "runs/LIP-PROTO-013/generations.jsonl"
+  evaluation_dir: "runs/LIP-PROTO-013/evaluation"
+  state_diagnostics_json: "runs/LIP-PROTO-013/state-diagnostics.json"

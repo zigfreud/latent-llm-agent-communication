@@ -351,6 +351,105 @@ def summarize_gatekept_holm(
     }
 
 
+def summarize_two_gate_holm(
+    records: Sequence[Mapping],
+    metric: str,
+    gates: Sequence[Sequence[str]],
+    family: Sequence[Sequence[str]],
+    *,
+    alpha: float = 0.05,
+    alternative: str = "greater",
+    bootstrap_iterations: int = 10_000,
+    confidence: float = 0.95,
+    seed: int = 1729,
+) -> dict:
+    """Open one Holm family only after two ordered replication gates pass."""
+
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be between zero and one")
+    if len(gates) != 2 or any(len(pair) != 2 for pair in gates):
+        raise ValueError("two ordered gates must contain [treatment, control]")
+    if not family or any(len(pair) != 2 for pair in family):
+        raise ValueError("family hypotheses must contain [treatment, control]")
+
+    cached: dict[str, dict[str, float]] = {}
+    results = []
+    for offset, hypothesis in enumerate([*gates, *family]):
+        treatment, control = (str(value) for value in hypothesis)
+        treatment_tasks = cached.setdefault(
+            treatment, task_means(records, treatment, metric)
+        )
+        control_tasks = cached.setdefault(
+            control, task_means(records, control, metric)
+        )
+        shared = sorted(set(treatment_tasks).intersection(control_tasks))
+        if not shared:
+            raise ValueError(f"hypothesis {treatment} vs {control} has no shared tasks")
+        differences = [
+            treatment_tasks[task_id] - control_tasks[task_id]
+            for task_id in shared
+        ]
+        lower, upper = bootstrap_mean_ci(
+            differences,
+            iterations=bootstrap_iterations,
+            confidence=confidence,
+            seed=seed + 3000 + offset,
+        )
+        p_value, method = sign_flip_p_value(
+            differences,
+            alternative=alternative,
+            seed=seed + 4000 + offset,
+        )
+        results.append(
+            {
+                "treatment": treatment,
+                "control": control,
+                "task_count": len(shared),
+                "nonzero_task_count": sum(
+                    abs(difference) > 1e-15 for difference in differences
+                ),
+                "mean_difference": mean(differences),
+                "ci_lower": lower,
+                "ci_upper": upper,
+                "p_value": p_value,
+                "p_value_method": method,
+                "alternative": alternative,
+            }
+        )
+
+    gate_results = results[:2]
+    sequence_active = True
+    for index, item in enumerate(gate_results):
+        item["gate_index"] = index
+        item["tested"] = sequence_active
+        item["rejected"] = bool(sequence_active and item["p_value"] <= alpha)
+        sequence_active = bool(sequence_active and item["rejected"])
+
+    raw_family = results[2:]
+    adjusted = holm_adjust([item["p_value"] for item in raw_family])
+    family_results = []
+    for item, adjusted_p in zip(raw_family, adjusted):
+        item["p_value_holm"] = adjusted_p
+        item["tested"] = sequence_active
+        item["rejected"] = bool(sequence_active and adjusted_p <= alpha)
+        family_results.append(item)
+
+    return {
+        "metric": metric,
+        "method": "two_gate_then_holm",
+        "familywise_alpha": alpha,
+        "alternative": alternative,
+        "cluster_unit": "task_id",
+        "replicates_within_task": "averaged before task-level test",
+        "stopping_rule": (
+            "test both replication gates in order; open one Holm-adjusted "
+            "component family only after both reject"
+        ),
+        "gates": gate_results,
+        "family": family_results,
+    }
+
+
 def summarize_metric(
     records: Sequence[Mapping],
     metric: str,
