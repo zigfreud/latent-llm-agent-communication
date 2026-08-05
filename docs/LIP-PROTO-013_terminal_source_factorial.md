@@ -255,7 +255,7 @@ python -m src.scripts.run_hardened_oracle_evaluation \
   --config config/LIP-PROTO-013_terminal_source_factorial.yaml \
   --generations runs/LIP-PROTO-013/screening/generations.jsonl \
   --output-dir runs/LIP-PROTO-013/screening/functional-evaluation \
-  --functional --overwrite
+  --overwrite
 
 python -m src.scripts.select_oracle_terminal_factorial_tasks \
   --config config/LIP-PROTO-013_terminal_source_factorial.yaml
@@ -267,7 +267,7 @@ python -m src.scripts.run_hardened_oracle_evaluation \
   --config config/LIP-PROTO-013_terminal_source_factorial.yaml \
   --generations runs/LIP-PROTO-013/generations.jsonl \
   --output-dir runs/LIP-PROTO-013/evaluation \
-  --functional --overwrite
+  --overwrite
 
 python -m src.scripts.plot_oracle_terminal_factorial \
   --summary runs/LIP-PROTO-013/evaluation/summary.json \
