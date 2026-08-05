@@ -1,6 +1,6 @@
 # LIP-PROTO-013 constant-capacity terminal-source factorial
 
-Status: frozen pre-data protocol; confirmation results pending.
+Status: completed preregistered execution; confirmatory result reported below.
 
 ## Research question
 
@@ -303,3 +303,136 @@ The SVG/PDF outputs are the paper artifacts; PNG is a review convenience.
 
 Pairwise and three-way factorial interactions may be reported descriptively,
 but they are not promoted to confirmatory claims in this protocol.
+
+## Result
+
+Execution completed on 2026-08-05. The structural screen produced the complete
+358-record grid for 179 candidates and two generation seeds. Under the frozen
+`any_functional_pass_across_screening_seeds` rule, 35 tasks in the two-token
+function-name stratum and 32 tasks in the three-token stratum were eligible.
+The selector took the first 16 tasks in the frozen hash order from each stratum,
+yielding the preregistered balanced 32-task confirmation population. The
+selection report passed, and the final registry and manifest hashes were
+`01442bfec82a12c3dde6bde4eb72a1c5ae28682a65ff1c35b5e1f09580b5c9f9`
+and `d9d1b211b5c1fcf97520e85fa80a5633c4a2511648be02712b8e4918989f38d3`.
+
+Confirmation produced all 1,152 registered records: 32 tasks, 12 conditions,
+and three generation seeds. The frozen self-replay checks had zero maximum
+absolute logit error for both `full_k32` and `terminal_k24`. Hardened scoring
+reported no missing cells, a validated Linux namespace sandbox,
+`claim_eligible=true`, `semantic_transport_supported=true`, and a passing
+terminal-source semantic gate.
+
+Task-clustered functional results were:
+
+| Condition | Component identity | Passes | Rate | 95% task-bootstrap interval |
+| --- | --- | ---: | ---: | ---: |
+| Neutral carrier | no latent packet | 0/96 | 0.00% | [0.00%, 0.00%] |
+| Task text | textual task prompt | 87/96 | 90.62% | [80.21%, 98.96%] |
+| Full `K=32` matched | matched full packet | 85/96 | 88.54% | [78.12%, 96.88%] |
+| Full `K=32` shuffled | same-stratum donor packet | 0/96 | 0.00% | [0.00%, 0.00%] |
+| `MMM` | matched core, name, boundary | 79/96 | 82.29% | [68.75%, 93.75%] |
+| `SMM` | donor core; matched name, boundary | 3/96 | 3.12% | [0.00%, 9.38%] |
+| `MSM` | matched core, boundary; donor name | 0/96 | 0.00% | [0.00%, 0.00%] |
+| `MMS` | matched core, name; donor boundary | 78/96 | 81.25% | [68.75%, 93.75%] |
+| `SSM` | matched boundary only | 0/96 | 0.00% | [0.00%, 0.00%] |
+| `SMS` | matched name only | 4/96 | 4.17% | [0.00%, 11.46%] |
+| `MSS` | matched core only | 0/96 | 0.00% | [0.00%, 0.00%] |
+| `SSS` | donor core, name, boundary | 0/96 | 0.00% | [0.00%, 0.00%] |
+
+Both ordered replication gates rejected. Full-`K=32` matched-minus-shuffled
+replay had mean task-level difference `0.885417`, 30 nonzero task clusters,
+interval `[0.781250, 0.968750]`, and one-sided Monte Carlo
+`p=0.0000099999`. Terminal-`K=24` `MMM`-minus-`SSS` replay had mean difference
+`0.822917`, 27 nonzero task clusters, interval `[0.687500, 0.937500]`, and the
+same one-sided Monte Carlo p-value. The known full packet therefore replicated,
+and the constant-capacity terminal packet independently transmitted task
+identity above its all-donor control.
+
+The opened seven-test family produced two Holm-confirmed component claims:
+
+| Contrast | Mean difference | 95% interval | Raw one-sided `p` | Holm `p` | Confirmed |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Core contribution: `MMM - SMM` | 0.791667 | [0.645833, 0.916667] | 0.0000099999 | 0.0000699993 | yes |
+| Function-name contribution: `MMM - MSM` | 0.822917 | [0.687500, 0.937500] | 0.0000099999 | 0.0000699993 | yes |
+| Boundary contribution: `MMM - MMS` | 0.010417 | [0.000000, 0.031250] | 0.5 | 1.0 | no |
+| Core-only rescue: `MSS - SSS` | 0.000000 | [0.000000, 0.000000] | 1.0 | 1.0 | no |
+| Name-only rescue: `SMS - SSS` | 0.041667 | [0.000000, 0.114583] | 0.25 | 1.0 | no |
+| Boundary-only rescue: `SSM - SSS` | 0.000000 | [0.000000, 0.000000] | 1.0 | 1.0 | no |
+| Name-plus-boundary rescue: `SMM - SSS` | 0.031250 | [0.000000, 0.093750] | 0.5 | 1.0 | no |
+
+Core and function-name identity are therefore independently useful in the
+otherwise matched packet. The observed factorial surface is also strongly
+conjunctive. Replacing only the name reduced functional success from 82.29% to
+0.00%; replacing only the core reduced it to 3.12%. Conversely, neither the
+matched core nor the matched name rescued an otherwise donor packet. Matched
+core plus matched name with a donor boundary (`MMS`) retained an observed
+81.25% rate, only one success below `MMM`. The protocol did not preregister
+equivalence or non-inferiority, so the failed boundary-contribution test and
+the near-equal point estimates do not prove that the boundary is universally
+irrelevant. They show that this experiment detected no positive boundary
+contribution conditional on matched core and name.
+
+The result resolves the apparent terminal-octet paradox from `LIP-PROTO-012`.
+That experiment deleted offsets `-8 ... -1` together: two task-dependent
+function-name positions and six visible task-invariant generation-boundary
+positions. The present constant-capacity intervention separates their source
+identities. Performance collapsed when name identity was wrong but remained
+nearly unchanged when only boundary identity was wrong. On this new
+confirmation population, the earlier deletion effect is therefore best
+attributed to removing the name-bearing subchannel, not to strong evidence that
+the six fixed boundary positions themselves carry the task identity required
+here.
+
+The pattern was stable across generation seeds. Full-`K=32` matched rates were
+93.75%, 87.50%, and 84.38% for seeds 1667, 1789, and 1901. Terminal-`K=24`
+`MMM` rates were 81.25%, 84.38%, and 81.25%; `MMS` was 81.25% under every
+seed. Text scored 87.50%, 93.75%, and 90.62%. Neutral, full-`K=32` shuffled,
+`MSM`, `MSS`, `SSM`, and `SSS` remained at 0.00% under every seed.
+
+### Exploratory state geometry
+
+The aggregate state diagnostics are descriptive and do not replace the
+matched-source interventions. At the eight replay-layer inputs, the two common
+function-name offsets `-8, -7` had mean task-signal fraction `0.7050`, mean
+pairwise cosine `0.2737`, effective-rank fraction `0.8323`, and mean residual
+norm `2.3281`. The common core offsets `-24 ... -10` had corresponding values
+`0.5875`, `0.4027`, `0.4337`, and `2.2025`. The six boundary offsets
+`-6 ... -1` had task-signal fraction only `0.0297` and pairwise cosine
+`0.9696`, despite a comparable mean norm of `1.9974`. Offset `-9` is a mixed
+stratum transition--core for two-token names and name for three-token names--
+and is not assigned to either common-region aggregate.
+
+Thus the causal and geometric views agree after resolving the terminal block:
+name and core states vary substantially with task identity, while the fixed
+boundary states are dominated by shared structure. The similar vector norms
+again show why magnitude alone is not an information or causal-capacity score.
+
+The supported claim remains bounded. For this model revision, prompt template,
+capability-screened MBPP population, native same-model oracle source, and
+replay through the first eight decoder blocks, a 24-position terminal packet
+transmitted task identity above an equal-capacity same-stratum donor control.
+Within that packet, both core and function-name source identity made confirmed
+positive contributions. This is the smallest packet confirmed among the sizes
+tested, not a mathematical minimum. The result does not establish arbitrary
+task coverage, non-inferiority to text, a learned sender-to-receiver bridge,
+cross-model interoperability, or textual replacement in an end-to-end agent
+system.
+
+The canonical artifact is stored at `lip-artifacts/LIP-PROTO-013` on Drive.
+Its manifest binds 23 scientific payloads: source commit, frozen config,
+preflight layout audit, candidate and selected registries, screening records
+and hardened scores, confirmation generations and metadata, aggregate state
+diagnostics, hardened confirmation scores, and raster/vector/PDF figures.
+Operational logs are retained beside the artifact but excluded from the
+scientific manifest. All 23 entries passed `sha256sum -c` after final rendering,
+and the normalized folder was independently visible through the authenticated
+Drive API.
+
+- `SOURCE_COMMIT.txt`: `a288613e6c65c8c4dc9d48d360274d35ea6cd219`
+- `SHA256SUMS`: `0e425b037b913d5fa11d26c6f12f5c17280466ab77c339bdde309988b6d138c6`
+- `confirmation/generations.jsonl`: `8ba18bf74e112cf6b43adf3b86ccd715540c5f907b0da7ba5c2272603e2bd7b5`
+- `confirmation/evaluation/summary.json`: `5970b00550807af336c856427c5c39b1a89278b1f8f7e84eb86cfd02be28a3ef`
+- `confirmation/state-diagnostics.json`: `b48ad459500babd12bdc9eb2c06326c4d3e8e99e760b68c35c95384da8a2f456`
+- `confirmation/figures/LIP-PROTO-013_terminal_source_factorial.svg`: `a8971ea765e1ef66a54ae76e1638f6843d9437102a0b03b1c3b3d942eb7b7a8e`
+- `screening/functional-evaluation/summary.json`: `8c72542d45b219fd3df96ce630a93c9d55c26a6bc4eefd641ede43fc24370eb7`
