@@ -45,11 +45,21 @@ from src.evaluation.oracle_block_deletion import (
     design_fingerprint as deletion_design_fingerprint,
     semantic_gate as deletion_semantic_gate,
 )
+from src.evaluation.oracle_terminal_factorial import (
+    ORACLE_TERMINAL_CANDIDATE_COUNT,
+    ORACLE_TERMINAL_EXPERIMENT_ID,
+    ORACLE_TERMINAL_PROTOCOL_VERSION,
+    ORACLE_TERMINAL_SCREENING_CONDITION,
+    ORACLE_TERMINAL_SCREENING_SCOPE,
+    design_fingerprint as terminal_design_fingerprint,
+    semantic_gate as terminal_semantic_gate,
+)
 from src.evaluation.semantics import CandidateProcessPolicy, evaluate_generation
 from src.evaluation.statistics import (
     summarize_fixed_sequence,
     summarize_gatekept_holm,
     summarize_metric,
+    summarize_two_gate_holm,
 )
 from src.pipelines.oracle_experiment import (
     load_json_object,
@@ -65,6 +75,12 @@ DEFAULT_CONFIG = Path("config/LIP-PROTO-005_oracle_packet_functional.yaml")
 
 
 def evaluation_contract(config: Mapping[str, Any]):
+    if config.get("experiment_id") == ORACLE_TERMINAL_EXPERIMENT_ID:
+        return (
+            ORACLE_TERMINAL_PROTOCOL_VERSION,
+            terminal_design_fingerprint(config),
+            terminal_semantic_gate,
+        )
     if config.get("experiment_id") == ORACLE_DELETION_EXPERIMENT_ID:
         return (
             ORACLE_DELETION_PROTOCOL_VERSION,
@@ -142,12 +158,21 @@ def validate_generation_grid(
     if metadata.get("design_sha256") != design_sha256:
         raise ValueError("generation metadata does not match the frozen config")
     task_ids = [str(task_id) for task_id in metadata.get("task_ids", [])]
-    screening = bool(
+    capability_screening = bool(
         config.get("experiment_id") == ORACLE_CAPABILITY_EXPERIMENT_ID
         and metadata.get("run_scope") == ORACLE_CAPABILITY_SCREENING_SCOPE
     )
+    terminal_screening = bool(
+        config.get("experiment_id") == ORACLE_TERMINAL_EXPERIMENT_ID
+        and metadata.get("run_scope") == ORACLE_TERMINAL_SCREENING_SCOPE
+    )
+    screening = capability_screening or terminal_screening
     conditions = (
-        [ORACLE_CAPABILITY_SCREENING_CONDITION]
+        [
+            ORACLE_TERMINAL_SCREENING_CONDITION
+            if terminal_screening
+            else ORACLE_CAPABILITY_SCREENING_CONDITION
+        ]
         if screening
         else [str(condition) for condition in config["conditions"]]
     )
@@ -193,8 +218,10 @@ def validate_generation_grid(
     if missing and not allow_incomplete:
         raise ValueError(f"generation grid is missing {len(missing)} records")
     expected_task_count = (
-        ORACLE_CAPABILITY_CANDIDATE_COUNT
-        if screening
+        ORACLE_TERMINAL_CANDIDATE_COUNT
+        if terminal_screening
+        else ORACLE_CAPABILITY_CANDIDATE_COUNT
+        if capability_screening
         else int(config["data"]["functional_task_count"])
     )
     complete = not missing and len(task_ids) == expected_task_count
@@ -251,7 +278,11 @@ def evaluate(
         scored.append(scored_row)
     screening = bool(design_validation["screening"])
     conditions = (
-        [ORACLE_CAPABILITY_SCREENING_CONDITION]
+        [
+            ORACLE_TERMINAL_SCREENING_CONDITION
+            if config.get("experiment_id") == ORACLE_TERMINAL_EXPERIMENT_ID
+            else ORACLE_CAPABILITY_SCREENING_CONDITION
+        ]
         if screening
         else list(config["conditions"])
     )
@@ -293,7 +324,19 @@ def evaluate(
             for condition, values in metrics["functional_pass"]["conditions"].items()
         }
         _, _, memory_gate = evaluation_contract(config)
-        if config.get("experiment_id") == ORACLE_DELETION_EXPERIMENT_ID:
+        if config.get("experiment_id") == ORACLE_TERMINAL_EXPERIMENT_ID:
+            primary = evaluation_config["primary_testing"]
+            primary_inference = summarize_two_gate_holm(
+                scored,
+                "functional_pass",
+                primary["gates"],
+                primary["family"],
+                alpha=float(primary["alpha"]),
+                alternative=str(primary["alternative"]),
+                **statistics_kwargs,
+            )
+            gate = memory_gate(condition_means, primary_inference)
+        elif config.get("experiment_id") == ORACLE_DELETION_EXPERIMENT_ID:
             primary = evaluation_config["primary_testing"]
             primary_inference = summarize_gatekept_holm(
                 scored,

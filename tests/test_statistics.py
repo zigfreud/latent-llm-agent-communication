@@ -6,6 +6,7 @@ from src.evaluation.statistics import (
     summarize_fixed_sequence,
     summarize_gatekept_holm,
     summarize_metric,
+    summarize_two_gate_holm,
     task_means,
 )
 
@@ -145,6 +146,66 @@ def test_gatekept_holm_opens_family_only_after_anchor_rejection():
     assert failed_anchor["anchor"]["rejected"] is False
     assert failed_anchor["family"][0]["tested"] is False
     assert failed_anchor["family"][0]["rejected"] is False
+
+
+def test_two_gate_holm_opens_one_global_family_only_after_both_gates():
+    records = []
+    for task_index in range(10):
+        task_id = f"task-{task_index}"
+        for condition, value in (
+            ("gate_1", 1),
+            ("gate_1_control", 0),
+            ("gate_2", 1),
+            ("gate_2_control", 0),
+            ("component_a", 1),
+            ("component_a_control", 0),
+            ("component_b", int(task_index < 2)),
+            ("component_b_control", 0),
+        ):
+            records.append(
+                {"task_id": task_id, "condition": condition, "score": value}
+            )
+    summary = summarize_two_gate_holm(
+        records,
+        "score",
+        [
+            ["gate_1", "gate_1_control"],
+            ["gate_2", "gate_2_control"],
+        ],
+        [
+            ["component_a", "component_a_control"],
+            ["component_b", "component_b_control"],
+        ],
+        bootstrap_iterations=100,
+    )
+    assert [item["rejected"] for item in summary["gates"]] == [True, True]
+    assert summary["family"][0]["tested"] is True
+    assert summary["family"][0]["p_value_holm"] == pytest.approx(2 / 1024)
+    assert summary["family"][0]["rejected"] is True
+    assert summary["family"][1]["rejected"] is False
+
+    failed = summarize_two_gate_holm(
+        [
+            {
+                **record,
+                "score": (
+                    0 if record["condition"] == "gate_2" else record["score"]
+                ),
+            }
+            for record in records
+        ],
+        "score",
+        [
+            ["gate_1", "gate_1_control"],
+            ["gate_2", "gate_2_control"],
+        ],
+        [["component_a", "component_a_control"]],
+        bootstrap_iterations=100,
+    )
+    assert failed["gates"][0]["rejected"] is True
+    assert failed["gates"][1]["rejected"] is False
+    assert failed["family"][0]["tested"] is False
+    assert failed["family"][0]["rejected"] is False
 
 
 def test_fixed_sequence_stops_confirmatory_rejection_after_first_failure():

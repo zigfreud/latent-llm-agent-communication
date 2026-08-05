@@ -93,6 +93,28 @@ from src.evaluation.oracle_block_deletion import (
     validate_deletion_memory_contract,
     validate_selected_task_manifest as validate_deletion_task_manifest,
 )
+from src.evaluation.oracle_terminal_factorial import (
+    ORACLE_TERMINAL_CAPTURE_LAYERS,
+    ORACLE_TERMINAL_CAPTURE_SIZE,
+    ORACLE_TERMINAL_CANDIDATE_COUNT,
+    ORACLE_TERMINAL_CONDITIONS,
+    ORACLE_TERMINAL_CONFIRMATION_SEEDS,
+    ORACLE_TERMINAL_EXPERIMENT_ID,
+    ORACLE_TERMINAL_LAYER_COUNT,
+    ORACLE_TERMINAL_PROTOCOL_VERSION,
+    ORACLE_TERMINAL_SCOPE_NAME,
+    ORACLE_TERMINAL_SCREENING_SEEDS,
+    ORACLE_TERMINAL_SELECTED_COUNT,
+    build_condition_plan as build_terminal_condition_plan,
+    design_fingerprint as terminal_design_fingerprint,
+    plan_as_dicts as terminal_plan_as_dicts,
+    primary_family as terminal_primary_family,
+    primary_gates as terminal_primary_gates,
+    terminal_patterns,
+    validate_selected_task_manifest as validate_terminal_task_manifest,
+    validate_terminal_design,
+    validate_terminal_memory_contract,
+)
 from src.evaluation.oracle_state_diagnostics import (
     validate_state_diagnostics_contract,
     summarize_state_diagnostics,
@@ -210,6 +232,24 @@ def experiment_contract(config: Mapping[str, Any]) -> dict[str, Any]:
             "supports_preflight": False,
             "state_capture_layers": ORACLE_DELETION_CAPTURE_LAYERS,
             "position_patterns": deletion_patterns(config["memory"]),
+        }
+    if experiment_id == ORACLE_TERMINAL_EXPERIMENT_ID:
+        return {
+            "experiment_id": experiment_id,
+            "protocol_version": ORACLE_TERMINAL_PROTOCOL_VERSION,
+            "packet_size": ORACLE_TERMINAL_CAPTURE_SIZE,
+            "layer_count": ORACLE_TERMINAL_LAYER_COUNT,
+            "conditions": ORACLE_TERMINAL_CONDITIONS,
+            "scope_order": (ORACLE_TERMINAL_SCOPE_NAME,),
+            "build_condition_plan": build_terminal_condition_plan,
+            "design_fingerprint": terminal_design_fingerprint,
+            "plan_as_dicts": terminal_plan_as_dicts,
+            "validate_memory_contract": validate_terminal_memory_contract,
+            "predecessor_field": "predecessor_experiment",
+            "supports_preflight": False,
+            "state_capture_layers": ORACLE_TERMINAL_CAPTURE_LAYERS,
+            "position_patterns": terminal_patterns(config["memory"]),
+            "plan_uses_tasks": True,
         }
     raise ValueError("unsupported oracle memory experiment_id")
 
@@ -420,6 +460,19 @@ def expected_block_deletion_comparisons() -> list[list[str]]:
         for pattern_name in ORACLE_DELETION_PATTERN_ORDER[1:]
     )
     comparisons.append(["text_only_no_lip", "neutral_no_lip"])
+    return comparisons
+
+
+def expected_terminal_factorial_comparisons() -> list[list[str]]:
+    comparisons = [list(pair) for pair in terminal_primary_gates()]
+    comparisons.extend(list(pair) for pair in terminal_primary_family())
+    comparisons.extend(
+        [
+            [terminal_primary_gates()[0][0], "neutral_no_lip"],
+            [terminal_primary_gates()[1][0], "neutral_no_lip"],
+            ["text_only_no_lip", "neutral_no_lip"],
+        ]
+    )
     return comparisons
 
 
@@ -991,6 +1044,186 @@ def _validate_proto012_config(config: Mapping[str, Any]) -> None:
         raise ValueError("output paths must be configured")
 
 
+def _validate_proto013_config(config: Mapping[str, Any]) -> None:
+    expected_top_level = {
+        "experiment_id",
+        "predecessor_experiment",
+        "population_source",
+        "models",
+        "prompt_protocol",
+        "runtime",
+        "data",
+        "screening",
+        "terminal_factorial",
+        "neutral_target_prompt",
+        "carrier",
+        "memory",
+        "diagnostics",
+        "conditions",
+        "controls",
+        "generation",
+        "evaluation",
+        "output",
+    }
+    unknown = sorted(set(config).difference(expected_top_level))
+    if unknown:
+        raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
+    if config.get("predecessor_experiment") != "LIP-PROTO-012":
+        raise ValueError("predecessor_experiment must bind LIP-PROTO-012")
+    protocol = protocol_metadata(config.get("prompt_protocol"))
+    if protocol["mode"] != "chat_template" or not protocol[
+        "add_generation_prompt"
+    ]:
+        raise ValueError("terminal factorial requires the generation boundary")
+    if config.get("neutral_target_prompt") != "Use the latent signal.":
+        raise ValueError("LIP-PROTO-013 freezes the shortened neutral carrier")
+    if config.get("carrier") != {"mode": "left_pad_masked_to_task_length"}:
+        raise ValueError("LIP-PROTO-013 freezes the length-controlled carrier")
+
+    population = config.get("population_source", {})
+    models = config.get("models", {})
+    data = config.get("data", {})
+    screening = config.get("screening", {})
+    runtime = config.get("runtime", {})
+    controls = config.get("controls", {})
+    generation = config.get("generation", {})
+    evaluation = config.get("evaluation", {})
+    output = config.get("output", {})
+    diagnostics = config.get("diagnostics", {})
+    for name, value in (
+        ("population_source", population),
+        ("models", models),
+        ("data", data),
+        ("screening", screening),
+        ("runtime", runtime),
+        ("controls", controls),
+        ("generation", generation),
+        ("evaluation", evaluation),
+        ("output", output),
+        ("diagnostics", diagnostics),
+    ):
+        if not isinstance(value, Mapping):
+            raise ValueError(f"{name} must be a mapping")
+
+    expected_population = {
+        "source_experiment": "LIP-PROTO-010",
+        "candidate_manifest_task_count": 192,
+        "legacy_excluded_task_count": 50,
+        "total_excluded_task_count": 242,
+        "remaining_task_count": 258,
+        "structural_candidate_count": ORACLE_TERMINAL_CANDIDATE_COUNT,
+        "structural_strata": {"2": 83, "3": 96},
+        "candidate_order_method": "sha256_within_tokenizer_stratum",
+        "candidate_order_salt": "LIP-PROTO-013-terminal-stratified-v1",
+    }
+    if any(
+        population.get(field) != value
+        for field, value in expected_population.items()
+    ):
+        raise ValueError("population_source does not match the frozen audit")
+    for field in ("candidate_task_manifest", "preflight_report"):
+        if not str(population.get(field, "")).strip():
+            raise ValueError(f"population_source.{field} must be configured")
+        digest = str(population.get(f"{field}_sha256", ""))
+        if len(digest) != 64:
+            raise ValueError(f"population_source.{field}_sha256 must be SHA-256")
+    if population.get("legacy_excluded_ids_sha256") != (
+        "557a70da9dbd099c8fc4bd3db44e0b2622220c61f8e93aa4cc621ee715485481"
+    ):
+        raise ValueError("legacy exclusion identity hash changed")
+    if population.get("preflight_source_commit") != (
+        "d9f44c3d4526a46f389dd61f8e13ff784f4c145d"
+    ):
+        raise ValueError("preflight source commit changed")
+
+    if models != {
+        "target_model": "NousResearch/Meta-Llama-3-8B-Instruct",
+        "target_model_revision": "53346005fb0ef11d3b6a83b12c895cca40156b6c",
+    }:
+        raise ValueError("target model and tokenizer revision must remain frozen")
+    frozen_data = {
+        "candidate_task_count": ORACLE_TERMINAL_CANDIDATE_COUNT,
+        "task_count": ORACLE_TERMINAL_SELECTED_COUNT,
+        "functional_task_start": 0,
+        "functional_task_count": ORACLE_TERMINAL_SELECTED_COUNT,
+        "functional_split": "mbpp_test_terminal_layout_stratified_32",
+    }
+    if any(
+        not str(data.get(field, "")).strip()
+        for field in (
+            "candidate_tasks_jsonl",
+            "candidate_task_manifest",
+            "tasks_jsonl",
+            "task_manifest",
+        )
+    ) or any(data.get(field) != value for field, value in frozen_data.items()):
+        raise ValueError("data must freeze 179 candidates and balanced 32 confirmation tasks")
+    if screening != {
+        "condition": "text_only_no_lip",
+        "seeds": list(ORACLE_TERMINAL_SCREENING_SEEDS),
+        "eligibility_rule": "any_functional_pass_across_screening_seeds",
+        "selected_task_count_per_stratum": 16,
+        "generation": {
+            "max_new_tokens": 256,
+            "do_sample": True,
+            "temperature": 0.2,
+            "top_p": 0.95,
+            "repetition_penalty": 1.0,
+        },
+    }:
+        raise ValueError("screening must match the frozen stratified calibration")
+    validate_terminal_design(config.get("terminal_factorial", {}))
+    if not isinstance(runtime.get("load_4bit"), bool):
+        raise ValueError("runtime.load_4bit must be a boolean")
+    validate_terminal_memory_contract(config.get("memory", {}))
+    validate_state_diagnostics_contract(diagnostics)
+    if list(config.get("conditions", [])) != list(ORACLE_TERMINAL_CONDITIONS):
+        raise ValueError("conditions must match the terminal source factorial")
+    if controls != {
+        "same_stratum_donor_memory": {
+            "permutation": "sattolo_derangement",
+            "seed": 3137,
+            "same_donor_across_s_components": True,
+        }
+    }:
+        raise ValueError("donor control must use the frozen stratified derangement")
+    if generation != {
+        "seeds": list(ORACLE_TERMINAL_CONFIRMATION_SEEDS),
+        "max_new_tokens": 256,
+        "do_sample": True,
+        "temperature": 0.2,
+        "top_p": 0.95,
+        "repetition_penalty": 1.0,
+    }:
+        raise ValueError("generation must match the frozen LIP-PROTO-013 contract")
+    if evaluation.get("comparisons") != expected_terminal_factorial_comparisons():
+        raise ValueError("evaluation.comparisons must match the factorial contrasts")
+    primary = evaluation.get("primary_testing")
+    if primary != {
+        "method": "two_gate_then_holm",
+        "alternative": "greater",
+        "alpha": 0.05,
+        "gates": [list(pair) for pair in terminal_primary_gates()],
+        "family": [list(pair) for pair in terminal_primary_family()],
+    }:
+        raise ValueError("primary_testing must use two gates and one seven-test Holm family")
+    if int(evaluation.get("bootstrap_iterations", 0)) <= 0:
+        raise ValueError("evaluation.bootstrap_iterations must be positive")
+    if any(
+        not str(output.get(field, "")).strip()
+        for field in (
+            "candidate_registry_report_json",
+            "screening_generations_jsonl",
+            "screening_evaluation_dir",
+            "selection_report_json",
+            "generations_jsonl",
+            "evaluation_dir",
+            "state_diagnostics_json",
+        )
+    ):
+        raise ValueError("output paths must be configured")
+
+
 def validate_config(config: Mapping[str, Any]) -> None:
     experiment_id = config.get("experiment_id")
     if experiment_id == "LIP-PROTO-008":
@@ -1007,6 +1240,9 @@ def validate_config(config: Mapping[str, Any]) -> None:
         return
     if experiment_id == ORACLE_DELETION_EXPERIMENT_ID:
         _validate_proto012_config(config)
+        return
+    if experiment_id == ORACLE_TERMINAL_EXPERIMENT_ID:
+        _validate_proto013_config(config)
         return
     raise ValueError("unsupported oracle memory experiment_id")
 
@@ -1084,6 +1320,43 @@ def resolve_packet_selection(
     )
 
 
+def assemble_component_packets(
+    state_memories: list[Mapping[str, Mapping[int, torch.Tensor]]],
+    *,
+    layer_indices: list[int],
+    component_oracle_indices: tuple[int, ...],
+    component_offsets: tuple[tuple[int, ...], ...],
+    capture_size: int,
+) -> tuple[dict[int, torch.Tensor], list[int]]:
+    """Assemble a constant-size packet from matched/donor component rows."""
+
+    if len(component_oracle_indices) != len(component_offsets) or not component_offsets:
+        raise ValueError("component source indices and offsets must align")
+    source_by_offset = []
+    flattened_offsets = []
+    for source_index, offsets in zip(component_oracle_indices, component_offsets):
+        if not 0 <= int(source_index) < len(state_memories):
+            raise ValueError("component oracle index is out of range")
+        normalized = [int(offset) for offset in offsets]
+        if not normalized:
+            raise ValueError("each component must contain at least one offset")
+        flattened_offsets.extend(normalized)
+        source_by_offset.extend([int(source_index)] * len(normalized))
+    if flattened_offsets != sorted(set(flattened_offsets)):
+        raise ValueError("component offsets must form one increasing unique packet")
+    if flattened_offsets[0] < -int(capture_size) or flattened_offsets[-1] >= 0:
+        raise ValueError("component offsets must fit the captured prompt suffix")
+    packets = {}
+    for layer_idx in layer_indices:
+        rows = []
+        for source_index, offset in zip(source_by_offset, flattened_offsets):
+            source = state_memories[source_index]["residual_input"][layer_idx]
+            capture_index = offset + int(capture_size)
+            rows.append(source[capture_index : capture_index + 1])
+        packets[layer_idx] = torch.cat(rows, dim=0)
+    return packets, source_by_offset
+
+
 def run_generation(
     config: dict[str, Any],
     config_path: Path,
@@ -1110,6 +1383,8 @@ def run_generation(
         validate_position_task_manifest(config, manifest, manifest_path)
     elif experiment_id == ORACLE_DELETION_EXPERIMENT_ID:
         validate_deletion_task_manifest(config, manifest, manifest_path)
+    elif experiment_id == ORACLE_TERMINAL_EXPERIMENT_ID:
+        validate_terminal_task_manifest(config, manifest, manifest_path)
     if preflight:
         start = int(config["data"]["preflight_task_start"])
         count = int(config["data"]["preflight_task_count"])
@@ -1122,6 +1397,8 @@ def run_generation(
         run_scope = "full"
     tasks = bound_tasks[start : start + count]
     if max_tasks is not None:
+        if experiment_id == ORACLE_TERMINAL_EXPERIMENT_ID:
+            raise ValueError("LIP-PROTO-013 forbids unbalanced --max-tasks subsets")
         if not 2 <= max_tasks <= len(tasks):
             raise ValueError("--max-tasks must fit the selected task slice")
         tasks = tasks[:max_tasks]
@@ -1374,10 +1651,18 @@ def run_generation(
     )
     write_json(diagnostics_path, state_diagnostics)
 
+    plan_input = tasks if contract.get("plan_uses_tasks") else [
+        str(task["task_id"]) for task in tasks
+    ]
+    control = (
+        config["controls"]["same_stratum_donor_memory"]
+        if experiment_id == ORACLE_TERMINAL_EXPERIMENT_ID
+        else config["controls"]["shuffled_oracle_memory"]
+    )
     plan = contract["build_condition_plan"](
-        [str(task["task_id"]) for task in tasks],
+        plan_input,
         conditions,
-        shuffle_seed=int(config["controls"]["shuffled_oracle_memory"]["seed"]),
+        shuffle_seed=int(control["seed"]),
     )
     gen_kwargs = generation_kwargs(config["generation"], tokenizer)
     output_mode = "a" if resume and output_path.exists() else "w"
@@ -1411,6 +1696,9 @@ def run_generation(
                 bundle_sha256 = None
                 bundle_norm = None
                 scalar_count = None
+                component_source_task_ids = None
+                component_sources = getattr(item, "component_sources", None)
+                source_task_ids_by_position = None
                 effective_seed = stable_seed(generation_seed, item.task_index, 108)
                 set_seed(effective_seed)
                 print(
@@ -1441,6 +1729,41 @@ def run_generation(
                         layer_idx=replay_layer,
                         positions=positions,
                         vectors=packet,
+                    )
+                elif getattr(item, "component_oracle_indices", None) is not None:
+                    injected_layers = list(scope["normalized_layers"])
+                    component_indices = tuple(item.component_oracle_indices)
+                    component_offsets = tuple(item.component_offsets)
+                    packets, source_indices_by_position = assemble_component_packets(
+                        state_memories,
+                        layer_indices=injected_layers,
+                        component_oracle_indices=component_indices,
+                        component_offsets=component_offsets,
+                        capture_size=packet_size,
+                    )
+                    component_source_task_ids = {
+                        component_name: str(tasks[source_index]["task_id"])
+                        for component_name, source_index in zip(
+                            ("core", "name", "boundary"), component_indices
+                        )
+                    }
+                    source_task_ids_by_position = [
+                        str(tasks[source_index]["task_id"])
+                        for source_index in source_indices_by_position
+                    ]
+                    boundary = "block_input"
+                    bundle_sha256 = state_bundle_sha256(packets)
+                    bundle_norm = state_bundle_norm(packets)
+                    scalar_count = sum(
+                        int(packet.numel()) for packet in packets.values()
+                    )
+                    output_text = generate_with_layer_input_replay(
+                        model,
+                        tokenizer,
+                        inputs,
+                        generation_kwargs=gen_kwargs,
+                        positions=positions,
+                        layer_packets=packets,
                     )
                 else:
                     oracle_task_id = str(tasks[item.oracle_index]["task_id"])
@@ -1513,6 +1836,9 @@ def run_generation(
                     ),
                     "memory_scalar_count": scalar_count,
                     "oracle_task_id": oracle_task_id,
+                    "memory_component_sources": component_sources,
+                    "memory_component_source_task_ids": component_source_task_ids,
+                    "memory_source_task_ids_by_position": source_task_ids_by_position,
                     "memory_frobenius_norm": bundle_norm,
                     "memory_sha256": bundle_sha256,
                     "target_model_revision": target_revision,

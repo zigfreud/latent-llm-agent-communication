@@ -95,6 +95,8 @@ def bind_tasks_to_manifest(
             "LIP-PROTO-009",
             "LIP-PROTO-010",
             "LIP-PROTO-011",
+            "LIP-PROTO-012",
+            "LIP-PROTO-013",
         } and not manifest.get("sampled_ids_disjoint_from_exclusions"):
             raise ValueError(f"{experiment_id} task manifest lacks exclusion proof")
         tasks_path = Path(str(data["tasks_jsonl"]))
@@ -120,6 +122,9 @@ def bind_tasks_to_manifest(
     revision = manifest.get("target_model_revision")
     if not isinstance(revision, str) or len(revision) != 40:
         raise ValueError("held-out manifest needs an immutable target model revision")
+    configured_revision = config.get("models", {}).get("target_model_revision")
+    if configured_revision is not None and revision != str(configured_revision):
+        raise ValueError("held-out manifest target model revision does not match")
     sampled_ids = manifest.get("sampled_ids")
     prompt_hashes = manifest.get("sampled_prompt_sha256")
     if not isinstance(sampled_ids, list) or not isinstance(prompt_hashes, list):
