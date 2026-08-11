@@ -19,7 +19,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--variants", nargs="+", default=None)
     parser.add_argument("--seeds", nargs="+", type=int, default=None)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
-    parser.add_argument("--allow-dry-run", action="store_true")
+    parser.add_argument(
+        "--allow-nonclaim-bundle",
+        action="store_true",
+        help="Permit a dry-run or preflight bundle; never marks the matrix complete.",
+    )
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--max-updates", type=int, default=None)
@@ -35,7 +39,7 @@ def main() -> None:
         variants=args.variants,
         seeds=args.seeds,
         device=args.device,
-        allow_dry_run=args.allow_dry_run,
+        allow_nonclaim_bundle=args.allow_nonclaim_bundle,
         resume=args.resume,
         overwrite=args.overwrite,
         max_updates=args.max_updates,

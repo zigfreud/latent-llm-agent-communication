@@ -105,10 +105,34 @@ def test_mock_task_materialization_and_dry_bundle_are_content_addressed(tmp_path
     }
     assert result["validation_status"] == "passed"
     assert result["records"] == 8
+    assert result["extraction_scope"] == "full"
     assert result["split_counts"]["confirmation"] == 0
     assert len(manifest["shards"]) == 3
     assert manifest["registry"]["manifest_sha256"]
     assert not (tmp_path / "bundle" / "staging").exists()
+
+
+def test_preflight_bundle_is_balanced_and_not_claim_eligible(tmp_path):
+    config = _config(tmp_path)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    materialize_packet_bridge_tasks(config_path, mock_data=True)
+
+    result = materialize_packet_bundle(
+        config_path,
+        bundle_dir=tmp_path / "preflight",
+        dry_run=True,
+        preflight_tasks_per_split=2,
+    )
+
+    assert result["extraction_scope"] == "preflight"
+    assert result["records"] == 6
+    assert result["split_counts"] == {
+        "train": 2,
+        "development_selection": 2,
+        "development_gate": 2,
+        "confirmation": 0,
+    }
 
 
 def test_terminal_layout_proves_name_immediately_precedes_boundary():

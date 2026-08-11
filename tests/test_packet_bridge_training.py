@@ -65,6 +65,7 @@ def _write_training_bundle(tmp_path):
         "schema_version": 1,
         "trace_id": "LIP-PROTO-014-training-test",
         "extraction_mode": "dry_run",
+        "extraction_scope": "full",
         "config_sha256": "b" * 64,
         "source": {
             "model_id": "source/test",

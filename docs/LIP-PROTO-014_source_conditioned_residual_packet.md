@@ -384,6 +384,35 @@ representation, bridge family, receiver carrier, data budget, and task family.
   statistics, checkpoints, selection histories, generation grids, hardened
   evaluation output, plots, environment evidence, and `SHA256SUMS`.
 
+### Executable preflight sequence
+
+From the repository root, set `LIP_RUNTIME_ROOT` to an ignored Drive/RAID
+directory and run:
+
+```bash
+python -m src.scripts.materialize_packet_bridge_tasks \
+  --config config/LIP-PROTO-014_source_conditioned_residual_packet.yaml
+
+python -m src.scripts.extract_packet_bridge_bundle \
+  --config config/LIP-PROTO-014_source_conditioned_residual_packet.yaml \
+  --bundle-dir "$LIP_RUNTIME_ROOT/preflight-bundle" \
+  --preflight-tasks-per-split 2
+
+python -m src.scripts.run_packet_bridge_matrix \
+  --config config/LIP-PROTO-014_source_conditioned_residual_packet.yaml \
+  --bundle-dir "$LIP_RUNTIME_ROOT/preflight-bundle" \
+  --output-dir "$LIP_RUNTIME_ROOT/preflight-training" \
+  --variants component_contrastive \
+  --seeds 4001 \
+  --max-updates 2 \
+  --allow-nonclaim-bundle
+```
+
+The preflight bundle is marked `extraction_scope=preflight`; claim-oriented
+training rejects it even though its tensors came from the real endpoints. Only
+after this path passes should the same extraction command be run without the
+preflight limit, followed by the complete registered matrix.
+
 ## Claim boundary
 
 A positive 014 permits the statement that, in this bounded environment, a

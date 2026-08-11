@@ -445,16 +445,30 @@ def materialize_packet_bundle(
     resume: bool = False,
     overwrite: bool = False,
     keep_staging: bool = False,
+    preflight_tasks_per_split: int | None = None,
 ) -> dict:
     """Build and validate a confirmation-free packet bundle."""
 
     config_path = Path(config_path)
     config = load_yaml(config_path)
     extraction = config["extraction"]
+    extraction_scope = (
+        "preflight" if preflight_tasks_per_split is not None else "full"
+    )
+    if (
+        preflight_tasks_per_split is not None
+        and preflight_tasks_per_split < 2
+    ):
+        raise ValueError("preflight_tasks_per_split must be at least two")
     bundle_dir = Path(bundle_dir or extraction["default_bundle_dir"])
     if bundle_dir.exists() and (bundle_dir / "manifest.json").is_file():
         if resume and not overwrite:
-            validation = validate_packet_bundle(bundle_dir, require_real=not dry_run)
+            validation = validate_packet_bundle(
+                bundle_dir,
+                require_real=not dry_run and extraction_scope == "full",
+            )
+            if validation["extraction_scope"] != extraction_scope:
+                raise ValueError("existing bundle uses a different extraction scope")
             return {
                 **validation,
                 "manifest": str(bundle_dir / "manifest.json"),
@@ -469,6 +483,14 @@ def materialize_packet_bundle(
     shard_dir.mkdir(parents=True, exist_ok=True)
 
     tasks, registry_manifest, registry_path = load_bound_packet_tasks(config)
+    if preflight_tasks_per_split is not None:
+        tasks = [
+            task
+            for split in TRAINING_SPLITS
+            for task in [
+                item for item in tasks if item["split"] == split
+            ][:preflight_tasks_per_split]
+        ]
     source_contract = _packet_contract(config, "source")
     target_contract = _packet_contract(config, "target")
     protocols = protocol_pair_metadata(config["prompt_protocols"])
@@ -572,6 +594,7 @@ def materialize_packet_bundle(
         "config_sha256": sha256_file(config_path),
         "registry_sha256": sha256_file(registry_path),
         "extraction_mode": "dry_run" if dry_run else "real",
+        "extraction_scope": extraction_scope,
     }
     trace_id = "LIP-PROTO-014-" + sha256_json(trace_payload)[:16]
     manifest = {
@@ -579,6 +602,7 @@ def materialize_packet_bundle(
         "schema_version": 1,
         "trace_id": trace_id,
         "extraction_mode": "dry_run" if dry_run else "real",
+        "extraction_scope": extraction_scope,
         "config_sha256": sha256_file(config_path),
         "source": {
             "model_id": source_spec["model_id"],
@@ -621,7 +645,10 @@ def materialize_packet_bundle(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    validation = validate_packet_bundle(bundle_dir, require_real=not dry_run)
+    validation = validate_packet_bundle(
+        bundle_dir,
+        require_real=not dry_run and extraction_scope == "full",
+    )
     if not keep_staging and staging_dir.exists():
         shutil.rmtree(staging_dir)
     return {**validation, "manifest": str(bundle_dir / "manifest.json")}

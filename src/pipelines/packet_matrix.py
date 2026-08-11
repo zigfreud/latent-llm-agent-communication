@@ -134,7 +134,7 @@ def run_packet_bridge_matrix(
     variants: Sequence[str] | None = None,
     seeds: Sequence[int] | None = None,
     device: str = "auto",
-    allow_dry_run: bool = False,
+    allow_nonclaim_bundle: bool = False,
     resume: bool = False,
     overwrite: bool = False,
     max_updates: int | None = None,
@@ -167,7 +167,7 @@ def run_packet_bridge_matrix(
                 variant_name=variant_name,
                 seed=seed,
                 device=device,
-                require_real=not allow_dry_run,
+                require_real=not allow_nonclaim_bundle,
                 max_updates=max_updates,
             )
             completed = _read_completed_run(run_dir, resolved) if resume else None
@@ -202,7 +202,7 @@ def run_packet_bridge_matrix(
         and len(selected_seeds) == len(configured_seeds)
         and set(selected_seeds) == set(configured_seeds)
         and max_updates is None
-        and not allow_dry_run
+        and not allow_nonclaim_bundle
     )
     summary = {
         "experiment_id": str(contract["experiment_id"]),

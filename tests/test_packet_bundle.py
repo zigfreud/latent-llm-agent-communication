@@ -59,6 +59,7 @@ def _write_bundle(tmp_path):
         "schema_version": 1,
         "trace_id": "LIP-PROTO-014-test",
         "extraction_mode": "dry_run",
+        "extraction_scope": "full",
         "config_sha256": "b" * 64,
         "source": {
             "model_id": "source/test",
@@ -123,7 +124,7 @@ def test_packet_bundle_validates_shapes_hashes_provenance_and_splits(tmp_path):
 def test_claim_oriented_validation_rejects_dry_run_bundle(tmp_path):
     bundle, _, _ = _write_bundle(tmp_path)
 
-    with pytest.raises(PacketBundleValidationError, match="requires extraction_mode=real"):
+    with pytest.raises(PacketBundleValidationError, match="requires real full"):
         validate_packet_bundle(bundle, require_real=True)
 
 

@@ -238,8 +238,15 @@ def validate_packet_bundle(
     extraction_mode = manifest.get("extraction_mode")
     if extraction_mode not in {"real", "dry_run"}:
         _fail("extraction_mode must be real or dry_run")
-    if require_real and extraction_mode != "real":
-        _fail("claim-oriented packet training requires extraction_mode=real")
+    extraction_scope = manifest.get("extraction_scope")
+    if extraction_scope not in {"full", "preflight"}:
+        _fail("extraction_scope must be full or preflight")
+    if require_real and (
+        extraction_mode != "real" or extraction_scope != "full"
+    ):
+        _fail(
+            "claim-oriented packet training requires real full extraction"
+        )
     _validate_endpoint(manifest.get("source"), label="source")
     _validate_endpoint(manifest.get("target"), label="target")
     _validate_dataset(manifest.get("dataset"))
@@ -339,6 +346,7 @@ def validate_packet_bundle(
         "bundle_dir": str(bundle_dir),
         "trace_id": manifest["trace_id"],
         "extraction_mode": extraction_mode,
+        "extraction_scope": extraction_scope,
         "source_shape": list(source_shape),
         "target_shape": list(target_shape),
         "split_counts": {name: observed_splits.get(name, 0) for name in PACKET_SPLITS},

@@ -19,6 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--keep-staging", action="store_true")
+    parser.add_argument("--preflight-tasks-per-split", type=int, default=None)
     return parser.parse_args()
 
 
@@ -31,9 +32,11 @@ def main() -> None:
         resume=args.resume,
         overwrite=args.overwrite,
         keep_staging=args.keep_staging,
+        preflight_tasks_per_split=args.preflight_tasks_per_split,
     )
     print("LIP packet bundle extraction passed")
     print(f"mode: {result['extraction_mode']}")
+    print(f"scope: {result['extraction_scope']}")
     print(f"records: {result['records']}")
     print(f"manifest: {result['manifest']}")
 
