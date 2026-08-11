@@ -434,6 +434,8 @@ Because this preflight contains only two training tasks while the registered
 full-run batch size is four, non-claim preflight training records an effective
 batch size of two. The configured batch size remains four and is used unchanged
 for the full bundle; full-scope runs are never allowed to reduce it implicitly.
+AMP overflow skips are recorded but do not consume the optimizer-update budget,
+and every training or matrix JSON is serialized with non-finite values rejected.
 
 ## Claim boundary
 

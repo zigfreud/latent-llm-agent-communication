@@ -238,7 +238,7 @@ def run_packet_bridge_matrix(
         },
     }
     (output_root / "matrix_summary.json").write_text(
-        json.dumps(summary, indent=2, sort_keys=True) + "\n",
+        json.dumps(summary, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
     return summary

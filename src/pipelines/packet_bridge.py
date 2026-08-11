@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 from pathlib import Path
 
@@ -325,6 +326,8 @@ def train_packet_bridge(config_path: Path | str) -> dict:
     best_key = None
     best_step = None
     history = []
+    amp_overflow_events = []
+    consecutive_amp_skips = 0
     step = 0
     epoch = 0
     best_path = output_dir / "best_checkpoint.pt"
@@ -351,16 +354,39 @@ def train_packet_bridge(config_path: Path | str) -> dict:
                 prediction = model(source)
                 loss_metrics = criterion(prediction, target, masks)
                 loss = loss_metrics["total_loss"]
+            if not bool(torch.isfinite(loss.detach()).all().item()):
+                raise FloatingPointError("packet training produced a non-finite loss")
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
             gradient_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
+            scale_before = float(scaler.get_scale())
             scaler.step(optimizer)
             scaler.update()
+            scale_after = float(scaler.get_scale())
+            gradient_norm_value = float(gradient_norm)
+            if use_amp and scale_after < scale_before:
+                consecutive_amp_skips += 1
+                amp_overflow_events.append(
+                    {
+                        "epoch": epoch,
+                        "scale_before": scale_before,
+                        "scale_after": scale_after,
+                        "reason": "nonfinite_gradient_amp_step_skipped",
+                    }
+                )
+                if consecutive_amp_skips > 16:
+                    raise FloatingPointError(
+                        "packet training exceeded 16 consecutive AMP overflow skips"
+                    )
+                continue
+            if not math.isfinite(gradient_norm_value):
+                raise FloatingPointError("packet training produced a non-finite gradient")
+            consecutive_amp_skips = 0
             step += 1
             row = {
                 "step": step,
                 "epoch": epoch,
-                "gradient_norm": float(gradient_norm),
+                "gradient_norm": gradient_norm_value,
                 **_json_ready_metrics(loss_metrics),
             }
             history.append(row)
@@ -416,6 +442,8 @@ def train_packet_bridge(config_path: Path | str) -> dict:
         "parameter_count": sum(parameter.numel() for parameter in model.parameters()),
         "configured_batch_size": configured_batch_size,
         "effective_batch_size": batch_size,
+        "amp_overflow_events": amp_overflow_events,
+        "skipped_amp_steps": len(amp_overflow_events),
         "updates_completed": step,
         "best_step": best_step,
         "best_selection_key": list(best_key),
@@ -428,10 +456,10 @@ def train_packet_bridge(config_path: Path | str) -> dict:
         "checkpoint": str(best_path),
     }
     (output_dir / "train_history.json").write_text(
-        json.dumps(history, indent=2), encoding="utf-8"
+        json.dumps(history, indent=2, allow_nan=False), encoding="utf-8"
     )
     (output_dir / "run_summary.json").write_text(
-        json.dumps(result, indent=2), encoding="utf-8"
+        json.dumps(result, indent=2, allow_nan=False), encoding="utf-8"
     )
     (output_dir / "resolved_config.yaml").write_text(
         yaml.safe_dump(config, sort_keys=False), encoding="utf-8"

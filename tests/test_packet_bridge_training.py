@@ -161,6 +161,8 @@ def test_bridge_only_training_selects_checkpoint_before_untouched_gate(tmp_path)
     assert result["updates_completed"] == 2
     assert result["configured_batch_size"] == 4
     assert result["effective_batch_size"] == 4
+    assert result["skipped_amp_steps"] == 0
+    assert result["amp_overflow_events"] == []
     assert result["best_step"] in {1, 2}
     assert result["bundle_validation"]["split_counts"]["confirmation"] == 0
     assert result["development_selection"]["task_count"] == 4
@@ -168,6 +170,11 @@ def test_bridge_only_training_selects_checkpoint_before_untouched_gate(tmp_path)
     assert (output_dir / "best_checkpoint.pt").is_file()
     assert (output_dir / "target_statistics.pt").is_file()
     assert (output_dir / "run_summary.json").is_file()
+    for path in (output_dir / "train_history.json", output_dir / "run_summary.json"):
+        json.loads(
+            path.read_text(encoding="utf-8"),
+            parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)),
+        )
 
 
 def test_nonclaim_preflight_caps_only_the_effective_batch_size():
