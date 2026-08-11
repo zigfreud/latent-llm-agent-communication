@@ -1,430 +1,397 @@
-# LIP-PROTO-014 source-conditioned residual packet distillation
+# LIP-PROTO-014 source-conditioned residual packet
 
-Status: conditional design draft; implementation and execution are blocked on
-the sealed `LIP-PROTO-013` result.
+Status: frozen train-side contract and implementation; real packet extraction
+and bridge training have not yet been executed. Confirmation tasks remain
+sealed behind the registered development gate.
 
 ## Research question
 
-`LIP-PROTO-010` established that native target-model prompt states can replace
-task text for bounded functional program synthesis. `LIP-PROTO-012` localized
-that capacity to a terminally weighted 24-position packet, and
-`LIP-PROTO-013` is testing which parts of that packet must preserve target-task
-identity when structural capacity is held constant.
+`LIP-PROTO-013` established that task identity in the causally effective
+receiver packet is concentrated in its terminal core and function-name
+components. The full first-eight-layer carrier remained effective, while the
+boundary component did not show an independently detectable positive
+contribution.
 
-`LIP-PROTO-014` asks the first learned cross-model question after that oracle
-sequence:
+`LIP-PROTO-014` asks the first learned heterogeneous-model question after that
+oracle result:
 
-> Can a bridge that sees only source-model latent states predict the
-> task-specific residual of a causally validated target-model packet well
-> enough for the receiver to solve unseen tasks without receiving their text?
+> Can a bridge that sees only DeepSeek-Coder source residual states reconstruct
+> enough of a causally validated Llama receiver packet to transport task
+> identity when the receiver sees no task-specific text?
 
-This is not a generic interoperability or text-equivalence claim. It is a
-bounded test between one pinned source, one pinned receiver, one prompt
-protocol, one packet carrier, and one public coding benchmark.
+This is a bounded pairwise transport experiment. A positive result supports a
+learned semantic bridge for the pinned source, receiver, carrier, prompt
+protocols, and MBPP task family. It does not by itself establish a universal
+model-independent latent language.
 
-## Dependency and branch contract
+## Why the universal-protocol claim is deferred
 
-The protocol is drafted before the `LIP-PROTO-013` confirmation result is read.
-No `LIP-PROTO-014` checkpoint training, final task materialization, or
-claim-eligible generation may begin until the predecessor artifact and source
-commit are sealed.
-
-The target packet is selected by this registered decision table:
-
-| `LIP-PROTO-013` outcome | `LIP-PROTO-014` action |
-| --- | --- |
-| Full `K=32` replication gate fails | Stop. Do not train a bridge against an unreplicated carrier. |
-| Full `K=32` passes, terminal `K=24` gate fails | Use the confirmed full `K=32`, first-eight-layer packet. |
-| Both gates pass | Use the terminal `K=24`, first-eight-layer packet. |
-
-Component-level `LIP-PROTO-013` results inform interpretation and later
-ablations, but they do not remove positions from the primary learned packet.
-This prevents a post-result component choice from becoming an unregistered
-compression claim.
-
-The development branch is stacked on the frozen `LIP-PROTO-013` implementation
-only while that PR is open. Its PR must not be opened until the predecessor is
-merged or the stack is otherwise rebased to a clean mainline.
-
-## Why predict residuals instead of raw states
-
-Let the native target packet for task (t), receiver layer \(\ell\), and prompt
-position \(p\) be
+The implementation is deliberately modular:
 
 \[
-H_{t,\ell,p} = \mu_{\ell,p} + \Delta_{t,\ell,p}.
+S_A \xrightarrow{E_A} Z_{LIP} \xrightarrow{D_B} \widehat\Delta_B.
 \]
 
-The scaffold
+Here, `E_A` is a sender encoder, `Z_LIP` is a fixed-shape 32 x 512 code, and
+`D_B` is a receiver decoder. This is the architecture needed for future
+endpoint composition.
+
+With only one observed pair `A -> B`, however, the internal code is not
+identifiable. For any invertible map `Q`, the pair
 
 \[
-\mu_{\ell,p} = \frac{1}{N_{train}}
-\sum_{t \in train} H_{t,\ell,p}
+E'_A = Q E_A, \qquad D'_B = D_B Q^{-1}
 \]
 
-contains target-side structure shared across training tasks. The centered
-residual
+produces exactly the same endpoint behavior. Nothing in one pair tells us which
+coordinate system is the reusable protocol. A model-agnostic claim therefore
+requires at least another independently trained endpoint and an unseen
+composition such as `E_A -> D_C` or `E_C -> D_B`.
+
+The 014 can prove that heterogeneous latent translation is learnable. A later
+protocol gate must prove that its middle representation is reusable.
+
+## Dependency and evidence boundary
+
+The carrier is frozen from the completed `LIP-PROTO-013` result:
+
+- receiver boundary: transformer block input;
+- receiver layers: first eight decoder blocks, indices `[0, ..., 7]`;
+- positions: terminal contiguous `K=24` suffix;
+- hidden width: 4096;
+- neutral carrier: `Use the latent signal.` rendered with the exact target chat
+  protocol and left-padded, with padding masked, to the task-prompt length.
+
+The executable config binds the predecessor `SHA256SUMS` digest. Any change to
+the predecessor artifact, endpoint revisions, prompt protocols, dataset
+revision, packet shapes, or task registry creates a different experiment.
+
+## What the NVIDIA result changes
+
+The design incorporates three lessons from NVIDIA's
+[Cross-Model KV Cache Transfer in LLM Families](https://arxiv.org/abs/2608.03893):
+
+1. A structured linear transfer is a required baseline, not an optional weak
+   comparator.
+2. Source information may be distributed across depth, so the sender captures
+   all 24 DeepSeek-Coder block inputs instead of only its final layer.
+3. Reconstruction error alone is insufficient. Checkpoint selection and final
+   claims are functional and identity-sensitive because where error lands can
+   matter more than its aggregate magnitude.
+
+The paper's closed-form per-head ridge map cannot be copied literally. Its
+endpoints have matched KV geometry and a very large token-level calibration
+set. The 014 has heterogeneous residual widths and 256 task-level training
+examples; a fully flattened ridge map would be severely underdetermined. The
+registered linear comparator therefore shares a width projection and learns a
+structured source-site mixture.
+
+## Frozen communication surfaces
+
+### Sender
+
+- model: `deepseek-ai/deepseek-coder-1.3b-base`;
+- immutable revision:
+  `e5babb80b8539a4e85dd2418c0ee611522276987`;
+- prompt: raw MBPP task with the required function name appended;
+- state: residual input to every one of the 24 decoder blocks;
+- positions: last 32 active prompt tokens;
+- task tensor: `[24, 32, 2048]`, stored as `float16`.
+
+The 24 x 32 sites are a fixed sender observation, not a claim that sender and
+receiver tokens or layers are aligned.
+
+### Receiver teacher
+
+- model: `NousResearch/Meta-Llama-3-8B-Instruct`;
+- immutable revision:
+  `53346005fb0ef11d3b6a83b12c895cca40156b6c`;
+- prompt: the same task under `lip-prompt-v1`, target chat template, generation
+  marker, and the frozen Python-code system prompt;
+- state: residual input to layers `[0, ..., 7]`;
+- positions: last 24 active prompt tokens;
+- task tensor: `[8, 24, 4096]`, stored as `float16`.
+
+For every task, tokenizer offsets must prove that the required function-name
+tokens immediately precede the same six-token chat boundary found in 013, and
+that at least one terminal core position remains.
+
+## Residual target
+
+Let the native target teacher packet for task `t`, layer `l`, and position `p`
+be `H[t,l,p]`. The receiver stores a task-independent scaffold computed only
+from training tasks:
 
 \[
-\Delta_{t,\ell,p} = H_{t,\ell,p} - \mu_{\ell,p}
+\mu_{l,p} = \frac{1}{N_{train}}
+\sum_{t \in train} H_{t,l,p}.
 \]
 
-contains the task-dependent displacement that the bridge must predict.
-
-The earlier single-vector bridge was optimized against raw target states. Raw
-state similarity can be dominated by a large task-invariant component: a model
-may reconstruct \(\mu\) well, obtain a favorable cosine, and still miss the
-small direction that identifies the task. `LIP-PROTO-014` turns the oracle
-mechanism result into an architectural inductive bias by predicting
-\(\Delta\), then reconstructing
+The bridge predicts the task-specific residual
 
 \[
-\widehat H_{t,\ell,p}
-= \mu_{\ell,p} + \widehat\Delta_{t,\ell,p}.
+\Delta_{t,l,p} = H_{t,l,p} - \mu_{l,p}.
 \]
 
-The scaffold is computed from the training split only and is stored once at
-the receiver. No evaluation-task target state contributes to it.
-
-## Frozen communication surface
-
-### Source
-
-- Model family: `deepseek-ai/deepseek-coder-1.3b-base`.
-- Revision: immutable Hugging Face commit, to be sealed in the config and
-  bundle manifest before extraction.
-- Prompt: raw MBPP task description plus only the benchmark-required callable
-  name, under the existing role-specific prompt contract.
-- State: final decoder-layer residual states at the final 32 non-padding source
-  positions.
-- Shape per task: `[32, 2048]` in the recorded source dtype.
-- The source model is frozen and is not present during bridge training after
-  packet extraction.
-
-The 32-position source suffix is intentionally not claimed to align token by
-token with the receiver suffix. It is a fixed source-side latent message from
-which a query-conditioned bridge reads.
-
-### Receiver teacher and carrier
-
-- Model: `NousResearch/Meta-Llama-3-8B-Instruct`.
-- Revision: the immutable receiver revision inherited from the sealed oracle
-  protocols unless the dependency table stops the experiment.
-- Carrier: the same neutral target prompt and exact chat-template rendering as
-  the selected oracle predecessor.
-- Injection boundary: decoder-block residual inputs.
-- Replay depth: the first eight of 32 receiver decoder blocks.
-- Positions: `K=24`, offsets `-24 ... -1`, if the terminal gate passes;
-  otherwise the confirmed full `K=32`, offsets `-32 ... -1`.
-- Target states are captured in a separate extraction pass; source and target
-  base models need not be resident simultaneously.
-
-## Bridge architecture
-
-The bridge is a shared query-conditioned packet mapper, not 192 unrelated
-linear heads and not one monolithic million-dimensional output layer.
-
-1. Project the source packet from width 2048 to bridge width \(d_b\).
-2. Add learned source-position embeddings.
-3. Construct one learned query for every receiver `(layer, position)` site by
-   combining receiver-layer and relative-position embeddings.
-4. Cross-attend the receiver queries to the projected source packet.
-5. Decode every query through one shared residual head to width 4096.
-6. Add the frozen training-only scaffold \(\mu_{\ell,p}\).
-
-In notation,
+Each receiver site is normalized by one training-only scalar RMS:
 
 \[
-Z_t = E_\theta(S_t),
-\qquad
-z_{t,\ell,p} = \operatorname{CrossAttn}_\theta(q_{\ell,p}, Z_t),
+\sigma_{l,p} =
+\sqrt{\frac{1}{N_{train}d}
+\sum_{t,j}\Delta_{t,l,p,j}^{2} + \epsilon}.
 \]
+
+The learned target is
+`Delta_tilde[t,l,p] = Delta[t,l,p] / sigma[l,p]`. At inference,
 
 \[
-\widehat\Delta_{t,\ell,p} = D_\theta(z_{t,\ell,p}),
-\qquad
-\widehat H_{t,\ell,p} = \mu_{\ell,p} + \widehat\Delta_{t,\ell,p}.
+\widehat H_{t,l,p} =
+\mu_{l,p} + \sigma_{l,p}\widehat{\widetilde\Delta}_{t,l,p}.
 \]
 
-The initial implementation freezes bridge width, attention-head count,
-dropout, optimizer, and step budget before the final holdout is generated.
-Any finite hyperparameter comparison is restricted to the development split
-and recorded in a selection report. Final task functional output must not be a
-selection metric.
+This decomposition matters because raw residual states contain a large shared
+receiver scaffold. A predictor can achieve low raw MSE by reproducing that
+shared structure while missing the smaller task-specific direction that is
+causally useful.
 
-### Frozen initial implementation
+## Query-conditioned bridge
 
-- source projection: `Linear(2048, 512)` followed by `LayerNorm`;
-- bridge width: `512`;
-- source-position embeddings: 32 learned embeddings;
-- receiver queries: the sum of 8 learned layer embeddings and either 24 or 32
-  learned relative-position embeddings, as resolved by the predecessor gate;
-- decoder: two pre-norm transformer-decoder blocks;
-- attention heads: 8;
-- feed-forward width: 2048 with GELU;
-- dropout: 0.10 in training and disabled in evaluation;
-- shared residual head: `Linear(512, 4096)`;
-- optimizer: AdamW, learning rate `1e-4`, weight decay `1e-2`;
-- task batch size: 4;
-- maximum updates: 2048;
-- validation interval: 64 updates;
-- gradient clipping: global norm 1.0;
-- bridge computation: FP32 parameters with FP16 autocast on T4;
-- no gradient is propagated into either base model.
+The primary bridge has two explicit modules.
 
-The proposed objective freezes `temperature=0.07`, `margin_target=0.05`,
-`lambda_huber=1.0`, `lambda_cosine=0.25`, `lambda_symmetric_nce=1.0`,
-`lambda_margin=0.10`, and `lambda_norm=0.05`.
+### Sender encoder `E_A`
 
-Checkpoint selection is lexicographic on the development split: highest
-task-level packet retrieval top-1, then highest paired diagonal margin, then
-lowest centered normalized residual RMSE, then earliest update. This rule is
-identical across replicas. No manual checkpoint choice is permitted.
+1. Project each 2048-wide sender state to width 512.
+2. Add learned layer and position embeddings.
+3. Flatten the 24 x 32 source sites into 768 memory sites.
+4. Use 32 learned protocol queries in two pre-normalized cross-attention blocks.
+5. Emit a fixed `[32, 512]` LIP code.
 
-## Training data and split topology
+### Receiver decoder `D_B`
 
-All splits are by task. Sites, positions, layers, and augmented views from the
-same task may never cross a split boundary.
+1. Form 8 x 24 receiver queries from learned layer and position embeddings.
+2. Cross-attend them to the LIP code in two pre-normalized blocks.
+3. Project each decoded query to width 4096.
+4. Emit the normalized receiver residual `[8, 24, 4096]`.
 
-- Training: a deterministic 256-task sample from the MBPP train split.
-- Development: a deterministic 64-task sample from the MBPP validation split.
-- Final confirmation: 32 latent-unseen, text-capable tasks from the sealed
-  `LIP-PROTO-013` candidate screen.
+The frozen width is 512, with 8 attention heads, feed-forward width 2048,
+dropout 0.10 during training, and dropout disabled during evaluation.
 
-The confirmation selector takes eligible ranks `[16:32]` separately inside
-the two-token and three-token tokenizer strata. It therefore selects 16 tasks
-per stratum after the 16+16 predecessor selection. The selector must prove:
+## Structured linear baseline
 
-- membership in the sealed candidate manifest;
-- functional text capability under the sealed screening rule;
-- exact rank-slice equality within each stratum;
-- disjointness from every `LIP-PROTO-013` confirmation task;
-- absence of any earlier learned-bridge or oracle-latent generation for the
-  selected task IDs.
-
-The already observed screen counts (35 capable two-token tasks and 32 capable
-three-token tasks) make this slice structurally feasible without consulting a
-`LIP-PROTO-013` latent outcome.
-
-## Packet bundle contract
-
-The existing single-vector latent bundle format is insufficient. The new
-content-addressed bundle records, per task:
-
-- task ID and prompt SHA-256;
-- source and target model IDs and immutable revisions;
-- role-specific formatted-prompt hashes;
-- source token IDs, attention-mask hash, layer, and selected offsets;
-- target token IDs, attention-mask hash, selected offsets, replay layers, and
-  capture boundary;
-- source packet `[32, 2048]`;
-- native target teacher packet `[L, K, 4096]`;
-- split identity and task-level provenance.
-
-Manifests record tensor dtype, shape, per-shard SHA-256, task IDs, prompt
-protocols, dataset revision, source commit, and the sealed predecessor artifact
-hash. Validation rejects mock extraction for claim-oriented runs.
-
-## Training objectives
-
-For numerical stability, each receiver site has a training-only scalar RMS
+For target site `s`, source site `m`, and source vector `x[m]`, the baseline is
 
 \[
-\sigma_{\ell,p}
-= \sqrt{\frac{1}{N_{train}d}
-\sum_{t,j}\Delta_{t,\ell,p,j}^{2} + \epsilon}.
+\widehat y_s = a_s \odot W
+\left(\sum_m M_{s,m}x_m\right) + b_s.
 \]
 
-Residual regression operates on
-\(\widetilde\Delta_{t,\ell,p}=\Delta_{t,\ell,p}/\sigma_{\ell,p}\).
-The proposed loss is
+`M` is a content-independent site-mixing matrix, `W` is one shared
+2048-to-4096 linear projection, and `a_s,b_s` are target-site scale and bias.
+The map is affine in the sender packet. It is expressive enough to learn
+cross-layer source selection without pretending that 256 tasks identify an
+unconstrained flattened map with billions of coefficients.
+
+## Component-aware objective
+
+The 24 receiver positions are partitioned for every task into:
+
+- `core`: task text before the terminal function name;
+- `name`: the tokenizer span of the required function name;
+- `boundary`: the fixed final six chat-template tokens.
+
+Site losses are averaged inside each component before components are combined
+with weights `core=0.45`, `name=0.45`, and `boundary=0.10`. Thus six easy
+boundary positions cannot numerically overwhelm two or three causally critical
+name positions.
+
+The primary loss is
 
 \[
 \mathcal L =
-\lambda_H \mathcal L_{Huber}
-+ \lambda_C \mathcal L_{cos}
-+ \lambda_N \mathcal L_{symNCE}
-+ \lambda_M \mathcal L_{margin}
-+ \lambda_R \mathcal L_{norm}.
+1.00\mathcal L_{Huber}
++0.25\mathcal L_{cos}
++1.00\mathcal L_{symNCE}
++0.10\mathcal L_{margin}
++0.05\mathcal L_{norm}.
 \]
 
-- `Huber` reconstructs the centered, site-normalized residual packet.
-- `cos` preserves residual direction at each receiver site.
-- `symNCE` makes predicted packets retrieve their paired target residual packet
-  in both prediction-to-target and target-to-prediction directions.
-- `margin` requires the paired packet to beat the hardest task-negative packet.
-- `norm` calibrates residual packet energy without allowing energy alone to
-  satisfy the contrastive objective.
+Contrastive similarity is calculated separately over the joint packet, core,
+and name regions, then averaged equally. For a batch similarity matrix `C`,
+the symmetric InfoNCE term is
 
-Flattened packet similarities are computed only after site normalization.
-Training batches are sampled by task; the 8 x K sites do not masquerade as
-independent examples.
+\[
+\mathcal L_{symNCE} = \tfrac12
+\left[CE(C/\tau, I) + CE(C^T/\tau, I)\right],
+\qquad \tau=0.07.
+\]
 
-### Registered objective ablation
+The hardest-negative margin requires each matched packet to exceed its closest
+task-negative by 0.05 in both retrieval directions. Batches are sampled by
+task; packet sites never masquerade as independent observations.
 
-The paper-facing ablation trains the same architecture and data with:
+## Data topology
 
-1. `raw_state`: the earlier raw-state MSE plus forward InfoNCE principle,
-   generalized to the packet;
-2. `centered_regression`: training-only scaffold plus centered Huber and cosine;
-3. `centered_contrastive`: the proposed full centered symmetric/margin-aware
-   objective.
+All splits are by task.
 
-Architecture, parameter count, source packet, target carrier, optimizer budget,
-and training seeds remain fixed. The proposed objective is primary; the other
-two are registered ablations, not candidates selected after final generation.
+- `train`: 256 deterministic tasks from MBPP `train`;
+- `development_selection`: first 32 selected tasks from MBPP `validation`;
+- `development_gate`: next 32 selected tasks from MBPP `validation`;
+- `confirmation`: 32 sealed capable MBPP `test` tasks opened only after the
+  multi-replica development gate.
 
-The `raw_state` objective uses `temperature=0.10`, forward InfoNCE weight 1.0,
-and raw-state MSE weight 0.35, matching the earlier bridge principle. The
-`centered_regression` objective uses centered normalized Huber weight 1.0 and
-sitewise cosine weight 0.25, with every contrastive, margin, and norm term set
-to zero. These constants are not retuned on the final cohort.
+Within each source dataset split, tasks are ordered by SHA-256 using the frozen
+selection salt. Train/development tasks are materialized before packet
+extraction. The training bundle must declare exactly zero confirmation records.
 
-## Independent replicas
+The confirmation selector takes eligible ranks `[16:32]` inside each of the
+two-token and three-token terminal-layout strata from the sealed 013 capability
+screen. It selects 16 tasks per stratum and proves that ranks `[0:16]` are
+exactly the predecessor cohort and that the new tasks overlap neither it nor
+any bridge train/development task.
 
-Every objective is trained with three independent seeds. Checkpoint selection
-uses development latent metrics only and applies the same deterministic rule to
-all objectives. The final holdout is generated once per selected checkpoint.
+## Content-addressed bundle
 
-Suggested fresh seed registry, to be copied into the executable config after
-dependency resolution:
+Every task record includes:
 
-- data selection: `4013`;
-- bridge replicas: `[4001, 4003, 4007]`;
-- generation: `[4127, 4241, 4357]`;
-- statistics/bootstrap: `4481`;
-- shuffled-task derangement: `4513`.
+- task, raw-prompt, role-formatted-prompt, input-ID, and attention-mask hashes;
+- the actual source/target input IDs and masks;
+- source and target token counts;
+- terminal function-name token count;
+- source packet `[24,32,2048]`;
+- receiver teacher packet `[8,24,4096]`;
+- split and task identity.
 
-No seed overlaps the screening, confirmation, donor, or statistics seeds of
-`LIP-PROTO-010` through `LIP-PROTO-013`.
+The manifest binds immutable model and dataset revisions, prompt protocols,
+packet contracts, registry digest, config digest, predecessor digest, task
+order, shard hashes, dtypes, and split counts. Shards are loaded only with
+`torch.load(..., weights_only=True)`. Claim-oriented training rejects dry-run
+bundles.
 
-## Functional conditions
+Source and target extraction are sequential. Neither base model is present
+during bridge-only training.
 
-The receiver never receives task-specific text except in the explicit text
-control.
+## Registered systems and replicas
 
-| Condition | Target-visible task text | Injected packet | Role |
-| --- | ---: | --- | --- |
-| `neutral_no_lip` | No | None | No-message baseline |
-| `text_only_no_lip` | Yes | None | Receiver capability ceiling |
-| `oracle_teacher_matched` | No | Native matching teacher | Carrier replication gate |
-| `oracle_teacher_shuffled` | No | Native same-stratum donor | Oracle identity control |
-| `mean_scaffold` | No | Training-only \(\mu\) | Shared-structure control |
-| `learned_matched` | No | \(\mu+\widehat\Delta(S_t)\) | Primary treatment |
-| `learned_shuffled` | No | \(\mu+\widehat\Delta(S_{\pi(t)})\) | Learned identity control |
-| `random_residual_norm_matched` | No | \(\mu+R_t\) | Residual-energy control |
+Three systems are trained with seeds `[4001, 4003, 4007]`:
 
-`learned_*` and random controls are generated for each bridge replica. No-vector
-baselines, the oracle controls, and the mean scaffold are generated once per
-task/generation seed and are explicitly marked as replica-independent rather
-than duplicated as new observations.
+1. `component_contrastive`: query-conditioned bridge and the full primary loss;
+2. `centered_regression`: the same nonlinear bridge with Huber and cosine only;
+3. `structured_linear_regression`: the affine structured baseline with the same
+   centered Huber and cosine regression objective.
 
-The random residual uses an isotropic direction with the primary treatment's
-layer-wise Frobenius norm. Shuffled donors are assigned by a same-stratum
-Sattolo derangement and retain their natural learned residuals. Both natural
-and norm diagnostics are recorded.
+The first comparison isolates the effect of identity-aware loss terms while
+holding architecture fixed. The second compares linear and nonlinear capacity
+under the same regression target and loss.
 
-The two ablation objectives receive matched and shuffled learned conditions
-under the same tasks, seeds, carrier, and functional scorer. They are labeled
-secondary and cannot replace the proposed objective in the primary claim.
+Training uses AdamW, learning rate `2e-4`, weight decay `0.01`, batch size 4,
+gradient clipping at 1.0, mixed precision on CUDA, 2048 updates, and validation
+every 64 updates. Base models remain frozen and unloaded.
 
-## Functional scoring and statistical unit
+## Checkpoint selection and development gate
 
-Generated Python is scored only inside the hardened Linux namespace sandbox.
-No normal subprocess scorer is claim-eligible.
+Checkpoint selection consults only `development_selection`. The lexicographic
+key maximizes, in order:
+
+1. weakest retrieval top-1 across joint/core/name;
+2. mean retrieval top-1;
+3. weakest diagonal margin;
+4. mean diagonal margin;
+5. negative normalized RMSE;
+6. earlier step.
+
+After selection, the chosen checkpoint is evaluated exactly once on
+`development_gate`. Task-level matched-minus-hardest-negative margins for
+joint, core, and name undergo one-sided sign-flip tests in one Holm family.
+One replica passes only if all three adjusted tests reject with positive mean
+margins. Confirmation opens only if at least two of the three primary replicas
+pass.
+
+No failed gate may be repaired by inspecting confirmation tasks, adding seeds,
+changing packet geometry, widening the bridge, or selecting a different
+checkpoint rule.
+
+## Functional confirmation conditions
+
+The receiver sees task text only in the explicit text control.
+
+| Condition | Task text at receiver | Packet |
+| --- | ---: | --- |
+| `neutral_no_lip` | no | none |
+| `text_only_no_lip` | yes | none |
+| `oracle_teacher_matched` | no | native matching teacher |
+| `oracle_teacher_shuffled` | no | same-stratum teacher donor |
+| `mean_scaffold` | no | training-only `mu` |
+| `learned_matched` | no | `mu + predicted residual` |
+| `learned_shuffled` | no | prediction from a same-stratum source donor |
+| `random_residual_norm_matched` | no | isotropic residual with matched layer norms |
 
 The task is the inferential unit. Generation seeds and bridge replicas are
-averaged within task before uncertainty or hypothesis testing. Bootstrap
-intervals resample tasks. Paired one-sided sign-flip tests use the exact task
-pairing; zero task differences do not create artificial resolution.
+averaged within task before hypothesis tests or task-bootstrap intervals.
+Generated Python is claim-eligible only when evaluated in the hardened,
+network-isolated Linux namespace used by the preceding protocols.
 
-The analysis has an ordered oracle gate:
+The oracle identity gate is tested first. If it passes, one Holm-adjusted
+primary family tests learned matched against learned shuffled, mean scaffold,
+and random norm. All three must reject in the predicted direction to support
+learned cross-model semantic transport.
+
+## Functional recovery measures
+
+Absolute functional rates remain primary. Two unbounded descriptive ratios
+make the remaining gaps interpretable:
 
 \[
-H_{oracle}: Y_{oracle\ matched} > Y_{oracle\ shuffled}.
+R_{identity} =
+\frac{P_{learned\ matched}-P_{learned\ shuffled}}
+{P_{oracle\ matched}-P_{oracle\ shuffled}},
 \]
-
-If it fails, learned semantic claims are closed. If it passes, one
-Holm-adjusted primary family opens:
 
 \[
-\begin{aligned}
-H_{identity} &: Y_{learned\ matched} > Y_{learned\ shuffled},\\
-H_{structure} &: Y_{learned\ matched} > Y_{mean\ scaffold},\\
-H_{energy} &: Y_{learned\ matched} > Y_{random\ norm\ matched}.
-\end{aligned}
+R_{text} =
+\frac{P_{learned\ matched}-P_{neutral}}
+{P_{text}-P_{neutral}}.
 \]
 
-All three primary hypotheses must reject in the predicted direction to set
-`learned_cross_model_transport_supported=true`. This makes the claim require
-task correspondence, improvement beyond shared target structure, and
-improvement beyond residual energy.
-
-One registered secondary contrast compares the proposed objective with the
-raw-state objective. It is labeled an objective ablation and is not required
-for the transport claim. Per-replica directions, absolute functional rates,
-the gap to native oracle replay, and the gap to text are always reported.
-
-The protocol does not claim non-inferiority to text unless a separate future
-design registers a non-inferiority margin and adequate power before data.
+Ratios are not clipped. A zero denominator is reported as undefined rather
+than silently replaced. These quantities describe recovered functional effect;
+they do not create a non-inferiority claim.
 
 ## Stop rules
 
-Stop without claim-eligible final generation when any of the following occurs:
+Stop before claim-eligible confirmation if any of the following occurs:
 
-- predecessor packet gate fails under the dependency table;
-- either confirmation tokenizer stratum has fewer than 16 remaining capable
-  tasks;
-- source or target bundle provenance does not bind to immutable model revisions
-  and exact prompt hashes;
-- native oracle replay fails on the development preflight;
-- the hardened sandbox probe fails;
-- fewer than two of three proposed-objective replicas satisfy the frozen
-  development checkpoint rule;
-- output completeness, task disjointness, or replica/seed cell checks fail.
+- immutable endpoint, prompt, dataset, registry, or predecessor provenance
+  fails validation;
+- target terminal-layout evidence fails;
+- native target self-replay exceeds the frozen logit threshold;
+- fewer than two primary replicas pass the development gate;
+- the sealed confirmation rank slice is unavailable or overlaps prior tasks;
+- generation cells are incomplete or duplicated;
+- the hardened functional-evaluation probe fails.
 
-Development failure is reported as a learnability limit of this bridge and
-objective. It is not repaired by inspecting final-task behavior, changing the
-packet after training, increasing model width, or trying unregistered seeds.
+Negative outcomes are results. They localize the limit to the tested sender
+representation, bridge family, receiver carrier, data budget, and task family.
 
-## Compute policy
+## Compute and artifact policy
 
-- Use a standard T4 unless measured memory requires a documented change.
-- Extract source and target bundles in separate model-loading passes.
-- Store generated bundles, checkpoints, and run outputs only under ignored
-  runtime paths and the canonical Drive artifact.
-- Run bridge-only training from cached packets; do not keep either base model
-  loaded during training.
-- Run a two-task, one-replica, all-condition real-model preflight before the
-  full confirmation budget.
-- Do not use a premium GPU merely to reduce wall-clock time.
-
-## Artifact contract
-
-The canonical artifact must contain:
-
-- frozen executable config and source commit;
-- predecessor artifact hash and dependency decision;
-- train/development/final task registries;
-- source/target packet bundle manifests and validation reports;
-- training-only scaffold and site-scale hashes;
-- resolved configs, logs, metrics, and best checkpoints for every replica;
-- development checkpoint-selection report;
-- complete generations and metadata;
-- hardened scored rows, sandbox report, and inferential summary;
-- paper-facing functional, geometry, and ablation figures;
-- top-level `SHA256SUMS` verified after rendering.
+- Prefer a standard T4.
+- Do not use a premium GPU only to reduce wall-clock time.
+- Keep packet bundles, checkpoints, and run outputs on the mounted Drive or RAID,
+  not on full local disks.
+- Run a two-task, one-replica real-model preflight before the full extraction
+  and confirmation budgets.
+- Preserve configs, registries, manifests, validation reports, target
+  statistics, checkpoints, selection histories, generation grids, hardened
+  evaluation output, plots, environment evidence, and `SHA256SUMS`.
 
 ## Claim boundary
 
-A positive result would establish that, in this pinned system, a learned bridge
-can transform source-model hidden states into a target-side latent packet that
-causally improves unseen functional behavior without exposing task text to the
-receiver, beyond task-shuffled, shared-structure, and energy-matched controls.
+A positive 014 permits the statement that, in this bounded environment, a
+learned bridge transformed source-model latent states into a receiver-side
+latent packet carrying causally useful task identity without transmitting the
+task text to the receiver.
 
-It would not establish universal latent language, arbitrary agents, arbitrary
-tasks, text non-inferiority, security against adversarial messages, or
-interoperability across untested models. A negative result would localize the
-failure to the tested source representation, query-conditioned mapper,
-residual objective, data scale, and carrier; it would not erase the native
-oracle channel established by the predecessor sequence.
+It does not yet permit the statement that the 32 x 512 internal code is a
+universal language, that arbitrary models can communicate through it, or that
+text has been replaced generally. Those require unseen endpoint composition,
+broader task families, and an independently registered non-inferiority design.
