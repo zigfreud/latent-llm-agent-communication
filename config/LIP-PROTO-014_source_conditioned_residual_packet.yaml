@@ -24,6 +24,7 @@ prompt_protocols:
     mode: "raw"
     add_generation_prompt: false
     system_prompt: null
+    raw_prefix: "You are a Python code generator. Return only Python code and define exactly the required function name.\n\nTask:\n"
   target:
     version: "lip-prompt-v1"
     mode: "chat_template"

@@ -96,13 +96,26 @@ structured source-site mixture.
 - published weight serialization: `pytorch_model.bin` (the pinned revision has
   no safetensors artifact), loaded with `use_safetensors: false`; the immutable
   revision check remains mandatory;
-- prompt: raw MBPP task with the required function name appended;
+- prompt: a registered source-only raw prefix followed by the MBPP task with
+  the required function name appended. The prefix uses the same Python-code
+  instruction as the receiver system prompt and ends in `Task:`; it is
+  serialized inline because the base source has no chat-template role;
 - state: residual input to every one of the 24 decoder blocks;
 - positions: last 32 active prompt tokens;
 - task tensor: `[24, 32, 2048]`, stored as `float16`.
 
 The 24 x 32 sites are a fixed sender observation, not a claim that sender and
 receiver tokens or layers are aligned.
+
+The real tokenizer preflight found that 206 of the 320 registered raw MBPP
+prompts were shorter than the frozen 32-position sender packet (including all
+six preflight tasks). The registered prefix is therefore a provenance-bound
+layout repair, not padding: it leaves the task at the terminal end, supplies
+active causal context, and preserves the frozen sender shape. At the pinned
+DeepSeek revision it contributes 24 tokens; the resulting minimum source
+lengths are 44 train, 49 development-selection, and 45 development-gate tokens.
+The failed no-prefix attempt and the complete token-length audits are retained
+with the runtime artifacts.
 
 ### Receiver teacher
 

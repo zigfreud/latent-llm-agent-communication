@@ -22,6 +22,7 @@ class PromptProtocol:
     mode: str = "raw"
     add_generation_prompt: bool = False
     system_prompt: Optional[str] = None
+    raw_prefix: Optional[str] = None
 
 
 def parse_prompt_protocol(config: Optional[Mapping[str, Any]] = None) -> PromptProtocol:
@@ -30,7 +31,13 @@ def parse_prompt_protocol(config: Optional[Mapping[str, Any]] = None) -> PromptP
     values = dict(config or {})
     unknown = sorted(
         set(values).difference(
-            {"version", "mode", "add_generation_prompt", "system_prompt"}
+            {
+                "version",
+                "mode",
+                "add_generation_prompt",
+                "system_prompt",
+                "raw_prefix",
+            }
         )
     )
     if unknown:
@@ -52,6 +59,13 @@ def parse_prompt_protocol(config: Optional[Mapping[str, Any]] = None) -> PromptP
         if protocol.mode != "chat_template":
             raise ValueError(
                 "prompt_protocol.system_prompt is supported only with mode=chat_template"
+            )
+    if protocol.raw_prefix is not None:
+        if not isinstance(protocol.raw_prefix, str) or not protocol.raw_prefix.strip():
+            raise ValueError("prompt_protocol.raw_prefix must be null or non-empty text")
+        if protocol.mode != "raw":
+            raise ValueError(
+                "prompt_protocol.raw_prefix is supported only with mode=raw"
             )
 
     return protocol
@@ -79,7 +93,7 @@ def format_prompt(
         raise ValueError("add_generation_prompt override must be a boolean")
 
     if protocol.mode == "raw":
-        return prompt
+        return f"{protocol.raw_prefix or ''}{prompt}"
 
     apply_template = getattr(tokenizer, "apply_chat_template", None)
     if not callable(apply_template):
@@ -126,7 +140,11 @@ def protocol_metadata(
 ) -> dict[str, Any]:
     """Return a JSON-serializable normalized protocol description."""
 
-    return asdict(parse_prompt_protocol(protocol_config))
+    metadata = asdict(parse_prompt_protocol(protocol_config))
+    if metadata["raw_prefix"] is None:
+        # Preserve the normalized metadata of existing lip-prompt-v1 artifacts.
+        metadata.pop("raw_prefix")
+    return metadata
 
 
 def protocol_pair_metadata(
