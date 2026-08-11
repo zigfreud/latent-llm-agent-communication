@@ -223,6 +223,20 @@ def _grad_scaler(enabled: bool):
         return torch.cuda.amp.GradScaler(enabled=enabled)
 
 
+def _resolve_training_batch_size(
+    configured_batch_size: int,
+    *,
+    train_count: int,
+    extraction_scope: str,
+    require_real: bool,
+) -> int:
+    if configured_batch_size <= train_count:
+        return configured_batch_size
+    if extraction_scope == "preflight" and not require_real:
+        return train_count
+    raise ValueError("training.batch_size cannot exceed the training task count")
+
+
 def train_packet_bridge(config_path: Path | str) -> dict:
     config_path = Path(config_path)
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
@@ -278,11 +292,15 @@ def train_packet_bridge(config_path: Path | str) -> dict:
         lr=float(_required(training_config, "learning_rate", "training")),
         weight_decay=float(training_config.get("weight_decay", 0.01)),
     )
-    batch_size = _positive_int(
+    configured_batch_size = _positive_int(
         _required(training_config, "batch_size", "training"), "training.batch_size"
     )
-    if batch_size > len(datasets["train"]):
-        raise ValueError("training.batch_size cannot exceed the training task count")
+    batch_size = _resolve_training_batch_size(
+        configured_batch_size,
+        train_count=len(datasets["train"]),
+        extraction_scope=str(validation["extraction_scope"]),
+        require_real=bool(data_config.get("require_real", True)),
+    )
     max_updates = _positive_int(
         _required(training_config, "max_updates", "training"), "training.max_updates"
     )
@@ -396,6 +414,8 @@ def train_packet_bridge(config_path: Path | str) -> dict:
         "device": str(device),
         "model_kind": model_config["kind"],
         "parameter_count": sum(parameter.numel() for parameter in model.parameters()),
+        "configured_batch_size": configured_batch_size,
+        "effective_batch_size": batch_size,
         "updates_completed": step,
         "best_step": best_step,
         "best_selection_key": list(best_key),

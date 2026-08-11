@@ -430,6 +430,11 @@ training rejects it even though its tensors came from the real endpoints. Only
 after this path passes should the same extraction command be run without the
 preflight limit, followed by the complete registered matrix.
 
+Because this preflight contains only two training tasks while the registered
+full-run batch size is four, non-claim preflight training records an effective
+batch size of two. The configured batch size remains four and is used unchanged
+for the full bundle; full-scope runs are never allowed to reduce it implicitly.
+
 ## Claim boundary
 
 A positive 014 permits the statement that, in this bounded environment, a

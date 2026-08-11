@@ -1,10 +1,14 @@
 import json
 
+import pytest
 import torch
 import yaml
 
 from src.core.packet_bundle import PACKET_SPLITS, sha256_file, sha256_json
-from src.pipelines.packet_bridge import train_packet_bridge
+from src.pipelines.packet_bridge import (
+    _resolve_training_batch_size,
+    train_packet_bridge,
+)
 
 
 def _training_record(split, index):
@@ -155,6 +159,8 @@ def test_bridge_only_training_selects_checkpoint_before_untouched_gate(tmp_path)
     result = train_packet_bridge(config_path)
 
     assert result["updates_completed"] == 2
+    assert result["configured_batch_size"] == 4
+    assert result["effective_batch_size"] == 4
     assert result["best_step"] in {1, 2}
     assert result["bundle_validation"]["split_counts"]["confirmation"] == 0
     assert result["development_selection"]["task_count"] == 4
@@ -162,3 +168,20 @@ def test_bridge_only_training_selects_checkpoint_before_untouched_gate(tmp_path)
     assert (output_dir / "best_checkpoint.pt").is_file()
     assert (output_dir / "target_statistics.pt").is_file()
     assert (output_dir / "run_summary.json").is_file()
+
+
+def test_nonclaim_preflight_caps_only_the_effective_batch_size():
+    assert _resolve_training_batch_size(
+        4,
+        train_count=2,
+        extraction_scope="preflight",
+        require_real=False,
+    ) == 2
+
+    with pytest.raises(ValueError, match="cannot exceed"):
+        _resolve_training_batch_size(
+            4,
+            train_count=2,
+            extraction_scope="full",
+            require_real=False,
+        )
