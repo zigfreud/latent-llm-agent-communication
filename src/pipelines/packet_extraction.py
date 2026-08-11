@@ -505,6 +505,7 @@ def materialize_packet_bundle(
             str(extraction.get("device", "auto")),
             load_4bit=bool(extraction.get("source_load_4bit", False)),
             revision=source_spec["revision"],
+            use_safetensors=bool(source_spec.get("use_safetensors", True)),
         )
         _extract_real_endpoint(
             tasks,
@@ -607,11 +608,13 @@ def materialize_packet_bundle(
         "source": {
             "model_id": source_spec["model_id"],
             "revision": source_spec["revision"],
+            "use_safetensors": bool(source_spec.get("use_safetensors", True)),
             "prompt_protocol": protocols["source"],
         },
         "target": {
             "model_id": target_spec["model_id"],
             "revision": target_spec["revision"],
+            "use_safetensors": bool(target_spec.get("use_safetensors", True)),
             "prompt_protocol": protocols["target"],
         },
         "dataset": {

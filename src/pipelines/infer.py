@@ -102,6 +102,8 @@ def load_source(
     device: str,
     load_4bit: bool = False,
     revision: Optional[str] = None,
+    *,
+    use_safetensors: bool = True,
 ):
     tok = AutoTokenizer.from_pretrained(
         model_id,
@@ -111,7 +113,7 @@ def load_source(
     _ensure_padding_token(tok)
     kwargs = {
         "device_map": device,
-        "use_safetensors": True,
+        "use_safetensors": bool(use_safetensors),
         "trust_remote_code": True,
         "revision": revision,
     }

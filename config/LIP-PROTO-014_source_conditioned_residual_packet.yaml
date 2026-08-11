@@ -12,9 +12,11 @@ models:
   source:
     model_id: "deepseek-ai/deepseek-coder-1.3b-base"
     revision: "e5babb80b8539a4e85dd2418c0ee611522276987"
+    use_safetensors: false
   target:
     model_id: "NousResearch/Meta-Llama-3-8B-Instruct"
     revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+    use_safetensors: true
 
 prompt_protocols:
   source:

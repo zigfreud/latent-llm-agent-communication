@@ -93,6 +93,9 @@ structured source-site mixture.
 - model: `deepseek-ai/deepseek-coder-1.3b-base`;
 - immutable revision:
   `e5babb80b8539a4e85dd2418c0ee611522276987`;
+- published weight serialization: `pytorch_model.bin` (the pinned revision has
+  no safetensors artifact), loaded with `use_safetensors: false`; the immutable
+  revision check remains mandatory;
 - prompt: raw MBPP task with the required function name appended;
 - state: residual input to every one of the 24 decoder blocks;
 - positions: last 32 active prompt tokens;
@@ -261,9 +264,10 @@ Every task record includes:
 - receiver teacher packet `[8,24,4096]`;
 - split and task identity.
 
-The manifest binds immutable model and dataset revisions, prompt protocols,
-packet contracts, registry digest, config digest, predecessor digest, task
-order, shard hashes, dtypes, and split counts. Shards are loaded only with
+The manifest binds immutable model and dataset revisions, endpoint weight
+serialization choices, prompt protocols, packet contracts, registry digest,
+config digest, predecessor digest, task order, shard hashes, dtypes, and split
+counts. Packet shards are loaded only with
 `torch.load(..., weights_only=True)`. Claim-oriented training rejects dry-run
 bundles.
 
