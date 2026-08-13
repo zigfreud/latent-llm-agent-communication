@@ -135,14 +135,17 @@ def _anchored_packet(absolute: torch.Tensor, scaffold: torch.Tensor) -> torch.Te
 
 
 def _condition_packets(
+    experiment: Mapping,
+    layers: list[int],
     record: Mapping,
     *,
     row_index: int,
     scaffold: torch.Tensor,
     variant_predictions: Mapping[str, Mapping[int, torch.Tensor]],
-    absolute_modes: Mapping[int, str],
-    anchored_modes: Mapping[int, str],
 ) -> list[dict]:
+    operators = experiment["conditions"]["operators"]
+    absolute_modes = _layer_modes(operators[ABSOLUTE_OPERATOR], layers)
+    anchored_modes = _layer_modes(operators[ANCHORED_OPERATOR], layers)
     oracle = record["target_packet"].float()
     conditions = [
         {
@@ -200,10 +203,13 @@ def run_anchored_trajectory_gate(
     target_device: str,
     bridge_device: str,
     colab_compute_units_before: float | None,
+    _contract_validator=_validate_contract,
+    _condition_builder=_condition_packets,
+    _gate_summarizer=None,
 ) -> dict:
     experiment = load_yaml(experiment_path)
     parent = load_yaml(parent_path)
-    _validate_contract(
+    _contract_validator(
         experiment,
         parent,
         experiment_path=experiment_path,
@@ -289,8 +295,8 @@ def run_anchored_trajectory_gate(
         "variant_provenance": variant_provenance,
     }
     payload = {
-        "experiment_id": "LIP-H0-008",
-        "protocol_version": ANCHORED_REPLAY_PROTOCOL_VERSION,
+        "experiment_id": experiment["experiment_id"],
+        "protocol_version": experiment["protocol_version"],
         "claim_status": experiment["claim_status"],
         "stage": "trajectory_gate",
         "task_indices": task_indices,
@@ -338,19 +344,16 @@ def run_anchored_trajectory_gate(
     offsets = [int(value) for value in experiment["capture"]["packet_offsets"]]
     positions = _suffix_positions(neutral_inputs, offsets)
     state_types = tuple(str(value) for value in experiment["capture"]["state_types"])
-    operators = experiment["conditions"]["operators"]
-    absolute_modes = _layer_modes(operators[ABSOLUTE_OPERATOR], layers)
-    anchored_modes = _layer_modes(operators[ANCHORED_OPERATOR], layers)
     completed_keys = {_result_key(row) for row in payload["results"]}
 
     for row_index, record in enumerate(records):
-        conditions = _condition_packets(
+        conditions = _condition_builder(
+            experiment,
+            layers,
             record,
             row_index=row_index,
             scaffold=shared_scaffold,
             variant_predictions=variant_predictions,
-            absolute_modes=absolute_modes,
-            anchored_modes=anchored_modes,
         )
         oracle_packets = _layer_packet(conditions[0]["packet"], layers)
         oracle_output, oracle_states = forward_with_packet_trajectory_capture(
@@ -359,7 +362,7 @@ def run_anchored_trajectory_gate(
             layer_indices=layers,
             positions=positions,
             layer_packets=oracle_packets,
-            replay_mode=absolute_modes,
+            replay_mode=conditions[0]["replay_mode"],
         )
         oracle_logits = oracle_output.logits[:, -1:, :].detach().float().cpu()
         del oracle_output
@@ -420,21 +423,31 @@ def run_anchored_trajectory_gate(
             gc.collect()
         del oracle_logits, oracle_states, oracle_packets
 
-    gate = experiment["gate"]
-    learned_gate = gate["learned_operator"]
-    oracle_gate = gate["oracle_entry_origin"]
-    payload["gate"] = summarize_anchored_gate(
-        payload["results"],
-        variants=variants,
-        seeds=seeds,
-        primary_variant=str(experiment["conditions"]["primary_variant"]),
-        minimum_taskwise_improvements=int(
-            learned_gate["minimum_taskwise_improvements"]
-        ),
-        minimum_passing_replicas=int(learned_gate["minimum_passing_replicas"]),
-        oracle_unanchored_reference=oracle_gate["unanchored_means"],
-        oracle_maximum_fraction=oracle_gate["maximum_fraction_of_unanchored"],
-    )
+    if _gate_summarizer is None:
+        gate = experiment["gate"]
+        learned_gate = gate["learned_operator"]
+        oracle_gate = gate["oracle_entry_origin"]
+        payload["gate"] = summarize_anchored_gate(
+            payload["results"],
+            variants=variants,
+            seeds=seeds,
+            primary_variant=str(experiment["conditions"]["primary_variant"]),
+            minimum_taskwise_improvements=int(
+                learned_gate["minimum_taskwise_improvements"]
+            ),
+            minimum_passing_replicas=int(
+                learned_gate["minimum_passing_replicas"]
+            ),
+            oracle_unanchored_reference=oracle_gate["unanchored_means"],
+            oracle_maximum_fraction=oracle_gate["maximum_fraction_of_unanchored"],
+        )
+    else:
+        payload["gate"] = _gate_summarizer(
+            experiment,
+            payload["results"],
+            variants,
+            seeds,
+        )
     payload["complete"] = True
     total_seconds = float(time.perf_counter() - started)
     payload["telemetry"].update(

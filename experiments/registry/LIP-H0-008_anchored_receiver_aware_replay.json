@@ -1,0 +1,74 @@
+{
+  "experiment_id": "LIP-H0-008",
+  "protocol_version": "lip-anchored-receiver-aware-replay-v1",
+  "claim_status": "exploratory_causal_operator_screen_only",
+  "run_commit": "3915a18e8bc3f8a05f06a835adbe340c05fc85f9",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-008",
+    "trajectory_gate": {
+      "path": "trajectory_gate.json",
+      "sha256": "4b18469a8e1eced1588312744c54ddcb95dc9124dc5e249fdf30e8f83340e493"
+    }
+  },
+  "sample": {
+    "source": "exposed_LIP-PROTO-014_confirmation_tasks",
+    "task_indices": [0, 1, 2, 3, 16, 17, 18, 19],
+    "tasks": 8,
+    "training_seeds": [4001, 4003, 4007],
+    "result_rows": 112,
+    "inferential_status": "paired_descriptive_gate_not_a_new_confirmation_set"
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "total_vram_bytes": 23659151360,
+    "peak_allocated_vram_bytes": 6156819456,
+    "peak_reserved_vram_bytes": 6199181312,
+    "wall_seconds": 84.80545807999988,
+    "task_conditions_per_hour": 4754.410967506923,
+    "colab_compute_units_before": 80.43,
+    "colab_compute_units_after": 80.3,
+    "colab_compute_units_consumed": 0.13
+  },
+  "gate": {
+    "oracle_entry_origin_passed": false,
+    "passing_primary_replicas": 0,
+    "learned_operator_passed": false,
+    "advance_to_functional_identity_test": false
+  },
+  "oracle_origin_metrics": {
+    "transition_jump_nrmse": {"unanchored": 0.288877, "anchored": 0.309992, "ratio": 1.073093, "passed": false},
+    "attention_output_nrmse": {"unanchored": 1.348284, "anchored": 1.257510, "ratio": 0.932674, "passed": false},
+    "residual_output_nrmse": {"unanchored": 1.713128, "anchored": 1.316022, "ratio": 0.768198, "passed": false}
+  },
+  "learned_replica_means": {
+    "component_contrastive": {
+      "4001": {"jump_absolute": 0.621235, "jump_anchored": 0.262779, "attention_absolute": 0.780719, "attention_anchored": 1.351994, "residual_absolute": 0.799541, "residual_anchored": 1.161254},
+      "4003": {"jump_absolute": 0.603046, "jump_anchored": 0.272849, "attention_absolute": 0.772527, "attention_anchored": 1.356003, "residual_absolute": 0.801775, "residual_anchored": 1.193273},
+      "4007": {"jump_absolute": 0.637315, "jump_anchored": 0.258891, "attention_absolute": 0.785857, "attention_anchored": 1.363226, "residual_absolute": 0.804055, "residual_anchored": 1.136035}
+    },
+    "structured_linear_regression": {
+      "4001": {"jump_absolute": 0.553944, "jump_anchored": 0.261934, "attention_absolute": 0.710243, "attention_anchored": 1.113878, "residual_absolute": 0.704636, "residual_anchored": 1.024863},
+      "4003": {"jump_absolute": 0.562859, "jump_anchored": 0.255708, "attention_absolute": 0.716392, "attention_anchored": 1.109605, "residual_absolute": 0.712655, "residual_anchored": 0.992963},
+      "4007": {"jump_absolute": 0.550029, "jump_anchored": 0.263176, "attention_absolute": 0.708443, "attention_anchored": 1.107684, "residual_absolute": 0.702215, "residual_anchored": 1.011664}
+    }
+  },
+  "layerwise_localization": {
+    "oracle_layer1_residual_unanchored": 1.5980,
+    "oracle_layer1_residual_anchored": 0.6292,
+    "oracle_layer2_attention_unanchored": 2.3805,
+    "oracle_layer2_attention_anchored": 2.3550,
+    "primary_layer2_attention_unanchored": 1.2557,
+    "primary_layer2_attention_anchored": 2.1165
+  },
+  "interpretation": {
+    "result": "negative_anchored_static_delta_operator",
+    "strongest_observation": "Entry anchoring repairs the local carrier state but repeated task-delta addition loses the benefit immediately and preserves the misleading jump-versus-state dissociation.",
+    "broader_hypothesis_status": "Receiver dynamics remain plausible; the static delta update is falsified."
+  },
+  "recommended_next_step": {
+    "experiment_id": "LIP-H0-009",
+    "kind": "entry_seed_free_evolution_operator_screen",
+    "operator": "replace layer 0 once, then apply no intervention at layers 1 through 7",
+    "proto_015_status": "premature"
+  }
+}

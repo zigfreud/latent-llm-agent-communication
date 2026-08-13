@@ -1,0 +1,92 @@
+experiment_id: "LIP-H0-009"
+protocol_version: "lip-entry-seed-free-evolution-v1"
+claim_status: "exploratory_causal_operator_screen_only"
+
+predecessor:
+  protocol: "LIP-H0-008"
+  registry: "experiments/registry/LIP-H0-008_anchored_receiver_aware_replay.json"
+  result_commit: "3915a18e"
+  trajectory_gate_sha256: "4b18469a8e1eced1588312744c54ddcb95dc9124dc5e249fdf30e8f83340e493"
+  conclusion: "layer-0 anchoring repairs the entry locally, but repeated static deltas immediately lose the advantage"
+
+parent:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
+
+hypothesis:
+  statement: "A task-conditioned entry seed is sufficient for the receiver to evolve its own trajectory, and repeated layerwise injection is destructive interference."
+  free_evolution_operator: "h_injected_0 = packet_0; h_injected_l = h_live_incoming_l, l in 1..7"
+  absolute_comparator: "h_injected_l = packet_l, l in 0..7"
+
+sample:
+  source: "exposed_LIP-PROTO-014_confirmation_tasks"
+  task_indices: [0, 1, 2, 3, 16, 17, 18, 19]
+  task_count: 8
+  tokenizer_strata: {2: 4, 3: 4}
+  inferential_status: "paired_descriptive_gate_not_a_new_confirmation_set"
+
+conditions:
+  variants:
+    - "component_contrastive"
+    - "structured_linear_regression"
+  primary_variant: "component_contrastive"
+  training_seeds: [4001, 4003, 4007]
+  operators:
+    absolute_replace:
+      layer_modes: {0: "replace", 1: "replace", 2: "replace", 3: "replace", 4: "replace", 5: "replace", 6: "replace", 7: "replace"}
+      packet: "predicted_absolute_packet"
+    entry_seed_then_free_evolution:
+      layer_modes: {0: "replace", 1: "add", 2: "add", 3: "add", 4: "add", 5: "add", 6: "add", 7: "add"}
+      packet: "absolute_packet_at_layer0_then_zero_updates"
+  oracle_diagnostics:
+    - "oracle_absolute_replace"
+    - "oracle_entry_seed_then_free_evolution"
+
+capture:
+  target_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  transition_layers: [1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  oracle_reference: "oracle_absolute_replace_on_the_same_neutral_carrier"
+  state_types:
+    - "query_pre_rope"
+    - "key_pre_rope"
+    - "value_pre_cache"
+    - "attention_output"
+    - "residual_output"
+
+gate:
+  comparison: "entry_seed_then_free_evolution_vs_absolute_replace"
+  metrics:
+    - "attention_output_nrmse_to_oracle_replace"
+    - "residual_output_nrmse_to_oracle_replace"
+  transition_jump_role: "diagnostic_only_because_layers_1_through_7_receive_zero_updates"
+  oracle_free_evolution:
+    reference: "LIP-H0-008_oracle_anchored_repeated_delta"
+    anchored_delta_means:
+      attention_output_nrmse: 1.257510
+      residual_output_nrmse: 1.316022
+    maximum_fraction_of_anchored_delta: 0.75
+  learned_operator:
+    minimum_taskwise_improvements: 6
+    minimum_passing_replicas: 2
+    decision_variant: "component_contrastive"
+    linear_variant_role: "diagnostic_only"
+  pass_action: "run_frozen_matched_vs_shuffled_functional_identity_pilot"
+  fail_action: "stop_before_generation_and_design_a_trained_live_state_conditioned_corrector"
+
+functional_followup:
+  status: "conditional_on_both_oracle_and_learned_trajectory_gates"
+  required_conditions:
+    - "learned_matched_absolute_replace"
+    - "learned_shuffled_absolute_replace"
+    - "learned_matched_entry_seed_then_free_evolution"
+    - "learned_shuffled_entry_seed_then_free_evolution"
+  interpretation: "Only a positive matched-minus-shuffled identity effect can graduate this operator toward PROTO-015."
+
+compute:
+  preferred_accelerator: "L4"
+  target_load_4bit: true
+  bridge_device: "cpu"
+  allow_silent_fallback: false
+  stop_after_trajectory_gate_if_failed: true
