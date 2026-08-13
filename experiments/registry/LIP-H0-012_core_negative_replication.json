@@ -1,0 +1,129 @@
+{
+  "experiment_id": "LIP-H0-012",
+  "protocol_version": "lip-core-negative-replication-v1",
+  "claim_status": "directional_replication_success_strong_gate_failed",
+  "run_commit": "0330044a8aba72dc684c29a3a8c8fce3322bbf64",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-012/replication-v1",
+    "seed_4001": {
+      "path": "4001/run_summary.json",
+      "sha256": "ea85d0677ea67e8348b578b90189f5e06ca3a08bab3ef980cc36ea6e87b4ec83"
+    },
+    "seed_4003": {
+      "path": "4003/run_summary.json",
+      "sha256": "732fec87a73f7705bde2275145ba3d6cb0e12ba0bdb38833877633e44fe80b9b"
+    },
+    "frozen_seed_4007": {
+      "path": "lip-artifacts/LIP-H0-011/screen-v1/run_summary.json",
+      "sha256": "9fab01ec20b1a691911b24dc2e276eae8ecfa1f498a2f555cacd1bf436bfb08a"
+    }
+  },
+  "frozen_design": {
+    "new_seeds": [4001, 4003],
+    "reused_seed": 4007,
+    "batch_size": 16,
+    "updates_per_new_seed": 128,
+    "examples_per_seed": 2048,
+    "in_batch_negatives": 15,
+    "confirmation_used": false
+  },
+  "results": {
+    "4001": {
+      "best_step": 128,
+      "normalized_residual_rmse": 1.392160,
+      "mean_retrieval": 0.812500,
+      "regions": {
+        "joint": {
+          "retrieval_top1": 0.906250,
+          "mean_diagonal_margin": 0.036832,
+          "p_value_holm": 0.000030,
+          "rejected": true
+        },
+        "core": {
+          "retrieval_top1": 0.718750,
+          "mean_diagonal_margin": 0.007406,
+          "p_value_holm": 0.122619,
+          "rejected": false
+        },
+        "name": {
+          "retrieval_top1": 0.812500,
+          "mean_diagonal_margin": 0.075225,
+          "p_value_holm": 0.000030,
+          "rejected": true
+        }
+      },
+      "directional_gate": true,
+      "strong_gate": false
+    },
+    "4003": {
+      "best_step": 112,
+      "normalized_residual_rmse": 1.398661,
+      "mean_retrieval": 0.708333,
+      "regions": {
+        "joint": {
+          "retrieval_top1": 0.791667,
+          "mean_diagonal_margin": 0.029887,
+          "p_value_holm": 0.000240,
+          "rejected": true
+        },
+        "core": {
+          "retrieval_top1": 0.625000,
+          "mean_diagonal_margin": 0.007580,
+          "p_value_holm": 0.173498,
+          "rejected": false
+        },
+        "name": {
+          "retrieval_top1": 0.708333,
+          "mean_diagonal_margin": 0.046536,
+          "p_value_holm": 0.000704,
+          "rejected": true
+        }
+      },
+      "directional_gate": true,
+      "strong_gate": false
+    },
+    "4007": {
+      "source": "frozen_H0_011_screen",
+      "best_step": 120,
+      "normalized_residual_rmse": 1.425170,
+      "mean_retrieval": 0.739583,
+      "core_retrieval_top1": 0.687500,
+      "core_mean_diagonal_margin": 0.003350,
+      "core_p_value_holm": 0.373306,
+      "directional_gate": true,
+      "strong_gate": false
+    }
+  },
+  "aggregate_gate": {
+    "directional_passing_seeds": 3,
+    "directional_required_seeds": 2,
+    "directional_replication_passed": true,
+    "positive_core_margin_seeds": 3,
+    "strong_passing_seeds": 0,
+    "strong_required_seeds": 2,
+    "strong_replication_passed": false
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "peak_allocated_vram_bytes": 8238643712,
+    "peak_reserved_vram_bytes": 8474591232,
+    "seed_4001_wall_seconds": 108.297011842,
+    "seed_4003_wall_seconds": 108.967920791,
+    "new_cells_wall_seconds": 217.264932633,
+    "colab_compute_units_before": 77.56,
+    "colab_compute_units_after": 77.05,
+    "colab_compute_units_consumed": 0.51,
+    "metering_note": "Usage is reported once over the complete H0-012 interval at Colab's visible precision; the identical interval embedded in both summaries must not be summed."
+  },
+  "interpretation": {
+    "supported": "At fixed exposure, expanding in-batch alternatives from three to fifteen reproducibly changed the core-margin sign: all three seeds improved relative to their paired H0-010 cells and all three ended positive.",
+    "not_supported": "Negative coverage alone did not produce statistically robust core separation: the core Holm test failed in every seed and the strong family passed in zero of three.",
+    "mechanistic_update": "Receiver-aware trajectory learning and negative coverage are both components of the missing property, but the remaining bottleneck is core-specific separation magnitude rather than gross reconstruction or name identity.",
+    "next_test": "Retain batch 16 and frozen receiver evolution, then add one preregistered core-specific margin-pressure intervention in a development-only screen."
+  },
+  "decision": {
+    "core_pressure_screen_authorized": true,
+    "functional_confirmation_authorized": false,
+    "proto_015_status": "premature"
+  }
+}
