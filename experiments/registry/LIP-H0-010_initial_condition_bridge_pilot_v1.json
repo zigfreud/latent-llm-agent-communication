@@ -1,0 +1,56 @@
+{
+  "experiment_id": "LIP-H0-010",
+  "protocol_version": "lip-unrolled-initial-condition-bridge-v1",
+  "claim_status": "failed_numeric_feasibility_pilot_only",
+  "run_commit": "c1a94bd259378d7f89292e67970691400728d46e",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-010/pilot",
+    "run_summary": {
+      "path": "run_summary.json",
+      "sha256": "90074e797a63ad31f050910120e793461af4a00d622c5cedb6df010b109fe6ee"
+    }
+  },
+  "pilot_gate": {
+    "passed": false,
+    "updates_completed": 16,
+    "required_updates": 16,
+    "finite_loss": true,
+    "nonzero_bridge_gradient_each_update": true,
+    "amp_overflow_events": 52,
+    "maximum_amp_overflow_events": 2,
+    "peak_allocated_vram_bytes": 6982702592,
+    "maximum_peak_allocated_vram_bytes": 22500000000
+  },
+  "numeric_diagnosis": {
+    "all_overflows_step_candidate": 1,
+    "scaler_first_before": 65536.0,
+    "scaler_last_after": 1.4551915228366852e-11,
+    "gradient_norm_range": [1.68246e16, 1.41406e17],
+    "loss_first": 1.03828e17,
+    "loss_last": 4.20964e15,
+    "induced_trajectory_norm_boundary_last": 3.3677084583662715e18,
+    "interpretation": "The inherited relative component-norm term is singular for near-zero teacher boundary norms. This is a loss-definition failure, not an L4 memory failure or a non-differentiable receiver path."
+  },
+  "development_diagnostics_not_used_as_a_quality_gate": {
+    "selection_entry_rmse": 0.884859,
+    "selection_induced_trajectory_rmse": 2.54922,
+    "gate_entry_rmse": 0.891164,
+    "gate_induced_trajectory_rmse": 2.54474,
+    "holm_margin_gate_passed": false
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "total_vram_bytes": 23659151360,
+    "peak_allocated_vram_bytes": 6982702592,
+    "peak_reserved_vram_bytes": 7107248128,
+    "wall_seconds": 150.615384382,
+    "colab_compute_units_before": 79.74,
+    "colab_compute_units_after": 79.62,
+    "colab_compute_units_consumed": 0.12
+  },
+  "decision": {
+    "full_matrix_authorized": false,
+    "revision": "version the loss contract, retain entry relative-norm regularization, and disable only the singular induced-trajectory relative-norm term",
+    "next_pilot": "lip-unrolled-initial-condition-bridge-v2"
+  }
+}

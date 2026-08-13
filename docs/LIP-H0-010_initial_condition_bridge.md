@@ -49,6 +49,14 @@ quality decision. It uses the same task batch of four as the full matrix so the
 contrastive objective retains the original PROTO-014 negative-set size. If
 feasible, the frozen matrix is two objectives by three seeds, 512 updates each.
 
+The first numeric pilot completed all 16 updates but failed its AMP gate. The
+failure localized to the relative component-norm penalty: teacher boundary
+regions with near-zero norm made the ratio term singular even though trajectory
+RMSE remained finite. Protocol v2 therefore keeps the inherited norm penalty
+for the layer-0 snapshot and disables only that term for the induced trajectory.
+Huber, cosine, symmetric NCE, and margin losses remain unchanged. The v1
+artifact is retained as a failed feasibility pilot rather than overwritten.
+
 ## Development decision
 
 Checkpoint selection uses joint/core/name retrieval and margins on the induced

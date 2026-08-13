@@ -1,5 +1,5 @@
 experiment_id: "LIP-H0-010"
-protocol_version: "lip-unrolled-initial-condition-bridge-v1"
+protocol_version: "lip-unrolled-initial-condition-bridge-v2"
 claim_status: "development_only_training_experiment"
 
 predecessor:
@@ -67,14 +67,25 @@ variants:
       lambda_induced_trajectory: 1.0
 
 loss:
-  temperature: 0.07
-  margin_target: 0.05
-  lambda_huber: 1.0
-  lambda_cosine: 0.25
-  lambda_symmetric_nce: 1.0
-  lambda_margin: 0.10
-  lambda_norm: 0.05
-  component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+  entry_snapshot:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 0.10
+    lambda_norm: 0.05
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+  induced_trajectory:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 0.10
+    lambda_norm: 0.0
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+    norm_term_rationale: "relative component norms are singular when a teacher trajectory region has near-zero norm"
 
 training:
   seeds: [4001, 4003, 4007]

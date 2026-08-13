@@ -43,7 +43,7 @@ from src.pipelines.packet_trajectory import _atomic_json
 from src.pipelines.receiver_aware_replay import _lf_sha256_file
 
 
-INITIAL_CONDITION_PROTOCOL_VERSION = "lip-unrolled-initial-condition-bridge-v1"
+INITIAL_CONDITION_PROTOCOL_VERSION = "lip-unrolled-initial-condition-bridge-v2"
 
 
 def _git_head() -> str:
@@ -130,6 +130,13 @@ def _validate_contract(
         raise ValueError("static control cannot use an induced trajectory loss")
     if float(systems["unrolled_initial_condition"]["lambda_induced_trajectory"]) <= 0.0:
         raise ValueError("primary system must optimize the induced trajectory")
+    losses = experiment["loss"]
+    if set(losses) != {"entry_snapshot", "induced_trajectory"}:
+        raise ValueError("H0-010 must define separate entry and trajectory losses")
+    if float(losses["entry_snapshot"]["lambda_norm"]) <= 0.0:
+        raise ValueError("entry snapshot loss must retain its norm regularizer")
+    if float(losses["induced_trajectory"]["lambda_norm"]) != 0.0:
+        raise ValueError("induced trajectory loss must disable singular relative norms")
     pilot = experiment["training"]["pilot"]
     if pilot["variant"] != "unrolled_initial_condition" or int(pilot["seed"]) != 4001:
         raise ValueError("H0-010 pilot cell changed")
@@ -412,7 +419,10 @@ def run_initial_condition_training(
     bridge_target_shape = (1, target_shape[1], target_shape[2])
     model_config = _bridge_model_config(experiment)
     bridge = build_packet_bridge(model_config, source_shape, bridge_target_shape).to(device)
-    criterion = build_packet_loss(experiment["loss"])
+    entry_criterion = build_packet_loss(experiment["loss"]["entry_snapshot"])
+    trajectory_criterion = build_packet_loss(
+        experiment["loss"]["induced_trajectory"]
+    )
     optimizer = torch.optim.AdamW(
         bridge.parameters(),
         lr=float(stage["learning_rate"]),
@@ -464,7 +474,7 @@ def run_initial_condition_training(
             )
             with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=use_amp):
                 predicted_entry = bridge(source)
-                entry_metrics = criterion(predicted_entry, target[:, :1], masks)
+                entry_metrics = entry_criterion(predicted_entry, target[:, :1], masks)
                 trajectory_metrics = None
                 total_loss = lambda_entry * entry_metrics["total_loss"]
                 if lambda_trajectory > 0.0:
@@ -477,7 +487,9 @@ def run_initial_condition_training(
                         site_scale=site_scale,
                         layers=layers,
                     )
-                    trajectory_metrics = criterion(induced[:, 1:], target[:, 1:], masks)
+                    trajectory_metrics = trajectory_criterion(
+                        induced[:, 1:], target[:, 1:], masks
+                    )
                     total_loss = (
                         total_loss
                         + lambda_trajectory * trajectory_metrics["total_loss"]

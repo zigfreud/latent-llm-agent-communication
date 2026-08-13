@@ -1,11 +1,16 @@
+from pathlib import Path
+
 import torch
 
 from src.pipelines.initial_condition_bridge import (
+    INITIAL_CONDITION_PROTOCOL_VERSION,
+    _validate_contract,
     _entry_raw_packet,
     _induced_trajectory,
     _normalize_trajectory,
     _repeat_receiver_inputs,
 )
+from src.pipelines.oracle_experiment import load_yaml
 
 
 class AddLayer(torch.nn.Module):
@@ -71,3 +76,22 @@ def test_induced_trajectory_remains_differentiable_after_normalization():
     assert trajectory[:, :, 0, 0].tolist() == [[10.0, 11.0, 12.0]]
     trajectory.sum().backward()
     assert entry.grad.tolist() == [[[[3.0]]]]
+
+
+def test_h0_010_contract_separates_singular_trajectory_norm_loss():
+    experiment_path = Path("config/LIP-H0-010_initial_condition_bridge.yaml")
+    parent_path = Path("config/LIP-PROTO-014_source_conditioned_residual_packet.yaml")
+    experiment = load_yaml(experiment_path)
+    parent = load_yaml(parent_path)
+    _validate_contract(
+        experiment,
+        parent,
+        experiment_path=experiment_path,
+        parent_path=parent_path,
+        predecessor_registry_path=Path(
+            "experiments/registry/LIP-H0-009_entry_seed_free_evolution.json"
+        ),
+    )
+    assert experiment["protocol_version"] == INITIAL_CONDITION_PROTOCOL_VERSION
+    assert experiment["loss"]["entry_snapshot"]["lambda_norm"] > 0.0
+    assert experiment["loss"]["induced_trajectory"]["lambda_norm"] == 0.0
