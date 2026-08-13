@@ -17,4 +17,4 @@ confirmation tasks may be opened.
 - Wall time: 30.11 seconds on NVIDIA L4.
 - Colab usage: 0.13 compute units.
 - Artifact: `lip-artifacts/LIP-H0-010/pilot-v3/run_summary.json`.
-- SHA-256: `ada20c333cfed7adf05b2f788cee941cd7c872190e67edb337269e0491306f41d`.
+- SHA-256: `ada20c333cfed7adf05b2f788cee941cd7c872190e67ed337269e0491306f41d`.

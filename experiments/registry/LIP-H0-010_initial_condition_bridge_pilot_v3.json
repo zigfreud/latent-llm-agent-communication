@@ -7,7 +7,7 @@
     "drive_root": "lip-artifacts/LIP-H0-010/pilot-v3",
     "run_summary": {
       "path": "run_summary.json",
-      "sha256": "ada20c333cfed7adf05b2f788cee941cd7c872190e67edb337269e0491306f41d"
+      "sha256": "ada20c333cfed7adf05b2f788cee941cd7c872190e67ed337269e0491306f41d"
     }
   },
   "pilot_gate": {
