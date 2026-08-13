@@ -335,10 +335,13 @@ def run_initial_condition_training(
     pilot: bool,
     target_device: str,
     colab_compute_units_before: float | None,
+    contract_validator=_validate_contract,
+    result_experiment_id: str = "LIP-H0-010",
+    result_protocol_version: str = INITIAL_CONDITION_PROTOCOL_VERSION,
 ) -> dict:
     experiment = load_yaml(experiment_path)
     parent = load_yaml(parent_path)
-    _validate_contract(
+    contract_validator(
         experiment,
         parent,
         experiment_path=experiment_path,
@@ -648,8 +651,8 @@ def run_initial_condition_training(
         )
 
     result = {
-        "experiment_id": "LIP-H0-010",
-        "protocol_version": INITIAL_CONDITION_PROTOCOL_VERSION,
+        "experiment_id": result_experiment_id,
+        "protocol_version": result_protocol_version,
         "claim_status": experiment["claim_status"],
         "stage": "pilot" if pilot else "full_training_cell",
         "variant": variant_name,

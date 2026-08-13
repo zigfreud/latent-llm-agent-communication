@@ -1,0 +1,136 @@
+experiment_id: "LIP-H0-011"
+protocol_version: "lip-core-negative-coverage-v1"
+claim_status: "development_only_negative_coverage_screen"
+
+predecessor:
+  protocol: "LIP-H0-010"
+  registry: "experiments/registry/LIP-H0-010_initial_condition_bridge_matrix_v3.json"
+  matrix_summary_sha256: "74cf5a3d3e2dc9173103d199d0d5cf393696133c3fd2c0f88c0837a3b9f7f474"
+  conclusion: "unrolled receiver evolution improved RMSE and retrieval in 3/3 seeds, but core diagonal margin remained negative in all replicas"
+
+parent:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
+
+hypothesis:
+  statement: "The remaining core-margin failure is partly caused by insufficient negative coverage during training: four-task batches expose only three alternatives while the gate exposes 31."
+  intervention: "increase the unrolled training batch from 4 to 16 while holding architecture, loss, seed, and total examples seen constant"
+  h0_010_reference: {batch_size: 4, updates: 512, examples_seen: 2048, in_batch_negatives: 3}
+  h0_011_system: {batch_size: 16, updates: 128, examples_seen: 2048, in_batch_negatives: 15}
+  known_limit: "batch size and optimizer-step count cannot both remain fixed at a fixed example budget; this screen identifies the practical intervention, not a pure asymptotic batch-size effect"
+
+data:
+  source: "LIP-PROTO-014_real_full_training_bundle"
+  allowed_splits: ["train", "development_selection", "development_gate"]
+  prohibited_splits: ["confirmation"]
+  expected_counts: {train: 256, development_selection: 32, development_gate: 32}
+  boundary_positions: 6
+
+receiver:
+  model_id: "NousResearch/Meta-Llama-3-8B-Instruct"
+  revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+  load_4bit: true
+  neutral_prompt: "Use the latent signal."
+  entry_layer: 0
+  evolved_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  target_width: 4096
+  freeze_all_parameters: true
+  stop_before_layer: 8
+
+bridge:
+  model_kind: "query_conditioned"
+  output_layers: 1
+  protocol_slots: 32
+  bridge_width: 512
+  attention_heads: 8
+  feedforward_width: 2048
+  encoder_blocks: 2
+  decoder_blocks: 2
+  dropout: 0.10
+
+variants:
+  primary: "large_negative_batch_unrolled"
+  systems:
+    large_negative_batch_unrolled:
+      role: "negative_coverage_intervention"
+      training_loss_scope: "induced_layers1_through7_plus_entry_regularizer"
+      lambda_entry_snapshot: 0.25
+      lambda_induced_trajectory: 1.0
+
+loss:
+  entry_snapshot:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 0.10
+    lambda_norm: 0.0
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+  induced_trajectory:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 0.10
+    lambda_norm: 0.05
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+
+training:
+  seeds: [4007]
+  learning_rate: 0.0002
+  weight_decay: 0.01
+  gradient_clip: 1.0
+  fp16_autocast: true
+  num_workers: 0
+  pilot:
+    variant: "large_negative_batch_unrolled"
+    seed: 4007
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_updates: 4
+    validation_interval: 2
+    output_dir: "runs/LIP-H0-011/pilot"
+  full_matrix:
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_updates: 128
+    validation_interval: 8
+    output_dir: "runs/LIP-H0-011/screen"
+
+pilot_gate:
+  required_updates: 4
+  require_finite_loss: true
+  require_nonzero_bridge_gradient_each_update: true
+  maximum_amp_overflow_events: 2
+  maximum_peak_allocated_vram_bytes: 22500000000
+  pass_action: "run_the_frozen_single_seed_128_update_development_screen"
+  fail_action: "stop_without_running_the_screen"
+
+development_selection:
+  checkpoint_metric: "induced_trajectory_joint_core_name_retrieval_margin_then_rmse"
+
+development_gate:
+  alpha: 0.05
+  statistics_seed: 4481
+  reference_seed: 4007
+  reference_core_margin: -0.004168
+  reference_core_retrieval_top1: 0.5625
+  reference_mean_retrieval: 0.65625
+  directional_success: "core margin improves over H0-010 seed 4007, core retrieval is not lower, and mean retrieval is not lower"
+  strong_success: "core margin is positive and the joint/core/name Holm family passes"
+  pass_action: "replicate_negative_coverage_intervention_before_any_functional_confirmation"
+  fail_action: "test_explicit_core_discriminative_pressure_in_development"
+
+confirmation:
+  status: "prohibited_in_H0-011"
+  proto_015_status: "premature"
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  receiver_forward_scope: "blocks_0_through_7_only"
+  bridge_and_receiver_device: "cuda"
