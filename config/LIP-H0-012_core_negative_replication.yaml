@@ -1,0 +1,127 @@
+experiment_id: "LIP-H0-012"
+protocol_version: "lip-core-negative-coverage-replication-v1"
+claim_status: "development_only_replication_extension"
+
+predecessor:
+  protocol: "LIP-H0-011"
+  registry: "experiments/registry/LIP-H0-011_core_negative_coverage.json"
+  screen_sha256: "9fab01ec20b1a691911b24dc2e276eae8ecfa1f498a2f555cacd1bf436bfb08a"
+  frozen_seed: 4007
+
+parent:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
+
+hypothesis:
+  statement: "The positive core-margin response to broader negative coverage replicates across training seeds."
+  intervention: "repeat the frozen H0-011 batch-16, 2,048-example system for seeds 4001 and 4003 and combine them with the frozen seed-4007 screen"
+
+data:
+  source: "LIP-PROTO-014_real_full_training_bundle"
+  allowed_splits: ["train", "development_selection", "development_gate"]
+  prohibited_splits: ["confirmation"]
+  expected_counts: {train: 256, development_selection: 32, development_gate: 32}
+  boundary_positions: 6
+
+receiver:
+  model_id: "NousResearch/Meta-Llama-3-8B-Instruct"
+  revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+  load_4bit: true
+  neutral_prompt: "Use the latent signal."
+  entry_layer: 0
+  evolved_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  target_width: 4096
+  freeze_all_parameters: true
+  stop_before_layer: 8
+
+bridge:
+  model_kind: "query_conditioned"
+  output_layers: 1
+  protocol_slots: 32
+  bridge_width: 512
+  attention_heads: 8
+  feedforward_width: 2048
+  encoder_blocks: 2
+  decoder_blocks: 2
+  dropout: 0.10
+
+variants:
+  primary: "large_negative_batch_unrolled"
+  systems:
+    large_negative_batch_unrolled:
+      role: "negative_coverage_replication"
+      training_loss_scope: "induced_layers1_through7_plus_entry_regularizer"
+      lambda_entry_snapshot: 0.25
+      lambda_induced_trajectory: 1.0
+
+loss:
+  entry_snapshot:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 0.10
+    lambda_norm: 0.0
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+  induced_trajectory:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 0.10
+    lambda_norm: 0.05
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+
+training:
+  seeds: [4001, 4003]
+  learning_rate: 0.0002
+  weight_decay: 0.01
+  gradient_clip: 1.0
+  fp16_autocast: true
+  num_workers: 0
+  pilot:
+    variant: "large_negative_batch_unrolled"
+    seed: 4007
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_updates: 4
+    validation_interval: 2
+    output_dir: "runs/LIP-H0-011/pilot"
+  full_matrix:
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_updates: 128
+    validation_interval: 8
+    output_dir: "runs/LIP-H0-012/replication"
+
+development_selection:
+  checkpoint_metric: "induced_trajectory_joint_core_name_retrieval_margin_then_rmse"
+
+development_gate:
+  alpha: 0.05
+  statistics_seed: 4481
+  reference_by_seed:
+    4001: {core_margin: -0.054298, core_retrieval_top1: 0.46875, mean_retrieval: 0.59375}
+    4003: {core_margin: -0.030750, core_retrieval_top1: 0.53125, mean_retrieval: 0.68750}
+    4007: {core_margin: -0.004168, core_retrieval_top1: 0.56250, mean_retrieval: 0.65625}
+  minimum_directional_replicas: 2
+  minimum_strong_replicas: 2
+  directional_criterion: "core margin improves, core retrieval is not lower, and mean retrieval is not lower relative to the paired H0-010 seed"
+  strong_criterion: "the joint/core/name Holm family passes"
+  pass_action: "freeze_a_new_untouched_functional_confirmation_design"
+  directional_only_action: "retain_negative_coverage_and_test_explicit_core_margin_pressure"
+  fail_action: "reject_negative_coverage_as_a_replicated_solution"
+
+confirmation:
+  status: "prohibited_in_H0-012"
+  proto_015_status: "premature_until_the_strong_replication_gate_passes"
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  receiver_forward_scope: "blocks_0_through_7_only"
+  bridge_and_receiver_device: "cuda"
