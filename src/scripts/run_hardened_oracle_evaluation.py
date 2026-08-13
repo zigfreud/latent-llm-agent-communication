@@ -1,4 +1,4 @@
-"""Run oracle functional scoring inside a probed Linux namespace sandbox."""
+"""Run registered functional scoring inside a probed Linux namespace sandbox."""
 
 from __future__ import annotations
 
@@ -27,7 +27,12 @@ from src.pipelines.oracle_experiment import (
     prepare_output_dir,
     write_json,
 )
-from src.scripts.evaluate_oracle_packet_semantics import evaluate
+from src.scripts.evaluate_oracle_packet_semantics import (
+    evaluate as evaluate_oracle_packet_semantics,
+)
+from src.scripts.evaluate_packet_bridge_confirmation import (
+    evaluate as evaluate_packet_bridge_confirmation,
+)
 
 
 NOBODY_UID = 65534
@@ -102,6 +107,12 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def evaluator_for_config(config: dict[str, Any]):
+    if config.get("experiment_id") == "LIP-PROTO-014":
+        return evaluate_packet_bridge_confirmation
+    return evaluate_oracle_packet_semantics
+
+
 def _make_tree_readonly(root: Path) -> None:
     for path in sorted(root.rglob("*"), reverse=True):
         if path.is_symlink():
@@ -171,15 +182,20 @@ def _run_parent(args: argparse.Namespace) -> None:
 
     config_path = args.config.resolve()
     config = load_yaml(config_path)
+    output_config = config.get("output", {})
+    if args.generations is None and not output_config.get("generations_jsonl"):
+        raise ValueError("--generations is required when config has no output path")
+    if args.output_dir is None and not output_config.get("evaluation_dir"):
+        raise ValueError("--output-dir is required when config has no output path")
     generations_path = (
         args.generations.resolve()
         if args.generations
-        else Path(str(config["output"]["generations_jsonl"])).resolve()
+        else Path(str(output_config["generations_jsonl"])).resolve()
     )
     output_dir = (
         args.output_dir.resolve()
         if args.output_dir
-        else Path(str(config["output"]["evaluation_dir"]))
+        else Path(str(output_config["evaluation_dir"]))
         .with_name("functional-evaluation")
         .resolve()
     )
@@ -205,11 +221,14 @@ def _run_parent(args: argparse.Namespace) -> None:
             host_secret=host_secret,
             allow_incomplete=args.allow_incomplete,
         )
+        with generations_path.open("r", encoding="utf-8") as handle:
+            generation_count = sum(1 for line in handle if line.strip())
+        wall_timeout = max(60 * 60, generation_count * 6 + 10 * 60)
         completed = subprocess.run(
             command,
             text=True,
             capture_output=True,
-            timeout=60 * 60,
+            timeout=wall_timeout,
             check=False,
             env={"LC_ALL": "C.UTF-8", "PATH": "/usr/local/bin:/usr/bin:/bin"},
         )
@@ -231,7 +250,7 @@ def _run_parent(args: argparse.Namespace) -> None:
         prepare_output_dir(output_dir, overwrite=args.overwrite)
         shutil.copytree(sandbox_output, output_dir, dirs_exist_ok=True)
 
-    print("Hardened oracle functional evaluation completed")
+    print("Hardened functional evaluation completed")
     print(f"execution_mode: {summary['execution_mode']}")
     print(f"claim_eligible: {summary['claim_eligible']}")
     print(f"semantic_transport_supported: {summary['semantic_transport_supported']}")
@@ -277,7 +296,8 @@ def _run_worker(args: argparse.Namespace) -> None:
     }
     config = load_yaml(INTERNAL_CONFIG)
     os.umask(0o077)
-    summary = evaluate(
+    evaluator = evaluator_for_config(config)
+    summary = evaluator(
         config,
         INTERNAL_GENERATIONS,
         INTERNAL_OUTPUT,

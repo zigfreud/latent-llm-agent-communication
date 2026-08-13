@@ -26,6 +26,20 @@ def test_raw_protocol_preserves_prompt_and_uses_tokenizer_special_tokens():
     assert tokenizer.calls == []
 
 
+def test_raw_protocol_can_prepend_a_registered_prefix():
+    tokenizer = FakeTokenizer()
+    config = {"mode": "raw", "raw_prefix": "Python task:\n"}
+
+    assert format_prompt("write code", tokenizer, config) == (
+        "Python task:\nwrite code"
+    )
+    assert protocol_metadata(config)["raw_prefix"] == "Python task:\n"
+    with pytest.raises(ValueError, match="only with mode=raw"):
+        parse_prompt_protocol(
+            {"mode": "chat_template", "raw_prefix": "Python task:\n"}
+        )
+
+
 def test_chat_protocol_uses_tokenizer_template_once():
     tokenizer = FakeTokenizer()
     config = {
