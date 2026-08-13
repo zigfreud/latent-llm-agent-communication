@@ -273,7 +273,7 @@ def run_initial_condition_matrix(
         ],
         "cells": state["completed_cells"],
         "development_gate": gate,
-        "confirmation_used": false,
+        "confirmation_used": False,
         "telemetry": {
             "colab_compute_units_before": colab_compute_units_before,
             "colab_compute_units_after": None,
