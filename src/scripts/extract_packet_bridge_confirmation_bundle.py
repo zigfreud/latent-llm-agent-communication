@@ -1,0 +1,47 @@
+"""Extract the post-gate LIP-PROTO-014 confirmation packet bundle."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from src.pipelines.packet_extraction import (
+    materialize_packet_confirmation_bundle,
+)
+
+
+DEFAULT_CONFIG = Path(
+    "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument("--bundle-dir", type=Path, required=True)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--keep-staging", action="store_true")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    result = materialize_packet_confirmation_bundle(
+        args.config,
+        bundle_dir=args.bundle_dir,
+        dry_run=args.dry_run,
+        resume=args.resume,
+        overwrite=args.overwrite,
+        keep_staging=args.keep_staging,
+    )
+    print("LIP packet confirmation extraction passed")
+    print(f"bundle: {args.bundle_dir}")
+    print(f"records: {result['records']}")
+    print(f"extraction_scope: {result['extraction_scope']}")
+    print(f"manifest: {result['manifest']}")
+
+
+if __name__ == "__main__":
+    main()

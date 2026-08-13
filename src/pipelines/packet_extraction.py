@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gc
 import json
+import math
 import shutil
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -23,6 +24,7 @@ from src.core.prompt_protocol import (
     protocol_pair_metadata,
     tokenizer_add_special_tokens,
 )
+from src.evaluation.oracle_terminal_factorial import validate_terminal_layout
 from src.pipelines.infer import load_source, load_target, model_input_device
 from src.pipelines.oracle_experiment import (
     load_json_object,
@@ -98,6 +100,115 @@ def load_bound_packet_tasks(config: Mapping) -> tuple[list[dict], dict, Path]:
     if manifest.get("task_keys_sha256") != sha256_json(task_keys):
         raise ValueError("packet task registry order hash changed")
     return tasks, manifest, manifest_path
+
+
+def load_bound_confirmation_tasks(
+    config: Mapping,
+) -> tuple[list[dict], dict, Path]:
+    """Load the post-gate confirmation cohort and revalidate every binding."""
+
+    confirmation = config["confirmation"]
+    tasks_path = Path(str(confirmation["tasks_jsonl"]))
+    manifest_path = Path(str(confirmation["task_manifest"]))
+    report_path = Path(str(confirmation["selection_report"]))
+    manifest = load_json_object(manifest_path)
+    report = load_json_object(report_path)
+    tasks = load_tasks(tasks_path)
+    if (
+        manifest.get("manifest_kind")
+        != "lip_packet_confirmation_task_manifest"
+        or manifest.get("schema_version") != 1
+        or manifest.get("experiment_id") != config.get("experiment_id")
+        or manifest.get("mock_data") is not False
+    ):
+        raise ValueError("confirmation task manifest violates the protocol")
+    expected_count = int(confirmation["task_count"])
+    task_ids = [str(task["task_id"]) for task in tasks]
+    checks = {
+        "task_count": len(tasks) == expected_count == manifest.get("task_count"),
+        "unique_ids": len(set(task_ids)) == len(task_ids),
+        "sampled_ids": task_ids == manifest.get("sampled_ids"),
+        "prompt_hashes": manifest.get("sampled_prompt_sha256")
+        == [prompt_sha256(str(task["prompt"])) for task in tasks],
+        "task_hashes": manifest.get("sampled_task_sha256")
+        == [task_sha256(task) for task in tasks],
+        "tasks_path": manifest.get("tasks_jsonl") == str(tasks_path),
+        "tasks_hash": manifest.get("tasks_jsonl_sha256")
+        == sha256_file(tasks_path),
+        "config_mapping": load_yaml(
+            Path(str(manifest.get("contract_config", "")))
+        )
+        == dict(config),
+        "config_hash": manifest.get("contract_config_sha256")
+        == sha256_file(Path(str(manifest.get("contract_config")))),
+        "target_model": manifest.get("target_model")
+        == config["models"]["target"]["model_id"],
+        "target_revision": manifest.get("target_model_revision")
+        == config["models"]["target"]["revision"],
+        "target_prompt_protocol": manifest.get("prompt_protocol")
+        == protocol_pair_metadata(config["prompt_protocols"])["target"],
+    }
+    failed = [name for name, passed in checks.items() if not passed]
+    if failed:
+        raise ValueError(
+            "confirmation task manifest failed its frozen bindings: "
+            + ", ".join(failed)
+        )
+
+    reference_fields = (
+        "candidate_manifest",
+        "screening_scored_jsonl",
+        "predecessor_selected_manifest",
+        "training_registry_manifest",
+        "matrix_summary",
+    )
+    for field in reference_fields:
+        path = Path(str(manifest.get(field, "")))
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        if manifest.get(f"{field}_sha256") != sha256_file(path):
+            raise ValueError(f"confirmation provenance hash changed: {field}")
+
+    training_tasks, training_manifest, training_manifest_path = (
+        load_bound_packet_tasks(config)
+    )
+    training_ids = {str(task["task_id"]) for task in training_tasks}
+    if training_ids.intersection(task_ids):
+        raise ValueError("confirmation tasks overlap packet train/development tasks")
+    if (
+        manifest.get("training_registry_manifest")
+        != str(training_manifest_path)
+        or manifest.get("training_registry_manifest_sha256")
+        != sha256_file(training_manifest_path)
+        or manifest.get("training_task_keys_sha256")
+        != training_manifest["task_keys_sha256"]
+    ):
+        raise ValueError("confirmation no longer binds the training registry")
+
+    strata = {2: [], 3: []}
+    for task in tasks:
+        strata[validate_terminal_layout(task.get("terminal_layout", {}))].append(
+            str(task["task_id"])
+        )
+    expected_strata = manifest.get("selected_task_ids_by_name_token_count", {})
+    if any(
+        strata[count] != expected_strata.get(str(count)) or len(strata[count]) != 16
+        for count in (2, 3)
+    ):
+        raise ValueError("confirmation tokenizer strata changed")
+
+    if (
+        report.get("passed") is not True
+        or report.get("matrix_gate_passed") is not True
+        or report.get("claim_eligible") is not False
+        or report.get("selected_task_count") != expected_count
+        or report.get("disjoint_from_predecessor") is not True
+        or report.get("disjoint_from_training_and_development") is not True
+        or report.get("task_manifest") != str(manifest_path)
+        or report.get("task_manifest_sha256") != sha256_file(manifest_path)
+    ):
+        raise ValueError("confirmation selection report failed validation")
+    return [{**task, "split": "confirmation"} for task in tasks], manifest, manifest_path
 
 
 def _suffix_positions(
@@ -279,6 +390,22 @@ def _extract_real_endpoint(
                 and staged.get("task_sha256") == expected_task_hash
                 and tuple(staged["packet"].shape) == tuple(contract["shape"])
             ):
+                if endpoint == "target" and index < self_check_tasks:
+                    self_check = staged.get("self_check")
+                    if not isinstance(self_check, Mapping):
+                        raise ValueError(
+                            "resumed target stage lacks its required self-replay check"
+                        )
+                    delta = float(self_check.get("maximum_absolute_logit_delta", math.inf))
+                    if (
+                        self_check.get("task_id") != str(task["task_id"])
+                        or not math.isfinite(delta)
+                        or delta > maximum_self_logit_delta
+                    ):
+                        raise ValueError(
+                            "resumed target stage failed its self-replay binding"
+                        )
+                    reports.append(dict(self_check))
                 continue
 
         formatted, inputs, metadata = _tokenize_prompt(
@@ -446,14 +573,21 @@ def materialize_packet_bundle(
     overwrite: bool = False,
     keep_staging: bool = False,
     preflight_tasks_per_split: int | None = None,
+    confirmation: bool = False,
 ) -> dict:
-    """Build and validate a confirmation-free packet bundle."""
+    """Build and validate a training-side or sealed-confirmation packet bundle."""
 
     config_path = Path(config_path)
     config = load_yaml(config_path)
     extraction = config["extraction"]
+    if confirmation and preflight_tasks_per_split is not None:
+        raise ValueError("confirmation extraction cannot use the training preflight slice")
     extraction_scope = (
-        "preflight" if preflight_tasks_per_split is not None else "full"
+        "confirmation"
+        if confirmation
+        else "preflight"
+        if preflight_tasks_per_split is not None
+        else "full"
     )
     if (
         preflight_tasks_per_split is not None
@@ -469,6 +603,32 @@ def materialize_packet_bundle(
             )
             if validation["extraction_scope"] != extraction_scope:
                 raise ValueError("existing bundle uses a different extraction scope")
+            if confirmation:
+                expected = int(config["confirmation"]["task_count"])
+                if validation["split_counts"] != {
+                    "train": 0,
+                    "development_selection": 0,
+                    "development_gate": 0,
+                    "confirmation": expected,
+                }:
+                    raise ValueError("existing confirmation bundle counts changed")
+                if not dry_run and validation["extraction_mode"] != "real":
+                    raise ValueError("existing confirmation bundle is not real")
+                _, _, confirmation_manifest_path = load_bound_confirmation_tasks(
+                    config
+                )
+                existing_manifest = load_json_object(bundle_dir / "manifest.json")
+                if (
+                    existing_manifest.get("config_sha256")
+                    != sha256_file(config_path)
+                    or existing_manifest.get("registry", {}).get(
+                        "manifest_sha256"
+                    )
+                    != sha256_file(confirmation_manifest_path)
+                ):
+                    raise ValueError(
+                        "existing confirmation bundle uses different provenance"
+                    )
             return {
                 **validation,
                 "manifest": str(bundle_dir / "manifest.json"),
@@ -482,7 +642,12 @@ def materialize_packet_bundle(
     shard_dir = bundle_dir / "shards"
     shard_dir.mkdir(parents=True, exist_ok=True)
 
-    tasks, registry_manifest, registry_path = load_bound_packet_tasks(config)
+    if confirmation:
+        tasks, registry_manifest, registry_path = load_bound_confirmation_tasks(
+            config
+        )
+    else:
+        tasks, registry_manifest, registry_path = load_bound_packet_tasks(config)
     if preflight_tasks_per_split is not None:
         tasks = [
             task
@@ -598,6 +763,11 @@ def materialize_packet_bundle(
         "extraction_scope": extraction_scope,
     }
     trace_id = "LIP-PROTO-014-" + sha256_json(trace_payload)[:16]
+    registry_task_keys_sha256 = registry_manifest.get("task_keys_sha256")
+    if confirmation:
+        registry_task_keys_sha256 = sha256_json(task_keys)
+    if not isinstance(registry_task_keys_sha256, str):
+        raise ValueError("registry manifest lacks a task-order digest")
     manifest = {
         "bundle_format": "lip_packet_bundle",
         "schema_version": 1,
@@ -625,7 +795,7 @@ def materialize_packet_bundle(
         "registry": {
             "manifest": str(registry_path),
             "manifest_sha256": sha256_file(registry_path),
-            "task_keys_sha256": registry_manifest["task_keys_sha256"],
+            "task_keys_sha256": registry_task_keys_sha256,
         },
         "source_packet": source_contract,
         "target_packet": target_contract,
@@ -652,6 +822,39 @@ def materialize_packet_bundle(
         bundle_dir,
         require_real=not dry_run and extraction_scope == "full",
     )
+    if extraction_scope == "confirmation":
+        expected = int(config["confirmation"]["task_count"])
+        if validation["split_counts"] != {
+            "train": 0,
+            "development_selection": 0,
+            "development_gate": 0,
+            "confirmation": expected,
+        }:
+            raise ValueError("confirmation bundle split counts changed")
+        if not dry_run and validation["extraction_mode"] != "real":
+            raise ValueError("claim-oriented confirmation extraction must be real")
     if not keep_staging and staging_dir.exists():
         shutil.rmtree(staging_dir)
     return {**validation, "manifest": str(bundle_dir / "manifest.json")}
+
+
+def materialize_packet_confirmation_bundle(
+    config_path: Path | str,
+    *,
+    bundle_dir: Path | str | None = None,
+    dry_run: bool = False,
+    resume: bool = False,
+    overwrite: bool = False,
+    keep_staging: bool = False,
+) -> dict:
+    """Extract the sealed 32-task cohort without mixing it into training data."""
+
+    return materialize_packet_bundle(
+        config_path,
+        bundle_dir=bundle_dir,
+        dry_run=dry_run,
+        resume=resume,
+        overwrite=overwrite,
+        keep_staging=keep_staging,
+        confirmation=True,
+    )

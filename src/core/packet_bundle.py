@@ -239,8 +239,8 @@ def validate_packet_bundle(
     if extraction_mode not in {"real", "dry_run"}:
         _fail("extraction_mode must be real or dry_run")
     extraction_scope = manifest.get("extraction_scope")
-    if extraction_scope not in {"full", "preflight"}:
-        _fail("extraction_scope must be full or preflight")
+    if extraction_scope not in {"full", "preflight", "confirmation"}:
+        _fail("extraction_scope must be full, preflight, or confirmation")
     if require_real and (
         extraction_mode != "real" or extraction_scope != "full"
     ):

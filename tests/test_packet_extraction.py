@@ -6,6 +6,7 @@ import yaml
 from src.pipelines.packet_extraction import (
     classify_target_terminal_layout,
     materialize_packet_bundle,
+    materialize_packet_confirmation_bundle,
 )
 from src.scripts.materialize_packet_bridge_tasks import (
     materialize_packet_bridge_tasks,
@@ -132,6 +133,43 @@ def test_preflight_bundle_is_balanced_and_not_claim_eligible(tmp_path):
         "development_selection": 2,
         "development_gate": 2,
         "confirmation": 0,
+    }
+
+
+def test_confirmation_bundle_uses_a_separate_sealed_scope(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    config["confirmation"] = {"task_count": 32}
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    registry_path = tmp_path / "confirmation-manifest.json"
+    registry_path.write_text("{}\n", encoding="utf-8")
+    tasks = [
+        {
+            "task_id": f"confirmation-{index:02d}",
+            "prompt": f"Write function_{index}",
+            "entry_point": f"function_{index}",
+            "split": "confirmation",
+        }
+        for index in range(32)
+    ]
+    monkeypatch.setattr(
+        "src.pipelines.packet_extraction.load_bound_confirmation_tasks",
+        lambda _config: (tasks, {}, registry_path),
+    )
+
+    result = materialize_packet_confirmation_bundle(
+        config_path,
+        bundle_dir=tmp_path / "confirmation-bundle",
+        dry_run=True,
+    )
+
+    assert result["extraction_scope"] == "confirmation"
+    assert result["records"] == 32
+    assert result["split_counts"] == {
+        "train": 0,
+        "development_selection": 0,
+        "development_gate": 0,
+        "confirmation": 32,
     }
 
 
