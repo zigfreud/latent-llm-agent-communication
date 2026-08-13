@@ -103,6 +103,28 @@ def test_packet_loss_is_finite_and_differentiable():
     assert torch.isfinite(prediction.grad).all()
 
 
+def test_disabled_norm_term_is_not_evaluated_for_zero_norm_target():
+    prediction = torch.full((2, 1, 8, 5), 1e20)
+    target = torch.zeros_like(prediction)
+    masks = build_terminal_component_masks(
+        torch.tensor([2, 2]),
+        target_positions=8,
+        boundary_positions=2,
+    )
+    criterion = ComponentAwarePacketLoss(
+        lambda_huber=0.0,
+        lambda_cosine=0.0,
+        lambda_symmetric_nce=0.0,
+        lambda_margin=0.0,
+        lambda_norm=0.0,
+    )
+
+    metrics = criterion(prediction, target, masks)
+
+    assert metrics["norm_loss"].item() == 0.0
+    assert torch.isfinite(metrics["total_loss"])
+
+
 def test_terminal_masks_reject_names_that_consume_the_entire_core():
     with pytest.raises(ValueError, match="leave at least one terminal core"):
         build_terminal_component_masks(

@@ -239,6 +239,9 @@ class ComponentAwarePacketLoss(nn.Module):
 
         norm_components = {}
         for name in COMPONENT_NAMES:
+            if self.lambda_norm == 0.0:
+                norm_components[name] = prediction.new_zeros(())
+                continue
             mask = component_masks[name]
             predicted_norm = torch.linalg.vector_norm(
                 _masked_flatten(prediction, mask), dim=1

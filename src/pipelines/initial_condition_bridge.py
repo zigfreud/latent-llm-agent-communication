@@ -43,7 +43,7 @@ from src.pipelines.packet_trajectory import _atomic_json
 from src.pipelines.receiver_aware_replay import _lf_sha256_file
 
 
-INITIAL_CONDITION_PROTOCOL_VERSION = "lip-unrolled-initial-condition-bridge-v2"
+INITIAL_CONDITION_PROTOCOL_VERSION = "lip-unrolled-initial-condition-bridge-v3"
 
 
 def _git_head() -> str:
@@ -133,10 +133,10 @@ def _validate_contract(
     losses = experiment["loss"]
     if set(losses) != {"entry_snapshot", "induced_trajectory"}:
         raise ValueError("H0-010 must define separate entry and trajectory losses")
-    if float(losses["entry_snapshot"]["lambda_norm"]) <= 0.0:
-        raise ValueError("entry snapshot loss must retain its norm regularizer")
-    if float(losses["induced_trajectory"]["lambda_norm"]) != 0.0:
-        raise ValueError("induced trajectory loss must disable singular relative norms")
+    if float(losses["entry_snapshot"]["lambda_norm"]) != 0.0:
+        raise ValueError("layer-0 entry loss must disable singular relative norms")
+    if float(losses["induced_trajectory"]["lambda_norm"]) <= 0.0:
+        raise ValueError("induced trajectory loss must retain its norm regularizer")
     pilot = experiment["training"]["pilot"]
     if pilot["variant"] != "unrolled_initial_condition" or int(pilot["seed"]) != 4001:
         raise ValueError("H0-010 pilot cell changed")

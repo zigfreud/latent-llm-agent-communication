@@ -1,0 +1,41 @@
+{
+  "experiment_id": "LIP-H0-010",
+  "protocol_version": "lip-unrolled-initial-condition-bridge-v2",
+  "claim_status": "failed_numeric_localization_pilot_only",
+  "run_commit": "4db3c68954749fb1f009876ed6afc6ea358ee07c",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-010/pilot-v2",
+    "run_summary": {
+      "path": "run_summary.json",
+      "sha256": "622cad3cb7b7b883cce4c1c6370e8a0575554e194b466f4606a04a95d87fedbc"
+    }
+  },
+  "pilot_gate": {
+    "passed": false,
+    "updates_completed": 16,
+    "finite_loss": true,
+    "nonzero_bridge_gradient_each_update": true,
+    "amp_overflow_events": 52,
+    "maximum_amp_overflow_events": 2,
+    "peak_allocated_vram_bytes": 6982702592
+  },
+  "scope_localization": {
+    "first_entry_norm_loss": 8.30624e18,
+    "first_induced_trajectory_norm_loss": 1.00572,
+    "last_entry_norm_loss": 3.36774e17,
+    "last_induced_trajectory_norm_loss": 2.87132,
+    "conclusion": "The singular relative-norm term is the layer-0-only entry auxiliary, not the induced seven-layer trajectory."
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "wall_seconds": 37.804174541,
+    "colab_compute_units_before": 79.23,
+    "colab_compute_units_after": 79.10,
+    "colab_compute_units_consumed": 0.13
+  },
+  "decision": {
+    "full_matrix_authorized": false,
+    "revision": "disable and skip only the layer-0 entry relative-norm term; restore the empirically stable trajectory norm term",
+    "next_pilot": "lip-unrolled-initial-condition-bridge-v3"
+  }
+}

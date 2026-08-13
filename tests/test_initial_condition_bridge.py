@@ -78,7 +78,7 @@ def test_induced_trajectory_remains_differentiable_after_normalization():
     assert entry.grad.tolist() == [[[[3.0]]]]
 
 
-def test_h0_010_contract_separates_singular_trajectory_norm_loss():
+def test_h0_010_contract_separates_singular_entry_norm_loss():
     experiment_path = Path("config/LIP-H0-010_initial_condition_bridge.yaml")
     parent_path = Path("config/LIP-PROTO-014_source_conditioned_residual_packet.yaml")
     experiment = load_yaml(experiment_path)
@@ -93,5 +93,5 @@ def test_h0_010_contract_separates_singular_trajectory_norm_loss():
         ),
     )
     assert experiment["protocol_version"] == INITIAL_CONDITION_PROTOCOL_VERSION
-    assert experiment["loss"]["entry_snapshot"]["lambda_norm"] > 0.0
-    assert experiment["loss"]["induced_trajectory"]["lambda_norm"] == 0.0
+    assert experiment["loss"]["entry_snapshot"]["lambda_norm"] == 0.0
+    assert experiment["loss"]["induced_trajectory"]["lambda_norm"] > 0.0
