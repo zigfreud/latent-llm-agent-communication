@@ -15,6 +15,16 @@ ORACLE_CAPTURED_STATE_TYPES = (
     "value_pre_cache",
 )
 
+TRAJECTORY_CAPTURED_STATE_TYPES = (
+    "incoming_before_replay",
+    "residual_input",
+    "query_pre_rope",
+    "key_pre_rope",
+    "value_pre_cache",
+    "attention_output",
+    "residual_output",
+)
+
 
 def _select_prompt_packet(hidden: torch.Tensor, positions: torch.Tensor) -> torch.Tensor:
     if not isinstance(hidden, torch.Tensor) or hidden.ndim != 3:
@@ -98,6 +108,116 @@ def forward_with_layer_state_capture(
                 f"failed to capture {state_type} at layer(s): {sorted(missing)}"
             )
     return outputs, captured
+
+
+def forward_with_packet_trajectory_capture(
+    model,
+    inputs: Mapping[str, torch.Tensor],
+    *,
+    layer_indices: Sequence[int],
+    positions: torch.Tensor,
+    layer_packets: Mapping[int, torch.Tensor] | None = None,
+) -> tuple[Any, dict[str, dict[int, torch.Tensor]]]:
+    """Capture native or replayed receiver states during one prefill forward."""
+
+    selected_layers = [int(layer) for layer in layer_indices]
+    if not selected_layers or len(set(selected_layers)) != len(selected_layers):
+        raise ValueError("layer_indices must be a non-empty unique sequence")
+    packets = {int(layer): value for layer, value in (layer_packets or {}).items()}
+    unknown_packets = set(packets).difference(selected_layers)
+    missing_packets = set(selected_layers).difference(packets) if packets else set()
+    if unknown_packets or missing_packets:
+        raise ValueError("layer_packets must cover exactly the configured layers")
+    captured = {state_type: {} for state_type in TRAJECTORY_CAPTURED_STATE_TYPES}
+    handles = []
+
+    def store(state_type: str, layer_idx: int, value: torch.Tensor) -> None:
+        captured[state_type][layer_idx] = (
+            _select_prompt_packet(value, positions).float().cpu()
+        )
+
+    def capture_and_optionally_replay(layer_idx: int):
+        def hook(module, module_in):
+            if not module_in:
+                raise ValueError("block pre-hook requires positional hidden states")
+            hidden = module_in[0]
+            store("incoming_before_replay", layer_idx, hidden)
+            if not packets:
+                store("residual_input", layer_idx, hidden)
+                return None
+            selected = positions.to(device=hidden.device, dtype=torch.long)
+            vectors = packets[layer_idx].to(device=hidden.device, dtype=hidden.dtype)
+            if vectors.shape != (selected.numel(), hidden.shape[-1]):
+                raise ValueError(
+                    f"layer {layer_idx} packet shape does not match replay sites"
+                )
+            captured["residual_input"][layer_idx] = vectors.detach().float().cpu()
+            updated = hidden.clone()
+            updated[0, selected, :] = vectors
+            return (updated, *module_in[1:])
+
+        return hook
+
+    def capture_projection(state_type: str, layer_idx: int):
+        def hook(module, module_in, module_out):
+            store(state_type, layer_idx, module_out)
+
+        return hook
+
+    def capture_attention_output(layer_idx: int):
+        def hook(module, module_in, module_out):
+            value = module_out[0] if isinstance(module_out, (tuple, list)) else module_out
+            store("attention_output", layer_idx, value)
+
+        return hook
+
+    def capture_block_output(layer_idx: int):
+        def hook(module, module_in, module_out):
+            value = module_out[0] if isinstance(module_out, (tuple, list)) else module_out
+            store("residual_output", layer_idx, value)
+
+        return hook
+
+    for layer_idx in selected_layers:
+        layer = model.model.layers[layer_idx]
+        attention = getattr(layer, "self_attn", None)
+        projections = {
+            "query_pre_rope": getattr(attention, "q_proj", None),
+            "key_pre_rope": getattr(attention, "k_proj", None),
+            "value_pre_cache": getattr(attention, "v_proj", None),
+        }
+        if attention is None or any(value is None for value in projections.values()):
+            raise ValueError("decoder layer does not expose self_attn q_proj/k_proj/v_proj")
+        handles.append(
+            layer.register_forward_pre_hook(capture_and_optionally_replay(layer_idx))
+        )
+        for state_type, projection in projections.items():
+            handles.append(
+                projection.register_forward_hook(
+                    capture_projection(state_type, layer_idx)
+                )
+            )
+        handles.append(attention.register_forward_hook(capture_attention_output(layer_idx)))
+        handles.append(layer.register_forward_hook(capture_block_output(layer_idx)))
+    try:
+        with torch.inference_mode():
+            outputs = model(
+                **inputs,
+                use_cache=False,
+                output_hidden_states=False,
+                return_dict=True,
+            )
+    finally:
+        for handle in handles:
+            handle.remove()
+    for state_type in TRAJECTORY_CAPTURED_STATE_TYPES:
+        missing = set(selected_layers).difference(captured[state_type])
+        if missing:
+            raise RuntimeError(
+                f"failed to capture {state_type} at layer(s): {sorted(missing)}"
+            )
+    return outputs, captured
+
 
 
 def forward_with_layer_input_capture(

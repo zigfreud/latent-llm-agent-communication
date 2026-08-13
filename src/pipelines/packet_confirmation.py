@@ -76,21 +76,26 @@ def _finite_tensor(value: torch.Tensor, *, label: str) -> None:
         raise FloatingPointError(f"{label} contains non-finite values")
 
 
-def _primary_model_config(config: Mapping) -> dict:
-    primary = str(config["objectives"]["primary"])
-    variant = config["objectives"]["variants"][primary]
+def _variant_model_config(config: Mapping, variant_name: str) -> dict:
+    variant = config["objectives"]["variants"][str(variant_name)]
     model = {"kind": str(variant["model_kind"])}
     if model["kind"] == "query_conditioned":
         model.update(dict(config["bridge"]))
     return model
 
 
-def load_primary_replica_specs(
+def _primary_model_config(config: Mapping) -> dict:
+    return _variant_model_config(config, str(config["objectives"]["primary"]))
+
+
+def load_variant_replica_specs(
     config_path: Path | str,
     matrix_summary_path: Path | str,
     training_bundle_dir: Path | str,
+    *,
+    variant_name: str,
 ) -> tuple[dict, list[dict], dict]:
-    """Validate the aggregate gate and bind all registered primary replicas."""
+    """Validate the aggregate gate and bind one registered bridge variant."""
 
     config_path = Path(config_path)
     matrix_summary_path = Path(matrix_summary_path)
@@ -101,8 +106,11 @@ def load_primary_replica_specs(
     training_validation = validate_packet_bundle(training_bundle_dir, require_real=True)
     training_manifest_hash = sha256_file(training_bundle_dir / "manifest.json")
     primary = str(config["objectives"]["primary"])
+    variant_name = str(variant_name)
+    if variant_name not in config["objectives"]["variants"]:
+        raise ValueError(f"unknown registered objective variant: {variant_name}")
     seeds = [int(seed) for seed in config["training"]["seeds"]]
-    primary_gate = matrix.get("development_gates", {}).get(primary, {})
+    variant_gate = matrix.get("development_gates", {}).get(variant_name, {})
     checks = {
         "experiment": matrix.get("experiment_id")
         == PACKET_CONFIRMATION_EXPERIMENT_ID,
@@ -116,9 +124,9 @@ def load_primary_replica_specs(
         "ready": matrix.get("ready_for_confirmation") is True,
         "primary": matrix.get("primary_variant") == primary,
         "registered_seeds": matrix.get("registered_seeds") == seeds,
-        "primary_complete": primary_gate.get("complete") is True,
-        "primary_passed": primary_gate.get("passed") is True,
-        "minimum_replicas": primary_gate.get("minimum_passing_replicas")
+        "variant_complete": variant_gate.get("complete") is True,
+        "variant_passed": variant_gate.get("passed") is True,
+        "minimum_replicas": variant_gate.get("minimum_passing_replicas")
         == int(config["development_gate"]["minimum_passing_replicas"]),
     }
     failed = [name for name, passed in checks.items() if not passed]
@@ -130,10 +138,10 @@ def load_primary_replica_specs(
     if training_validation["split_counts"]["confirmation"] != 0:
         raise ValueError("training bundle contains confirmation records")
 
-    run_entries = matrix.get("runs", {}).get(primary, [])
+    run_entries = matrix.get("runs", {}).get(variant_name, [])
     if [int(entry.get("seed", -1)) for entry in run_entries] != seeds:
         raise ValueError("primary matrix run order differs from registered seeds")
-    expected_model = _primary_model_config(config)
+    expected_model = _variant_model_config(config, variant_name)
     specs = []
     for entry in run_entries:
         seed = int(entry["seed"])
@@ -150,7 +158,7 @@ def load_primary_replica_specs(
             config,
             bundle_dir=training_bundle_dir,
             output_dir=summary_path.parent,
-            variant_name=primary,
+            variant_name=variant_name,
             seed=seed,
         )
         run_checks = {
@@ -169,7 +177,7 @@ def load_primary_replica_specs(
         failed_run = [name for name, passed in run_checks.items() if not passed]
         if failed_run:
             raise ValueError(
-                f"primary replica {seed} failed provenance: "
+                f"{variant_name} replica {seed} failed provenance: "
                 + ", ".join(failed_run)
             )
         specs.append(
@@ -192,11 +200,28 @@ def load_primary_replica_specs(
     return matrix, specs, training_validation
 
 
-def predict_primary_confirmation_packets(
+def load_primary_replica_specs(
+    config_path: Path | str,
+    matrix_summary_path: Path | str,
+    training_bundle_dir: Path | str,
+) -> tuple[dict, list[dict], dict]:
+    """Validate and bind the registered primary bridge replicas."""
+
+    config = load_yaml(Path(config_path))
+    return load_variant_replica_specs(
+        config_path,
+        matrix_summary_path,
+        training_bundle_dir,
+        variant_name=str(config["objectives"]["primary"]),
+    )
+
+
+def predict_variant_confirmation_packets(
     config: Mapping,
     replica_specs: Sequence[Mapping],
     confirmation_records: Sequence[Mapping],
     *,
+    variant_name: str,
     source_shape: Sequence[int],
     target_shape: Sequence[int],
     device: str = "auto",
@@ -211,7 +236,7 @@ def predict_primary_confirmation_packets(
         [record["source_packet"].float() for record in confirmation_records]
     )
     _finite_tensor(source, label="confirmation source packets")
-    expected_model = _primary_model_config(config)
+    expected_model = _variant_model_config(config, variant_name)
     predictions: dict[int, torch.Tensor] = {}
     scaffold = None
     site_scale = None
@@ -278,6 +303,30 @@ def predict_primary_confirmation_packets(
             torch.cuda.empty_cache()
     assert scaffold is not None and site_scale is not None
     return predictions, scaffold, site_scale
+
+
+def predict_primary_confirmation_packets(
+    config: Mapping,
+    replica_specs: Sequence[Mapping],
+    confirmation_records: Sequence[Mapping],
+    *,
+    source_shape: Sequence[int],
+    target_shape: Sequence[int],
+    device: str = "auto",
+    batch_size: int = 4,
+) -> tuple[dict[int, torch.Tensor], torch.Tensor, torch.Tensor]:
+    """Run each registered primary bridge and reconstruct receiver packets."""
+
+    return predict_variant_confirmation_packets(
+        config,
+        replica_specs,
+        confirmation_records,
+        variant_name=str(config["objectives"]["primary"]),
+        source_shape=source_shape,
+        target_shape=target_shape,
+        device=device,
+        batch_size=batch_size,
+    )
 
 
 def _strict_json_object(line: str, *, line_number: int) -> dict:

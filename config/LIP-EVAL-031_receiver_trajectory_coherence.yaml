@@ -1,0 +1,106 @@
+experiment_id: "LIP-EVAL-031"
+protocol_version: "lip-receiver-trajectory-coherence-v1"
+evaluation_type: "post_confirmation_exploratory_causal_gap_localization"
+claim_status: "exploratory_hypothesis_generation_only"
+
+predecessor:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  result_commit: "9e0037567f496131269fe70e3ebbf9e8fa0161e0"
+  merge_commit: "02f72d12c4d5601a8df5ab524fc985dff73836f2"
+  sha256sums_sha256: "2066ebe36d61da87e3d1c0f5dc8f8f6f2e93ca472e4405d783f0a7a64caa1db1"
+  observed_oracle_identity_effect: 0.875
+  observed_learned_identity_effect: 0.0
+
+hypothesis:
+  statement: >-
+    A bridge that predicts receiver residual snapshots independently can pass
+    packet-geometry gates while failing functionally because its consecutive
+    layer states do not form a trajectory realizable by the receiver dynamics.
+  falsifying_pattern: >-
+    Learned packets have replay discontinuity and receiver-state alignment
+    comparable to oracle packets, yet remain functionally inert.
+  supporting_pattern: >-
+    Learned packets show materially larger cross-layer discontinuities and
+    poorer Q/K/V, attention-output, or next-token alignment than oracle packets.
+
+artifacts:
+  training_bundle: "runs/LIP-PROTO-014/packet-bundle"
+  confirmation_bundle: "runs/LIP-PROTO-014/confirmation-bundle"
+  matrix_summary: "runs/LIP-PROTO-014/training/matrix_summary.json"
+  output_dir: "runs/LIP-EVAL-031"
+
+sample:
+  source: "exposed_LIP-PROTO-014_confirmation_tasks"
+  pilot_task_indices: [0, 1]
+  full_task_count: 32
+  inferential_status: "descriptive_only"
+
+conditions:
+  packet_families:
+    - "oracle_teacher_matched"
+    - "component_contrastive"
+    - "structured_linear_regression"
+    - "mean_scaffold"
+  pilot_training_seeds: [4001]
+  full_training_seeds: [4001, 4003, 4007]
+
+capture:
+  target_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  state_types:
+    - "incoming_before_replay"
+    - "residual_input"
+    - "query_pre_rope"
+    - "key_pre_rope"
+    - "value_pre_cache"
+    - "attention_output"
+    - "residual_output"
+  logit_position: -1
+
+metrics:
+  entry_layer: 0
+  transition_layers: [1, 2, 3, 4, 5, 6, 7]
+  replay_discontinuity:
+    - "relative_jump_rms"
+    - "scheduled_incoming_cosine"
+    - "incoming_to_scheduled_norm_ratio"
+  native_alignment:
+    - "normalized_rmse"
+    - "cosine"
+    - "candidate_to_native_norm_ratio"
+  logits:
+    - "kl_native_to_candidate"
+    - "total_variation"
+    - "top1_agreement"
+
+decision_policy:
+  primary_comparison: "component_contrastive_vs_oracle_teacher_matched"
+  architecture_comparison: "structured_linear_regression_vs_component_contrastive"
+  continue_to_corrector_if: >-
+    The primary learned bridge has a reproducible trajectory-coherence deficit
+    relative to oracle, with at least one downstream receiver-state family
+    moving in the same direction.
+  redirect_if: >-
+    Oracle and learned trajectories are similarly discontinuous and similarly
+    aligned, requiring localization outside the static-versus-dynamic bridge
+    hypothesis.
+  prohibited_claims:
+    - "confirmatory evidence"
+    - "general cross-model interoperability"
+    - "proof that discontinuity causes the functional floor"
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  target_load_4bit: true
+  pilot_before_full: true
+  telemetry:
+    - "gpu_name"
+    - "total_vram_bytes"
+    - "peak_allocated_vram_bytes"
+    - "peak_reserved_vram_bytes"
+    - "wall_seconds"
+    - "task_conditions_per_hour"
+    - "colab_compute_units_before"
+    - "colab_compute_units_after"
