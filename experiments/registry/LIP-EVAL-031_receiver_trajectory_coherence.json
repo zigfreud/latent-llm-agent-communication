@@ -1,0 +1,154 @@
+{
+  "experiment_id": "LIP-EVAL-031",
+  "protocol_version": "lip-receiver-trajectory-coherence-v1",
+  "claim_status": "exploratory_hypothesis_generation_only",
+  "run_commit": "e6f21d2f24c67d7ec0014ce4b70609884bad7600",
+  "contract_sha256": "b3ea48d219d33c898d77cd06680a9e7f4d01d79ab6f539cfc21a721048474c15",
+  "parent_config_sha256": "ddc875992de05ae1246e42fb51e18cd93a5f1facc951b0c79c4dac87383514ed",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-EVAL-031",
+    "pilot_metrics": {
+      "path": "pilot_metrics.json",
+      "sha256": "a3acc8fcd6304954690f218b76915a2ddf0d20ace98369fdb4f5013cd68119fc"
+    },
+    "full_metrics": {
+      "path": "full_metrics.json",
+      "sha256": "71c76b9e73e300f3781666dc11e1fa5869651608f981fc110439c2a312f2de1d"
+    }
+  },
+  "sample": {
+    "source": "exposed_LIP-PROTO-014_confirmation_tasks",
+    "tasks": 32,
+    "training_seeds": [4001, 4003, 4007],
+    "result_rows": 256,
+    "inferential_status": "descriptive_only"
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "total_vram_bytes": 23659151360,
+    "peak_allocated_vram_bytes": 6156819456,
+    "peak_reserved_vram_bytes": 6205472768,
+    "pilot_wall_seconds": 120.18913373199996,
+    "full_wall_seconds": 161.84596240899987,
+    "full_task_conditions_per_hour": 5694.303313363052,
+    "colab_compute_units_before_pilot": 82.21,
+    "colab_compute_units_after_pilot": 81.94,
+    "colab_compute_units_after_full": 81.81,
+    "colab_compute_units_observed_total": 0.4
+  },
+  "condition_means": {
+    "oracle_teacher_matched": {
+      "n": 32,
+      "transition_jump_nrmse": 0.16979,
+      "transition_jump_sd": 0.045205,
+      "query_nrmse": 0.003604,
+      "key_nrmse": 0.003805,
+      "value_nrmse": 0.007748,
+      "attention_output_nrmse": 0.367066,
+      "residual_output_nrmse": 0.167772,
+      "next_token_total_variation": 0.936577
+    },
+    "mean_scaffold": {
+      "n": 32,
+      "transition_jump_nrmse": 0.677857,
+      "transition_jump_sd": 0.0,
+      "query_nrmse": 0.720679,
+      "key_nrmse": 0.726966,
+      "value_nrmse": 0.806432,
+      "attention_output_nrmse": 0.870576,
+      "residual_output_nrmse": 0.845246,
+      "next_token_total_variation": 0.936541
+    },
+    "component_contrastive": {
+      "4001": {
+        "transition_jump_nrmse": 0.616554,
+        "transition_jump_sd": 0.042307,
+        "query_nrmse": 0.504767,
+        "key_nrmse": 0.535735,
+        "value_nrmse": 0.786094,
+        "attention_output_nrmse": 0.818158,
+        "residual_output_nrmse": 0.797127
+      },
+      "4003": {
+        "transition_jump_nrmse": 0.601034,
+        "transition_jump_sd": 0.041382,
+        "query_nrmse": 0.479636,
+        "key_nrmse": 0.517638,
+        "value_nrmse": 0.788739,
+        "attention_output_nrmse": 0.807904,
+        "residual_output_nrmse": 0.797046
+      },
+      "4007": {
+        "transition_jump_nrmse": 0.635624,
+        "transition_jump_sd": 0.044613,
+        "query_nrmse": 0.536841,
+        "key_nrmse": 0.562612,
+        "value_nrmse": 0.788543,
+        "attention_output_nrmse": 0.826815,
+        "residual_output_nrmse": 0.802597
+      }
+    },
+    "structured_linear_regression": {
+      "4001": {
+        "transition_jump_nrmse": 0.556961,
+        "transition_jump_sd": 0.021292,
+        "query_nrmse": 0.458641,
+        "key_nrmse": 0.482712,
+        "value_nrmse": 0.708985,
+        "attention_output_nrmse": 0.763907,
+        "residual_output_nrmse": 0.710584
+      },
+      "4003": {
+        "transition_jump_nrmse": 0.56657,
+        "transition_jump_sd": 0.02268,
+        "query_nrmse": 0.477211,
+        "key_nrmse": 0.499357,
+        "value_nrmse": 0.716388,
+        "attention_output_nrmse": 0.770267,
+        "residual_output_nrmse": 0.719864
+      },
+      "4007": {
+        "transition_jump_nrmse": 0.554661,
+        "transition_jump_sd": 0.020567,
+        "query_nrmse": 0.456909,
+        "key_nrmse": 0.481018,
+        "value_nrmse": 0.707566,
+        "attention_output_nrmse": 0.761724,
+        "residual_output_nrmse": 0.709752
+      }
+    }
+  },
+  "paired_oracle_contrasts": {
+    "component_contrastive": {
+      "jump_greater_tasks_per_seed": [32, 32, 32],
+      "attention_error_greater_tasks_per_seed": [32, 32, 32],
+      "residual_error_greater_tasks_per_seed": [32, 32, 32],
+      "median_jump_ratio_by_seed": [3.703, 3.725, 3.914]
+    },
+    "structured_linear_regression": {
+      "jump_greater_tasks_per_seed": [32, 32, 32],
+      "attention_error_greater_tasks_per_seed": [32, 32, 32],
+      "residual_error_greater_tasks_per_seed": [32, 32, 32],
+      "median_jump_ratio_by_seed": [3.491, 3.548, 3.479]
+    }
+  },
+  "cross_layer_profiles": {
+    "layer_indices": [1, 2, 3, 4, 5, 6, 7],
+    "oracle_teacher_matched": [0.1578, 0.2132, 0.1928, 0.1409, 0.1573, 0.1958, 0.1308],
+    "component_contrastive_all_seeds": [0.7462, 0.5819, 0.5845, 0.5546, 0.6051, 0.6564, 0.5956],
+    "structured_linear_all_seeds": [0.6133, 0.5324, 0.5475, 0.4927, 0.554, 0.6166, 0.5594]
+  },
+  "interpretation": {
+    "result": "supports_receiver_trajectory_coherence_hypothesis",
+    "strongest_observation": "Every learned seed had larger transition jumps, attention-output error, and residual-output error than oracle on all 32 tasks.",
+    "non_diagnostic_endpoint": "Absolute next-token alignment to the native text prompt did not distinguish conditions.",
+    "boundary": "The evaluation is post-confirmation and descriptive. It localizes a candidate missing property but does not establish that repairing trajectory coherence restores functional task identity."
+  },
+  "recommended_next_step": {
+    "kind": "small_causal_operator_experiment",
+    "branch": "exp/LIP-H0-007-receiver-aware-corrector",
+    "first_intervention": "Inject the task residual packet onto the receiver's live incoming carrier instead of replacing it with an absolute static snapshot.",
+    "proto_015_status": "premature_until_dynamic_replay_has_a_positive_causal_result"
+  }
+}
+
