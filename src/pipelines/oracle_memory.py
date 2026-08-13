@@ -117,7 +117,7 @@ def forward_with_packet_trajectory_capture(
     layer_indices: Sequence[int],
     positions: torch.Tensor,
     layer_packets: Mapping[int, torch.Tensor] | None = None,
-    replay_mode: str = "replace",
+    replay_mode: str | Mapping[int, str] = "replace",
 ) -> tuple[Any, dict[str, dict[int, torch.Tensor]]]:
     """Capture native or replayed receiver states during one prefill forward."""
 
@@ -125,8 +125,7 @@ def forward_with_packet_trajectory_capture(
     if not selected_layers or len(set(selected_layers)) != len(selected_layers):
         raise ValueError("layer_indices must be a non-empty unique sequence")
     packets = {int(layer): value for layer, value in (layer_packets or {}).items()}
-    if replay_mode not in {"replace", "add"}:
-        raise ValueError("replay_mode must be replace or add")
+    replay_modes = _normalize_replay_modes(selected_layers, replay_mode)
     unknown_packets = set(packets).difference(selected_layers)
     missing_packets = set(selected_layers).difference(packets) if packets else set()
     if unknown_packets or missing_packets:
@@ -155,7 +154,7 @@ def forward_with_packet_trajectory_capture(
                     f"layer {layer_idx} packet shape does not match replay sites"
                 )
             updated = hidden.clone()
-            if replay_mode == "replace":
+            if replay_modes[layer_idx] == "replace":
                 injected = vectors
             else:
                 injected = hidden[0, selected, :] + vectors
@@ -283,7 +282,7 @@ def forward_with_layer_input_replay(
     *,
     positions: torch.Tensor,
     layer_packets: Mapping[int, torch.Tensor],
-    replay_mode: str = "replace",
+    replay_mode: str | Mapping[int, str] = "replace",
 ):
     """Run one forward pass with exact block-input prompt-state replay."""
 
@@ -311,15 +310,16 @@ def _register_replay_hooks(
     positions: torch.Tensor,
     layer_packets: Mapping[int, torch.Tensor],
     *,
-    replay_mode: str = "replace",
+    replay_mode: str | Mapping[int, str] = "replace",
 ) -> list[Any]:
+    replay_modes = _normalize_replay_modes(layer_packets, replay_mode)
     handles = []
     for layer_idx, vectors in layer_packets.items():
         hook = make_lip_packet_pre_hook(
             vectors,
             positions,
             enable=True,
-            mode=replay_mode,
+            mode=replay_modes[int(layer_idx)],
         )
         handles.append(
             model.model.layers[int(layer_idx)].register_forward_pre_hook(hook)
@@ -335,7 +335,7 @@ def generate_with_layer_input_replay(
     generation_kwargs: Mapping[str, Any],
     positions: torch.Tensor | None = None,
     layer_packets: Mapping[int, torch.Tensor] | None = None,
-    replay_mode: str = "replace",
+    replay_mode: str | Mapping[int, str] = "replace",
 ) -> str:
     """Generate while replaying oracle prompt states before selected blocks."""
 
@@ -363,3 +363,22 @@ def generate_with_layer_input_replay(
     return tokenizer.decode(continuation, skip_special_tokens=True).replace(
         "</s>", ""
     ).strip()
+
+
+def _normalize_replay_modes(
+    layer_indices: Sequence[int] | Mapping[int, Any],
+    replay_mode: str | Mapping[int, str],
+) -> dict[int, str]:
+    """Resolve one replay mode per layer without weakening frozen callers."""
+
+    layers = [int(layer) for layer in layer_indices]
+    if isinstance(replay_mode, str):
+        modes = {layer: replay_mode for layer in layers}
+    else:
+        modes = {int(layer): str(mode) for layer, mode in replay_mode.items()}
+        if set(modes) != set(layers):
+            raise ValueError("mapped replay_mode must cover exactly the replayed layers")
+    invalid = {mode for mode in modes.values() if mode not in {"replace", "add"}}
+    if invalid:
+        raise ValueError("replay_mode must contain only replace or add")
+    return modes

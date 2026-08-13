@@ -123,6 +123,34 @@ def test_trajectory_capture_adds_task_delta_to_each_live_incoming_state():
     assert outputs.logits[0, -1, 0].item() == 2700.0
 
 
+def test_trajectory_capture_can_anchor_entry_then_add_to_live_state():
+    packets = {0: torch.tensor([[20.0]]), 1: torch.tensor([[40.0]])}
+    outputs, captured = forward_with_packet_trajectory_capture(
+        ToyModel(),
+        toy_inputs(),
+        layer_indices=[0, 1],
+        positions=torch.tensor([2]),
+        layer_packets=packets,
+        replay_mode={0: "replace", 1: "add"},
+    )
+    assert captured["residual_input"][0].tolist() == [[20.0]]
+    assert captured["incoming_before_replay"][1].tolist() == [[200.0]]
+    assert captured["residual_input"][1].tolist() == [[240.0]]
+    assert outputs.logits[0, -1, 0].item() == 2400.0
+
+
+def test_trajectory_capture_rejects_incomplete_mapped_replay_mode():
+    with pytest.raises(ValueError, match="cover exactly"):
+        forward_with_packet_trajectory_capture(
+            ToyModel(),
+            toy_inputs(),
+            layer_indices=[0, 1],
+            positions=torch.tensor([2]),
+            layer_packets={0: torch.tensor([[20.0]]), 1: torch.tensor([[40.0]])},
+            replay_mode={0: "replace"},
+        )
+
+
 def test_trajectory_capture_rejects_unknown_replay_mode():
     with pytest.raises(ValueError, match="replay_mode"):
         forward_with_packet_trajectory_capture(

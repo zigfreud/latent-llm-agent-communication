@@ -1,0 +1,92 @@
+experiment_id: "LIP-H0-008"
+protocol_version: "lip-anchored-receiver-aware-replay-v1"
+claim_status: "exploratory_causal_operator_screen_only"
+
+predecessor:
+  protocol: "LIP-H0-007"
+  registry: "experiments/registry/LIP-H0-007_receiver_aware_replay_operator.json"
+  result_commit: "d533e446"
+  trajectory_gate_sha256: "48b38270c359ccd0ffe529dabd1faa64ad683e4ef025a82ed4d5edabfd0763b6"
+  conclusion: "the unanchored additive operator fails even for exact oracle packets"
+
+parent:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
+
+hypothesis:
+  statement: "The additive operator failed because layer 0 did not establish a shared task-conditioned carrier origin before relative updates were applied."
+  anchored_operator: "h_injected_0 = packet_0; h_injected_l = h_live_incoming_l + (packet_l - training_scaffold_l), l in 1..7"
+  absolute_comparator: "h_injected_l = packet_l, l in 0..7"
+
+sample:
+  source: "exposed_LIP-PROTO-014_confirmation_tasks"
+  task_indices: [0, 1, 2, 3, 16, 17, 18, 19]
+  task_count: 8
+  tokenizer_strata: {2: 4, 3: 4}
+  inferential_status: "paired_descriptive_gate_not_a_new_confirmation_set"
+
+conditions:
+  variants:
+    - "component_contrastive"
+    - "structured_linear_regression"
+  primary_variant: "component_contrastive"
+  training_seeds: [4001, 4003, 4007]
+  operators:
+    absolute_replace:
+      layer_modes: {0: "replace", 1: "replace", 2: "replace", 3: "replace", 4: "replace", 5: "replace", 6: "replace", 7: "replace"}
+      packet: "predicted_absolute_packet"
+    anchored_layer0_replace_then_delta_add:
+      layer_modes: {0: "replace", 1: "add", 2: "add", 3: "add", 4: "add", 5: "add", 6: "add", 7: "add"}
+      packet: "absolute_packet_at_layer0_then_packet_minus_training_scaffold"
+  oracle_diagnostics:
+    - "oracle_absolute_replace"
+    - "oracle_anchored_layer0_replace_then_delta_add"
+
+capture:
+  target_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  transition_layers: [1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  oracle_reference: "oracle_absolute_replace_on_the_same_neutral_carrier"
+  state_types:
+    - "query_pre_rope"
+    - "key_pre_rope"
+    - "value_pre_cache"
+    - "attention_output"
+    - "residual_output"
+
+gate:
+  comparison: "anchored_layer0_replace_then_delta_add_vs_absolute_replace"
+  metrics:
+    - "transition_jump_nrmse"
+    - "attention_output_nrmse_to_oracle_replace"
+    - "residual_output_nrmse_to_oracle_replace"
+  direction: "lower_is_better_for_all_metrics"
+  oracle_entry_origin:
+    reference: "LIP-H0-007_oracle_live_task_delta_add"
+    unanchored_means:
+      transition_jump_nrmse: 0.288877
+      attention_output_nrmse: 1.348284
+      residual_output_nrmse: 1.713128
+    maximum_fraction_of_unanchored:
+      transition_jump_nrmse: 1.0
+      attention_output_nrmse: 0.75
+      residual_output_nrmse: 0.75
+  learned_operator:
+    minimum_taskwise_improvements: 6
+    minimum_passing_replicas: 2
+    decision_variant: "component_contrastive"
+    linear_variant_role: "diagnostic_only"
+  pass_action: "run_frozen_matched_vs_shuffled_functional_identity_pilot"
+  fail_action: "stop_before_generation_and_move_to_a_trained_live_state_corrector"
+
+functional_followup:
+  status: "conditional_on_both_oracle_origin_and_learned_operator_gates"
+  interpretation: "Only a positive functional identity effect can graduate this operator toward PROTO-015."
+
+compute:
+  preferred_accelerator: "L4"
+  target_load_4bit: true
+  bridge_device: "cpu"
+  allow_silent_fallback: false
+  stop_after_trajectory_gate_if_failed: true
