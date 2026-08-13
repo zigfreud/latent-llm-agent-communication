@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import json
 import time
 from collections.abc import Mapping, Sequence
@@ -38,6 +39,13 @@ from src.pipelines.packet_trajectory import (
 )
 
 
+def _lf_sha256_file(path: Path) -> str:
+    """Hash tracked text with Git's LF representation on every host."""
+
+    normalized = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(normalized).hexdigest()
+
+
 def _validate_contract(
     experiment: Mapping,
     parent: Mapping,
@@ -54,7 +62,7 @@ def _validate_contract(
         raise ValueError("H0-007 must remain an exploratory operator screen")
     if parent.get("experiment_id") != "LIP-PROTO-014":
         raise ValueError("H0-007 parent must be LIP-PROTO-014")
-    if experiment["parent"]["config_sha256"] != sha256_file(parent_path):
+    if experiment["parent"]["config_sha256"] != _lf_sha256_file(parent_path):
         raise ValueError("parent config hash differs from the frozen contract")
     predecessor = load_json_object(predecessor_registry_path)
     if predecessor.get("experiment_id") != "LIP-EVAL-031":

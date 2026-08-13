@@ -12,7 +12,7 @@ predecessor:
 parent:
   protocol: "LIP-PROTO-014"
   config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
-  config_sha256: "ddc875992de05ae1246e42fb51e18cd93a5f1facc951b0c79c4dac87383514ed"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
 
 hypothesis:
   statement: "Preserving the receiver's realized incoming state and adding only the task-conditioned residual will reduce cross-layer intervention and move downstream states toward the oracle-replay regime."
