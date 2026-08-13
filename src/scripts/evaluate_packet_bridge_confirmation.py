@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from src.evaluation.oracle_functional import declares_entry_point, stable_seed
+from src.evaluation.oracle_terminal_factorial import validate_terminal_layout
 from src.evaluation.packet_bridge import normalized_transport_recovery
 from src.evaluation.packet_bridge_confirmation import (
     PACKET_CONFIRMATION_CONDITIONS,
@@ -391,16 +392,43 @@ def validate_confirmation_generation_grid(
     if missing and not allow_incomplete:
         raise ValueError(f"confirmation grid is missing {len(missing)} rows")
 
-    ordered_tasks = [task_specs[task_id] for task_id in task_ids]
-    donors = stratified_confirmation_donors(
-        ordered_tasks,
-        seed=int(config["confirmation"]["derangement_seed"]),
-    )
+    donor_task_ids = metadata.get("donor_task_ids")
+    if (
+        not isinstance(donor_task_ids, Mapping)
+        or set(donor_task_ids) != set(task_ids)
+        or any(
+            str(donor) not in task_ids or str(target) == str(donor)
+            for target, donor in donor_task_ids.items()
+        )
+    ):
+        raise ValueError("confirmation metadata donor plan is invalid")
     donor_task_ids = {
-        task_ids[target]: task_ids[source] for target, source in donors.items()
+        str(target): str(donor) for target, donor in donor_task_ids.items()
     }
-    if metadata.get("donor_task_ids") != donor_task_ids:
-        raise ValueError("confirmation donor plan changed")
+    if set(task_specs) == set(task_ids):
+        ordered_tasks = [task_specs[task_id] for task_id in task_ids]
+        donors = stratified_confirmation_donors(
+            ordered_tasks,
+            seed=int(config["confirmation"]["derangement_seed"]),
+        )
+        recomputed_donor_task_ids = {
+            task_ids[target]: task_ids[source]
+            for target, source in donors.items()
+        }
+        if donor_task_ids != recomputed_donor_task_ids:
+            raise ValueError("confirmation donor plan changed")
+    elif not allow_incomplete:
+        raise ValueError("full confirmation lacks task specifications")
+    for target_task_id, donor_task_id in donor_task_ids.items():
+        if target_task_id in task_specs and donor_task_id in task_specs:
+            target_stratum = validate_terminal_layout(
+                task_specs[target_task_id].get("terminal_layout", {})
+            )
+            donor_stratum = validate_terminal_layout(
+                task_specs[donor_task_id].get("terminal_layout", {})
+            )
+            if target_stratum != donor_stratum:
+                raise ValueError("confirmation donor crosses tokenizer strata")
     for row in records:
         condition = str(row["condition"])
         task_id = str(row["task_id"])

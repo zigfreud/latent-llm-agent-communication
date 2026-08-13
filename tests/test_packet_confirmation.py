@@ -281,6 +281,19 @@ def test_confirmation_grid_validator_binds_donors_replicas_and_random_norms():
     assert validation["record_count"] == 1344
     assert validation["cluster_unit"] == "task_id"
 
+    chunk_metadata = deepcopy(metadata)
+    chunk_metadata.update(
+        {"records": 14, "complete": False, "claim_eligible": False}
+    )
+    chunk_validation = validate_confirmation_generation_grid(
+        records[:14],
+        chunk_metadata,
+        config,
+        allow_incomplete=True,
+    )
+    assert chunk_validation["complete"] is False
+    assert chunk_validation["missing_record_count"] == 1330
+
     changed = deepcopy(records)
     random_row = next(
         row
