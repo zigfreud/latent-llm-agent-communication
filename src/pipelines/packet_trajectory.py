@@ -117,6 +117,32 @@ def _gpu_telemetry() -> dict:
     }
 
 
+def _validate_confirmation_artifact(
+    validation: Mapping,
+    manifest: Mapping,
+    *,
+    parent_config_sha256: str,
+    expected_task_count: int,
+) -> None:
+    checks = {
+        "real_extraction": validation.get("extraction_mode") == "real",
+        "confirmation_scope": validation.get("extraction_scope") == "confirmation",
+        "parent_config": manifest.get("config_sha256") == parent_config_sha256,
+        "confirmation_count": validation.get("split_counts", {}).get("confirmation")
+        == int(expected_task_count),
+        "no_training_rows": all(
+            validation.get("split_counts", {}).get(split, 0) == 0
+            for split in ("train", "development_selection", "development_gate")
+        ),
+    }
+    failed = [name for name, passed in checks.items() if not passed]
+    if failed:
+        raise ValueError(
+            "confirmation artifact differs from the frozen contract: "
+            + ", ".join(failed)
+        )
+
+
 def _condition_packets(
     record: Mapping,
     *,
@@ -202,12 +228,15 @@ def run_packet_trajectory_evaluation(
 
     training_validation = validate_packet_bundle(training_bundle_dir, require_real=True)
     confirmation_validation = validate_packet_bundle(
-        confirmation_bundle_dir, require_real=True
+        confirmation_bundle_dir, require_real=False
     )
-    if confirmation_validation["split_counts"]["confirmation"] != int(
-        parent_config["confirmation"]["task_count"]
-    ):
-        raise ValueError("confirmation bundle does not contain the frozen cohort")
+    confirmation_manifest = load_json_object(confirmation_bundle_dir / "manifest.json")
+    _validate_confirmation_artifact(
+        confirmation_validation,
+        confirmation_manifest,
+        parent_config_sha256=sha256_file(parent_config_path),
+        expected_task_count=int(parent_config["confirmation"]["task_count"]),
+    )
     if training_validation["source_shape"] != confirmation_validation["source_shape"]:
         raise ValueError("source packet shape differs across training/confirmation")
     if training_validation["target_shape"] != confirmation_validation["target_shape"]:
@@ -486,4 +515,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

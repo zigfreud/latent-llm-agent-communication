@@ -8,6 +8,7 @@ from src.evaluation.packet_trajectory import (
     tensor_alignment,
 )
 from src.pipelines.oracle_memory import forward_with_packet_trajectory_capture
+from src.pipelines.packet_trajectory import _validate_confirmation_artifact
 
 
 class ToyAttention(torch.nn.Module):
@@ -131,3 +132,30 @@ def test_native_and_logit_alignment_are_json_ready():
     assert logits["candidate_top1_token_id"] == 2
     assert logits["top1_agreement"] is False
     assert logits["kl_native_to_candidate"] > 0.0
+
+
+def test_confirmation_artifact_accepts_real_confirmation_scope_not_full_scope():
+    validation = {
+        "extraction_mode": "real",
+        "extraction_scope": "confirmation",
+        "split_counts": {
+            "train": 0,
+            "development_selection": 0,
+            "development_gate": 0,
+            "confirmation": 32,
+        },
+    }
+    _validate_confirmation_artifact(
+        validation,
+        {"config_sha256": "a" * 64},
+        parent_config_sha256="a" * 64,
+        expected_task_count=32,
+    )
+
+    with pytest.raises(ValueError, match="confirmation_scope"):
+        _validate_confirmation_artifact(
+            {**validation, "extraction_scope": "full"},
+            {"config_sha256": "a" * 64},
+            parent_config_sha256="a" * 64,
+            expected_task_count=32,
+        )
