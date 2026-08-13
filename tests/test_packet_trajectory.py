@@ -102,6 +102,38 @@ def test_trajectory_capture_observes_incoming_state_before_each_replacement():
     assert outputs.logits[0, -1, 0].item() == 400.0
 
 
+def test_trajectory_capture_adds_task_delta_to_each_live_incoming_state():
+    deltas = {0: torch.tensor([[20.0]]), 1: torch.tensor([[40.0]])}
+    outputs, captured = forward_with_packet_trajectory_capture(
+        ToyModel(),
+        toy_inputs(),
+        layer_indices=[0, 1],
+        positions=torch.tensor([2]),
+        layer_packets=deltas,
+        replay_mode="add",
+    )
+    assert captured["incoming_before_replay"][0].tolist() == [[3.0]]
+    assert captured["residual_input"][0].tolist() == [[23.0]]
+    assert captured["query_pre_rope"][0].tolist() == [[46.0]]
+    assert captured["attention_output"][0].tolist() == [[207.0]]
+    assert captured["residual_output"][0].tolist() == [[230.0]]
+    assert captured["incoming_before_replay"][1].tolist() == [[230.0]]
+    assert captured["residual_input"][1].tolist() == [[270.0]]
+    assert captured["query_pre_rope"][1].tolist() == [[540.0]]
+    assert outputs.logits[0, -1, 0].item() == 2700.0
+
+
+def test_trajectory_capture_rejects_unknown_replay_mode():
+    with pytest.raises(ValueError, match="replay_mode"):
+        forward_with_packet_trajectory_capture(
+            ToyModel(),
+            toy_inputs(),
+            layer_indices=[0, 1],
+            positions=torch.tensor([2]),
+            replay_mode="blend",
+        )
+
+
 def test_native_and_logit_alignment_are_json_ready():
     native = {
         "residual_input": {0: torch.tensor([[1.0, 2.0]])},

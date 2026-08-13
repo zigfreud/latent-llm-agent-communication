@@ -1,0 +1,91 @@
+experiment_id: "LIP-H0-007"
+protocol_version: "lip-receiver-aware-replay-operator-v1"
+claim_status: "exploratory_causal_operator_screen_only"
+
+predecessor:
+  protocol: "LIP-EVAL-031"
+  registry: "experiments/registry/LIP-EVAL-031_receiver_trajectory_coherence.json"
+  result_commit: "256e7642"
+  full_artifact_sha256: "71c76b9e73e300f3781666dc11e1fa5869651608f981fc110439c2a312f2de1d"
+  conclusion: "learned absolute snapshots do not form an oracle-regime receiver trajectory"
+
+parent:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "ddc875992de05ae1246e42fb51e18cd93a5f1facc951b0c79c4dac87383514ed"
+
+hypothesis:
+  statement: "Preserving the receiver's realized incoming state and adding only the task-conditioned residual will reduce cross-layer intervention and move downstream states toward the oracle-replay regime."
+  additive_operator: "h_injected_l = h_live_incoming_l + (packet_l - training_scaffold_l)"
+  absolute_comparator: "h_injected_l = packet_l"
+
+sample:
+  source: "exposed_LIP-PROTO-014_confirmation_tasks"
+  task_indices: [0, 1, 2, 3, 16, 17, 18, 19]
+  task_count: 8
+  tokenizer_strata: {2: 4, 3: 4}
+  inferential_status: "paired_descriptive_gate_not_a_new_confirmation_set"
+
+conditions:
+  variants:
+    - "component_contrastive"
+    - "structured_linear_regression"
+  primary_variant: "component_contrastive"
+  training_seeds: [4001, 4003, 4007]
+  operators:
+    absolute_replace:
+      replay_mode: "replace"
+      packet: "predicted_absolute_packet"
+    live_task_delta_add:
+      replay_mode: "add"
+      packet: "predicted_absolute_packet_minus_training_scaffold"
+  oracle_diagnostics:
+    - "oracle_absolute_replace"
+    - "oracle_live_task_delta_add"
+
+capture:
+  target_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  transition_layers: [1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  oracle_reference: "oracle_absolute_replace_on_the_same_neutral_carrier"
+  state_types:
+    - "query_pre_rope"
+    - "key_pre_rope"
+    - "value_pre_cache"
+    - "attention_output"
+    - "residual_output"
+
+gate:
+  comparison: "live_task_delta_add_vs_absolute_replace"
+  metrics:
+    - "transition_jump_nrmse"
+    - "attention_output_nrmse_to_oracle_replace"
+    - "residual_output_nrmse_to_oracle_replace"
+  direction: "lower_is_better_for_all_metrics"
+  minimum_taskwise_improvements: 6
+  minimum_passing_replicas: 2
+  decision_variant: "component_contrastive"
+  linear_variant_role: "diagnostic_only"
+  pass_action: "run_frozen_matched_vs_shuffled_functional_identity_pilot"
+  fail_action: "stop_before_generation_and_redesign_the_operator"
+
+functional_followup:
+  status: "conditional_on_trajectory_gate"
+  task_indices: [0, 1, 2, 3, 16, 17, 18, 19]
+  training_seeds: [4001, 4003, 4007]
+  generation_seeds: [4127, 4241, 4357]
+  donor_plan: "PROTO-014_full_confirmation_stratified_derangement_then_subset"
+  required_conditions:
+    - "learned_matched_absolute_replace"
+    - "learned_shuffled_absolute_replace"
+    - "learned_matched_live_task_delta_add"
+    - "learned_shuffled_live_task_delta_add"
+  primary_endpoint: "matched_minus_shuffled_task_identity_effect_for_live_task_delta_add"
+  interpretation: "Only a positive functional identity effect may motivate a trainable corrector or PROTO-015."
+
+compute:
+  preferred_accelerator: "L4"
+  target_load_4bit: true
+  bridge_device: "cpu"
+  allow_silent_fallback: false
+  stop_after_trajectory_gate_if_failed: true
