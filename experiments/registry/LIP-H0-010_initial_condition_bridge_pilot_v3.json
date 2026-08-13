@@ -1,0 +1,49 @@
+{
+  "experiment_id": "LIP-H0-010",
+  "protocol_version": "lip-unrolled-initial-condition-bridge-v3",
+  "claim_status": "passed_numeric_feasibility_pilot_only",
+  "run_commit": "1c7e4da2f7d8259d74ee772912f0caf5323afdf5",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-010/pilot-v3",
+    "run_summary": {
+      "path": "run_summary.json",
+      "sha256": "ada20c333cfed7adf05b2f788cee941cd7c872190e67edb337269e0491306f41d"
+    }
+  },
+  "pilot_gate": {
+    "passed": true,
+    "updates_completed": 16,
+    "required_updates": 16,
+    "finite_loss": true,
+    "nonzero_bridge_gradient_each_update": true,
+    "amp_overflow_events": 1,
+    "maximum_amp_overflow_events": 2,
+    "peak_allocated_vram_bytes": 6981469184,
+    "maximum_peak_allocated_vram_bytes": 22500000000
+  },
+  "training_diagnostics_not_used_as_a_quality_gate": {
+    "loss_first": 3.19268,
+    "loss_last": 2.71022,
+    "gradient_norm_min": 0.518722,
+    "gradient_norm_max": 3.31545,
+    "selection_induced_trajectory_rmse": 1.63581,
+    "gate_induced_trajectory_rmse": 1.63742,
+    "development_holm_gate_passed": false,
+    "best_step": 8
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "total_vram_bytes": 23659151360,
+    "peak_allocated_vram_bytes": 6981469184,
+    "peak_reserved_vram_bytes": 7105150976,
+    "wall_seconds": 30.113394363,
+    "colab_compute_units_before": 79.10,
+    "colab_compute_units_after": 78.97,
+    "colab_compute_units_consumed": 0.13
+  },
+  "decision": {
+    "full_matrix_authorized": true,
+    "quality_claim": "none; the pilot gates feasibility only",
+    "next_step": "run the frozen two-variant three-seed development matrix without confirmation data"
+  }
+}

@@ -59,6 +59,11 @@ snapshot and retains it for the induced trajectory. Huber, cosine, symmetric
 NCE, and margin losses remain unchanged. Disabled norm terms are not evaluated,
 preventing `0 * inf` from becoming NaN. Prior artifacts remain preserved.
 
+The v3 pilot passed: 16/16 updates, one AMP overflow, finite nonzero gradients,
+and 6.98 GB peak allocated VRAM. This authorizes the frozen six-cell development
+matrix; it is not evidence that the learned initial condition carries task
+identity.
+
 ## Development decision
 
 Checkpoint selection uses joint/core/name retrieval and margins on the induced

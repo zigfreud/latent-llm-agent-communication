@@ -574,6 +574,22 @@ def run_initial_condition_training(
                         best_path,
                     )
                 _atomic_json(output_dir / "train_history.json", history)
+                print(
+                    json.dumps(
+                        {
+                            "event": "initial_condition_validation",
+                            "variant": variant_name,
+                            "seed": int(seed),
+                            "step": step,
+                            "training_loss": row["total_loss"],
+                            "selection_trajectory_rmse": selection[
+                                "induced_trajectory"
+                            ]["normalized_residual_rmse"],
+                            "best_step": best_step,
+                        }
+                    ),
+                    flush=True,
+                )
             del source, target, predicted_entry, entry_metrics, total_loss, scaled_loss
             if trajectory_metrics is not None:
                 del trajectory_metrics, induced
