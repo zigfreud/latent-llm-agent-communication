@@ -1,0 +1,97 @@
+{
+  "experiment_id": "LIP-H0-011",
+  "protocol_version": "lip-core-negative-coverage-v1",
+  "claim_status": "directional_development_success_replication_required",
+  "run_commit": "bc289d1197165715ef31ff0b3d6bdf038fead4dc",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-011",
+    "pilot": {
+      "path": "pilot-v1/run_summary.json",
+      "sha256": "bc90e865d8559861ec5c0bc8f305e919b3d2d7acd6a9d04fd9410af759ebc872"
+    },
+    "screen": {
+      "path": "screen-v1/run_summary.json",
+      "sha256": "9fab01ec20b1a691911b24dc2e276eae8ecfa1f498a2f555cacd1bf436bfb08a"
+    }
+  },
+  "pilot_gate": {
+    "passed": true,
+    "updates_completed": 4,
+    "finite_loss": true,
+    "nonzero_bridge_gradient_each_update": true,
+    "amp_overflow_events": 1,
+    "peak_allocated_vram_bytes": 8238643712,
+    "peak_reserved_vram_bytes": 8474591232
+  },
+  "screen": {
+    "seed": 4007,
+    "batch_size": 16,
+    "updates": 128,
+    "examples_seen": 2048,
+    "in_batch_negatives": 15,
+    "best_step": 120,
+    "normalized_residual_rmse": 1.425170,
+    "regions": {
+      "joint": {
+        "retrieval_top1": 0.656250,
+        "mean_diagonal_margin": 0.024520,
+        "p_value_holm": 0.009140,
+        "rejected": true
+      },
+      "core": {
+        "retrieval_top1": 0.687500,
+        "mean_diagonal_margin": 0.003350,
+        "p_value_holm": 0.373306,
+        "rejected": false
+      },
+      "name": {
+        "retrieval_top1": 0.875000,
+        "mean_diagonal_margin": 0.063089,
+        "p_value_holm": 0.000420,
+        "rejected": true
+      }
+    },
+    "mean_retrieval": 0.739583,
+    "holm_family_passed": false
+  },
+  "paired_to_H0_010_seed_4007": {
+    "reference": {
+      "batch_size": 4,
+      "updates": 512,
+      "examples_seen": 2048,
+      "in_batch_negatives": 3,
+      "rmse": 1.287742,
+      "core_retrieval_top1": 0.562500,
+      "core_margin": -0.004168,
+      "mean_retrieval": 0.656250
+    },
+    "core_margin_improved": true,
+    "core_margin_became_positive": true,
+    "core_retrieval_not_lower": true,
+    "mean_retrieval_not_lower": true,
+    "directional_success": true,
+    "strong_success": false,
+    "rmse_tradeoff": "RMSE worsened while identity separation improved, demonstrating that reconstruction and discrimination are distinct properties."
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "peak_allocated_vram_bytes": 8238643712,
+    "peak_reserved_vram_bytes": 8474591232,
+    "pilot_wall_seconds": 27.401439,
+    "screen_wall_seconds": 111.565239,
+    "colab_compute_units_before": 78.08,
+    "colab_compute_units_after": 77.56,
+    "colab_compute_units_consumed": 0.52,
+    "metering_note": "The balance did not change between screen start and finalization; usage is reported over the full H0-011 interval at Colab's visible precision."
+  },
+  "interpretation": {
+    "supported": "Broader in-batch negative coverage is part of the missing property: at equal example exposure it inverted the core margin and improved both core and mean retrieval.",
+    "not_yet_supported": "One seed with a nonsignificant positive core margin is insufficient for a robust learned identity carrier or a functional confirmation.",
+    "next_test": "Replicate the same frozen batch-16 intervention across seeds 4001, 4003, and 4007 before changing the loss or opening confirmation."
+  },
+  "decision": {
+    "replication_authorized": true,
+    "functional_confirmation_authorized": false,
+    "proto_015_status": "premature"
+  }
+}
