@@ -1,0 +1,75 @@
+{
+  "experiment_id": "LIP-H0-009",
+  "protocol_version": "lip-entry-seed-free-evolution-v1",
+  "claim_status": "exploratory_causal_operator_screen_only",
+  "run_commit": "c739c0234885945a5c2aefb2af162f7b579ce3f5",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-009",
+    "trajectory_gate": {
+      "path": "trajectory_gate.json",
+      "sha256": "62381432a277cbb612522730523858f292f4869939cb7ef91843f02417500c78"
+    }
+  },
+  "sample": {
+    "source": "exposed_LIP-PROTO-014_confirmation_tasks",
+    "task_indices": [0, 1, 2, 3, 16, 17, 18, 19],
+    "tasks": 8,
+    "training_seeds": [4001, 4003, 4007],
+    "result_rows": 112,
+    "inferential_status": "paired_descriptive_gate_not_a_new_confirmation_set"
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "total_vram_bytes": 23659151360,
+    "peak_allocated_vram_bytes": 6156819456,
+    "peak_reserved_vram_bytes": 6199181312,
+    "wall_seconds": 85.23096515499947,
+    "task_conditions_per_hour": 4730.675045938385,
+    "colab_compute_units_before": 80.3,
+    "colab_compute_units_after": 79.92,
+    "colab_compute_units_consumed": 0.38
+  },
+  "gate": {
+    "oracle_free_evolution_passed": true,
+    "passing_primary_replicas": 0,
+    "learned_operator_passed": false,
+    "advance_to_functional_identity_test": false
+  },
+  "oracle_free_evolution": {
+    "attention_output_nrmse": {"anchored_repeated_delta": 1.257510, "free_evolution": 0.396621, "ratio": 0.315402, "passed": true},
+    "residual_output_nrmse": {"anchored_repeated_delta": 1.316022, "free_evolution": 0.323061, "ratio": 0.245483, "passed": true},
+    "attention_profile_layers_0_to_7": [0.0, 0.1602, 0.3489, 0.4414, 0.4702, 0.5485, 0.6151, 0.5887],
+    "residual_profile_layers_0_to_7": [0.0, 0.1529, 0.2707, 0.3541, 0.3868, 0.4328, 0.4769, 0.5103]
+  },
+  "learned_replica_means": {
+    "component_contrastive": {
+      "4001": {"attention_absolute": 0.780719, "attention_free": 1.286689, "residual_absolute": 0.799541, "residual_free": 1.045672, "attention_improved_tasks": 0, "residual_improved_tasks": 0},
+      "4003": {"attention_absolute": 0.772527, "attention_free": 1.266510, "residual_absolute": 0.801775, "residual_free": 1.040865, "attention_improved_tasks": 0, "residual_improved_tasks": 0},
+      "4007": {"attention_absolute": 0.785857, "attention_free": 1.322035, "residual_absolute": 0.804055, "residual_free": 1.061333, "attention_improved_tasks": 0, "residual_improved_tasks": 0}
+    },
+    "structured_linear_regression": {
+      "4001": {"attention_absolute": 0.710243, "attention_free": 1.099498, "residual_absolute": 0.704636, "residual_free": 0.947430, "attention_improved_tasks": 0, "residual_improved_tasks": 0},
+      "4003": {"attention_absolute": 0.716392, "attention_free": 1.123527, "residual_absolute": 0.712655, "residual_free": 0.958424, "attention_improved_tasks": 0, "residual_improved_tasks": 0},
+      "4007": {"attention_absolute": 0.708443, "attention_free": 1.117375, "residual_absolute": 0.702215, "residual_free": 0.950538, "attention_improved_tasks": 0, "residual_improved_tasks": 0}
+    }
+  },
+  "entry_localization": {
+    "component_contrastive_q_nrmse_range": [0.7124, 0.7681],
+    "component_contrastive_k_nrmse_range": [0.7474, 0.7976],
+    "component_contrastive_v_nrmse_range": [0.9161, 0.9196],
+    "component_contrastive_attention_nrmse_range": [0.6603, 0.6780],
+    "component_contrastive_residual_nrmse_range": [0.8731, 0.8828]
+  },
+  "interpretation": {
+    "result": "positive_oracle_initial_condition_mechanics_negative_learned_initial_condition",
+    "missing_property": "a causally sufficient receiver initial condition",
+    "training_implication": "Optimize a source-conditioned target layer-0 seed through frozen receiver dynamics using induced later-layer losses rather than independently fitting static target snapshots."
+  },
+  "recommended_next_step": {
+    "experiment_id": "LIP-H0-010",
+    "branch": "exp/LIP-H0-010-initial-condition-bridge",
+    "kind": "development_only_unrolled_initial_condition_bridge",
+    "confirmation_usage": "prohibited_until_training_and_development_gates_are_frozen",
+    "proto_015_status": "premature"
+  }
+}
