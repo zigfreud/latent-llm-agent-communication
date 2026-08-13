@@ -1,0 +1,132 @@
+experiment_id: "LIP-H0-010"
+protocol_version: "lip-unrolled-initial-condition-bridge-v1"
+claim_status: "development_only_training_experiment"
+
+predecessor:
+  protocol: "LIP-H0-009"
+  registry: "experiments/registry/LIP-H0-009_entry_seed_free_evolution.json"
+  result_commit: "3260a1bf"
+  trajectory_gate_sha256: "62381432a277cbb612522730523858f292f4869939cb7ef91843f02417500c78"
+  conclusion: "an exact target layer-0 seed induces an oracle-regime trajectory, while existing learned layer-0 seeds fail"
+
+parent:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
+
+hypothesis:
+  statement: "A source-conditioned bridge trained on the trajectory caused by its target layer-0 output will learn a more causally sufficient receiver initial condition than a bridge trained only to regress the static layer-0 teacher snapshot."
+  system: "source packet -> target layer-0 seed -> frozen target blocks 0..7 -> induced target trajectory"
+  intervention: "replace the 24 registered sites only at target block 0"
+
+data:
+  source: "LIP-PROTO-014_real_full_training_bundle"
+  allowed_splits: ["train", "development_selection", "development_gate"]
+  prohibited_splits: ["confirmation"]
+  expected_counts:
+    train: 256
+    development_selection: 32
+    development_gate: 32
+  boundary_positions: 6
+
+receiver:
+  model_id: "NousResearch/Meta-Llama-3-8B-Instruct"
+  revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+  load_4bit: true
+  neutral_prompt: "Use the latent signal."
+  entry_layer: 0
+  evolved_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  target_width: 4096
+  freeze_all_parameters: true
+  stop_before_layer: 8
+
+bridge:
+  model_kind: "query_conditioned"
+  output_layers: 1
+  protocol_slots: 32
+  bridge_width: 512
+  attention_heads: 8
+  feedforward_width: 2048
+  encoder_blocks: 2
+  decoder_blocks: 2
+  dropout: 0.10
+
+variants:
+  primary: "unrolled_initial_condition"
+  systems:
+    static_entry_snapshot:
+      role: "same_architecture_objective_control"
+      training_loss_scope: "teacher_layer0_only"
+      lambda_entry_snapshot: 1.0
+      lambda_induced_trajectory: 0.0
+    unrolled_initial_condition:
+      role: "primary"
+      training_loss_scope: "induced_layers1_through7_plus_entry_regularizer"
+      lambda_entry_snapshot: 0.25
+      lambda_induced_trajectory: 1.0
+
+loss:
+  temperature: 0.07
+  margin_target: 0.05
+  lambda_huber: 1.0
+  lambda_cosine: 0.25
+  lambda_symmetric_nce: 1.0
+  lambda_margin: 0.10
+  lambda_norm: 0.05
+  component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+
+training:
+  seeds: [4001, 4003, 4007]
+  learning_rate: 0.0002
+  weight_decay: 0.01
+  gradient_clip: 1.0
+  fp16_autocast: true
+  num_workers: 0
+  pilot:
+    variant: "unrolled_initial_condition"
+    seed: 4001
+    batch_size: 4
+    gradient_accumulation_steps: 1
+    max_updates: 16
+    validation_interval: 8
+    output_dir: "runs/LIP-H0-010/pilot"
+  full_matrix:
+    batch_size: 4
+    gradient_accumulation_steps: 1
+    max_updates: 512
+    validation_interval: 32
+    output_dir: "runs/LIP-H0-010/training"
+
+pilot_gate:
+  required_updates: 16
+  require_finite_loss: true
+  require_nonzero_bridge_gradient_each_update: true
+  maximum_amp_overflow_events: 2
+  maximum_peak_allocated_vram_bytes: 22500000000
+  pass_action: "run_the_frozen_two_variant_three_seed_development_matrix"
+  fail_action: "stop_and_revise_memory_or_numeric_settings_without_opening_confirmation"
+
+development_selection:
+  checkpoint_metric: "induced_trajectory_joint_core_name_retrieval_margin_then_rmse"
+  receiver_evolution_used_for_both_variants: true
+
+development_gate:
+  alpha: 0.05
+  statistics_seed: 4481
+  minimum_passing_primary_replicas: 2
+  required_regions: ["joint", "core", "name"]
+  primary_vs_static_requirement: "primary induced-trajectory RMSE lower in at least two paired seeds without lower mean retrieval"
+  pass_action: "freeze_a_new_untouched_functional_confirmation_protocol"
+  fail_action: "remain_in_development_and_redesign_initial_condition_learning"
+
+confirmation:
+  status: "prohibited_in_H0-010"
+  exposed_PROTO_014_tasks: "must_not_be_used_for_checkpoint_selection_or_gating"
+  proto_015_status: "premature_until_development_gate_passes"
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  receiver_forward_scope: "blocks_0_through_7_only"
+  bridge_and_receiver_device: "cuda"
