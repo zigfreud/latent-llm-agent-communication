@@ -1,0 +1,113 @@
+{
+  "experiment_id": "LIP-H0-010",
+  "protocol_version": "lip-unrolled-initial-condition-bridge-v3",
+  "claim_status": "negative_development_gate_with_positive_dynamic_learning_signal",
+  "run_commit": "050848f28ec8c94c8ac0d637a51d6ea8a65a6cdb",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-010/matrix-v3",
+    "matrix_summary": {
+      "path": "matrix_summary.json",
+      "sha256": "74cf5a3d3e2dc9173103d199d0d5cf393696133c3fd2c0f88c0837a3b9f7f474"
+    }
+  },
+  "matrix": {
+    "variants": ["static_entry_snapshot", "unrolled_initial_condition"],
+    "seeds": [4001, 4003, 4007],
+    "updates_per_cell": 512,
+    "batch_size": 4,
+    "development_only": true,
+    "confirmation_used": false
+  },
+  "development_gate": {
+    "passed": false,
+    "paired_primary_vs_static": {
+      "passing_pairs": 3,
+      "required_pairs": 2,
+      "passed": true,
+      "pairs": [
+        {
+          "seed": 4001,
+          "static_rmse": 2.375878,
+          "unrolled_rmse": 1.269395,
+          "static_mean_retrieval": 0.135417,
+          "unrolled_mean_retrieval": 0.593750,
+          "passed": true
+        },
+        {
+          "seed": 4003,
+          "static_rmse": 2.318978,
+          "unrolled_rmse": 1.273613,
+          "static_mean_retrieval": 0.177083,
+          "unrolled_mean_retrieval": 0.687500,
+          "passed": true
+        },
+        {
+          "seed": 4007,
+          "static_rmse": 2.224540,
+          "unrolled_rmse": 1.287742,
+          "static_mean_retrieval": 0.156250,
+          "unrolled_mean_retrieval": 0.656250,
+          "passed": true
+        }
+      ]
+    },
+    "primary_multi_replica_holm": {
+      "passing_replicas": 0,
+      "required_replicas": 2,
+      "passed": false,
+      "failure_localization": "core diagonal margin was negative in all three replicas"
+    }
+  },
+  "unrolled_gate_regions": {
+    "4001": {
+      "joint_retrieval_top1": 0.593750,
+      "joint_margin": 0.004317,
+      "core_retrieval_top1": 0.468750,
+      "core_margin": -0.054298,
+      "name_retrieval_top1": 0.718750,
+      "name_margin": 0.035250
+    },
+    "4003": {
+      "joint_retrieval_top1": 0.781250,
+      "joint_margin": 0.021217,
+      "core_retrieval_top1": 0.531250,
+      "core_margin": -0.030750,
+      "name_retrieval_top1": 0.750000,
+      "name_margin": 0.059962
+    },
+    "4007": {
+      "joint_retrieval_top1": 0.718750,
+      "joint_margin": 0.031032,
+      "core_retrieval_top1": 0.562500,
+      "core_margin": -0.004168,
+      "name_retrieval_top1": 0.687500,
+      "name_margin": 0.047820
+    }
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "peak_allocated_vram_bytes": 6981469184,
+    "peak_reserved_vram_bytes": 7105150976,
+    "summed_cell_wall_seconds": 1181.668684,
+    "colab_compute_units_before": 78.72,
+    "colab_compute_units_after": 78.08,
+    "colab_compute_units_consumed": 0.64
+  },
+  "interpretation": {
+    "supported": "Training through frozen receiver evolution learns a substantially better receiver initial condition than static layer-0 regression, replicated in all three seeds.",
+    "not_supported": "The learned initial condition is not yet a robust carrier of core task identity under the frozen Holm gate.",
+    "mechanistic_localization": "The remaining failure is discriminative separation in the core region, not gross trajectory reconstruction or name-region identity.",
+    "likely_pressure_mismatch": "Training exposes three in-batch negatives per update while the development gate tests the hardest of 31 alternatives; the margin term also has weight 0.1."
+  },
+  "administrative_note": {
+    "issue": "The six cells completed before matrix aggregation raised a Python NameError because JSON-style false was used in source.",
+    "effect_on_scientific_results": "none",
+    "fix_commit": "08f25160",
+    "aggregation_method": "The one-literal fix was applied to the Colab working tree without advancing the frozen run commit, then the resumable runner skipped all six complete cells and aggregated them."
+  },
+  "decision": {
+    "functional_confirmation_authorized": false,
+    "proto_015_status": "premature",
+    "next_step": "Design a development-only core-discriminative unrolled initial-condition experiment with broader negative coverage and stronger core margin pressure."
+  }
+}
