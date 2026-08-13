@@ -1,0 +1,105 @@
+{
+  "experiment_id": "LIP-H0-007",
+  "protocol_version": "lip-receiver-aware-replay-operator-v1",
+  "claim_status": "exploratory_causal_operator_screen_only",
+  "run_commit": "cf3411d2778cd0edc397acc38f337a47cc0f4408",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-007",
+    "trajectory_gate": {
+      "path": "trajectory_gate.json",
+      "sha256": "48b38270c359ccd0ffe529dabd1faa64ad683e4ef025a82ed4d5edabfd0763b6"
+    }
+  },
+  "sample": {
+    "source": "exposed_LIP-PROTO-014_confirmation_tasks",
+    "task_indices": [0, 1, 2, 3, 16, 17, 18, 19],
+    "tasks": 8,
+    "training_seeds": [4001, 4003, 4007],
+    "result_rows": 112,
+    "inferential_status": "paired_descriptive_gate_not_a_new_confirmation_set"
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "total_vram_bytes": 23659151360,
+    "peak_allocated_vram_bytes": 6156819456,
+    "peak_reserved_vram_bytes": 6199181312,
+    "wall_seconds": 317.45734296600017,
+    "task_conditions_per_hour": 1270.0919003255908,
+    "colab_compute_units_before": 81.2,
+    "colab_compute_units_after": 80.94,
+    "colab_compute_units_consumed": 0.26
+  },
+  "gate": {
+    "decision_variant": "component_contrastive",
+    "minimum_taskwise_improvements": 6,
+    "minimum_passing_replicas": 2,
+    "passing_primary_replicas": 0,
+    "advance_to_functional_identity_test": false
+  },
+  "learned_replica_means": {
+    "component_contrastive": {
+      "4001": {
+        "transition_jump_nrmse": {"absolute_replace": 0.621235, "live_task_delta_add": 0.259197, "improved_tasks": 8},
+        "attention_output_nrmse": {"absolute_replace": 0.780719, "live_task_delta_add": 1.230306, "improved_tasks": 0},
+        "residual_output_nrmse": {"absolute_replace": 0.799541, "live_task_delta_add": 1.214120, "improved_tasks": 0}
+      },
+      "4003": {
+        "transition_jump_nrmse": {"absolute_replace": 0.603046, "live_task_delta_add": 0.271354, "improved_tasks": 8},
+        "attention_output_nrmse": {"absolute_replace": 0.772527, "live_task_delta_add": 1.241413, "improved_tasks": 0},
+        "residual_output_nrmse": {"absolute_replace": 0.801775, "live_task_delta_add": 1.240497, "improved_tasks": 0}
+      },
+      "4007": {
+        "transition_jump_nrmse": {"absolute_replace": 0.637315, "live_task_delta_add": 0.253131, "improved_tasks": 8},
+        "attention_output_nrmse": {"absolute_replace": 0.785857, "live_task_delta_add": 1.209280, "improved_tasks": 0},
+        "residual_output_nrmse": {"absolute_replace": 0.804055, "live_task_delta_add": 1.187665, "improved_tasks": 0}
+      }
+    },
+    "structured_linear_regression": {
+      "4001": {
+        "transition_jump_nrmse": {"absolute_replace": 0.553944, "live_task_delta_add": 0.264486, "improved_tasks": 8},
+        "attention_output_nrmse": {"absolute_replace": 0.710243, "live_task_delta_add": 1.082211, "improved_tasks": 0},
+        "residual_output_nrmse": {"absolute_replace": 0.704636, "live_task_delta_add": 1.095532, "improved_tasks": 0}
+      },
+      "4003": {
+        "transition_jump_nrmse": {"absolute_replace": 0.562859, "live_task_delta_add": 0.257156, "improved_tasks": 8},
+        "attention_output_nrmse": {"absolute_replace": 0.716392, "live_task_delta_add": 1.077716, "improved_tasks": 0},
+        "residual_output_nrmse": {"absolute_replace": 0.712655, "live_task_delta_add": 1.072777, "improved_tasks": 0}
+      },
+      "4007": {
+        "transition_jump_nrmse": {"absolute_replace": 0.550029, "live_task_delta_add": 0.264806, "improved_tasks": 8},
+        "attention_output_nrmse": {"absolute_replace": 0.708443, "live_task_delta_add": 1.083667, "improved_tasks": 0},
+        "residual_output_nrmse": {"absolute_replace": 0.702215, "live_task_delta_add": 1.091905, "improved_tasks": 0}
+      }
+    }
+  },
+  "oracle_diagnostic": {
+    "absolute_replace": {
+      "transition_jump_nrmse": 0.167896,
+      "query_nrmse": 0.0,
+      "key_nrmse": 0.0,
+      "value_nrmse": 0.0,
+      "attention_output_nrmse": 0.0,
+      "residual_output_nrmse": 0.0
+    },
+    "live_task_delta_add": {
+      "transition_jump_nrmse": 0.288877,
+      "query_nrmse": 0.435504,
+      "key_nrmse": 0.465057,
+      "value_nrmse": 0.647877,
+      "attention_output_nrmse": 1.348284,
+      "residual_output_nrmse": 1.713128
+    }
+  },
+  "interpretation": {
+    "result": "negative_naive_additive_operator",
+    "falsified_assumption": "The mean teacher scaffold is a valid affine origin for adding a task residual to the receiver's live neutral carrier at every layer.",
+    "metric_warning": "Lower transition jump alone can be anti-diagnostic: it improved universally while downstream oracle alignment worsened universally.",
+    "broader_hypothesis_status": "The receiver-trajectory hypothesis remains open; only this static untrained realization was falsified."
+  },
+  "recommended_next_step": {
+    "experiment_id": "LIP-H0-008",
+    "kind": "anchored_receiver_aware_operator_screen",
+    "operator": "absolute replacement at layer 0, then live task-delta addition at layers 1 through 7",
+    "proto_015_status": "premature"
+  }
+}
