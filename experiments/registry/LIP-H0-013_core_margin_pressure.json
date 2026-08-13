@@ -1,0 +1,122 @@
+{
+  "experiment_id": "LIP-H0-013",
+  "protocol_version": "lip-core-margin-pressure-v1",
+  "claim_status": "directional_success_strong_gate_failed",
+  "run_commit": "32e97fcc57d973d3f2a08fad3fc5fc767130cec4",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-013",
+    "pilot": {
+      "path": "pilot-v1/run_summary.json",
+      "sha256": "90852aeb08edac3c091b1f2f1b29d851c26b71940a8688499281abc0f16c60bb"
+    },
+    "screen": {
+      "path": "screen-v1/run_summary.json",
+      "sha256": "80792ddaa130ea9d9de9d2baddbe433cafb7b497bc09ec1949841f932d49d0b6"
+    }
+  },
+  "frozen_intervention": {
+    "seed": 4007,
+    "batch_size": 16,
+    "updates": 128,
+    "examples_seen": 2048,
+    "induced_trajectory_lambda_margin_before": 0.10,
+    "induced_trajectory_lambda_margin_after": 1.00,
+    "all_other_loss_terms_unchanged": true,
+    "confirmation_used": false
+  },
+  "pilot_gate": {
+    "passed": true,
+    "updates_completed": 4,
+    "finite_loss": true,
+    "nonzero_bridge_gradient_each_update": true,
+    "amp_overflow_events": 1,
+    "best_step": 2,
+    "peak_allocated_vram_bytes": 8238643712,
+    "peak_reserved_vram_bytes": 8474591232,
+    "wall_seconds": 27.155847912
+  },
+  "screen": {
+    "best_step": 120,
+    "normalized_residual_rmse": 1.418561,
+    "regions": {
+      "joint": {
+        "retrieval_top1": 0.843750,
+        "mean_diagonal_margin": 0.040589,
+        "p_value_holm": 0.000030,
+        "rejected": true
+      },
+      "core": {
+        "retrieval_top1": 0.718750,
+        "mean_diagonal_margin": 0.010905,
+        "p_value_holm": 0.081319,
+        "rejected": false
+      },
+      "name": {
+        "retrieval_top1": 0.875000,
+        "mean_diagonal_margin": 0.068961,
+        "p_value_holm": 0.000080,
+        "rejected": true
+      }
+    },
+    "mean_retrieval": 0.812500,
+    "holm_family_passed": false,
+    "amp_overflow_events": 1,
+    "wall_seconds": 107.748063815
+  },
+  "paired_to_H0_011_seed_4007": {
+    "reference": {
+      "normalized_residual_rmse": 1.425170,
+      "core_retrieval_top1": 0.687500,
+      "core_margin": 0.003350,
+      "mean_retrieval": 0.739583,
+      "core_p_value_holm": 0.373306
+    },
+    "core_margin_improved": true,
+    "core_retrieval_not_lower": true,
+    "mean_retrieval_not_lower": true,
+    "rmse_not_higher": true,
+    "directional_success": true,
+    "strong_success": false
+  },
+  "training_margin_diagnostic": {
+    "H0_011_lambda_0_10": {
+      "joint_median_final": [0.020515, 0.003319],
+      "core_median_final": [0.038300, 0.022980],
+      "name_median_final": [0.015579, 0.0]
+    },
+    "H0_013_lambda_1_00": {
+      "joint_median_final": [0.021195, 0.003252],
+      "core_median_final": [0.037811, 0.024734],
+      "name_median_final": [0.015724, 0.0]
+    },
+    "interpretation": "The tenfold scalar changed the selected solution and improved the held development gate, but did not reduce the observed batch-level core hinge violation. Blindly scaling the same aggregate term again is therefore not the next identified intervention."
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "peak_allocated_vram_bytes": 8238643712,
+    "peak_reserved_vram_bytes": 8474591232,
+    "pilot_wall_seconds": 27.155847912,
+    "screen_wall_seconds": 107.748063815,
+    "colab_compute_units_before": 76.79,
+    "colab_compute_units_after": 76.66,
+    "colab_compute_units_consumed": 0.13,
+    "metering_note": "Usage is reported once over the complete H0-013 interval at Colab's visible precision; the identical interval embedded in pilot and screen summaries must not be summed."
+  },
+  "administrative_note": {
+    "event": "The Colab UI briefly reported an inactivity disconnect during the screen.",
+    "resolution": "Reconnection attached to the same live backend; the uninterrupted process resumed reporting at step 72 and completed all 128 updates.",
+    "scientific_effect": "none"
+  },
+  "interpretation": {
+    "supported": "At fixed trajectory evolution and negative coverage, stronger aggregate margin pressure directionally improves the learned identity geometry on the paired development seed.",
+    "not_supported": "The intervention did not yield Holm-robust core separation and does not justify multi-seed replication, functional confirmation, or PROTO-015.",
+    "mechanistic_update": "The remaining uncertainty is no longer whether trajectory evolution or negative coverage matter. It is whether the core-margin gradient is too small, conflicts with reconstruction/NCE gradients, or is trained against the wrong hard-negative geometry.",
+    "next_test": "Run a development-only gradient-geometry evaluation on frozen H0-011 and H0-013 checkpoints before choosing another training intervention."
+  },
+  "decision": {
+    "exact_replication_authorized": false,
+    "gradient_geometry_eval_authorized": true,
+    "functional_confirmation_authorized": false,
+    "proto_015_status": "premature"
+  }
+}
