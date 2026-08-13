@@ -1,8 +1,7 @@
 # LIP-PROTO-014 source-conditioned residual packet
 
-Status: frozen train-side contract and implementation; real packet extraction
-and bridge training have not yet been executed. Confirmation tasks remain
-sealed behind the registered development gate.
+Status: completed preregistered execution; claim-eligible negative confirmatory
+result reported below.
 
 ## Research question
 
@@ -437,14 +436,210 @@ for the full bundle; full-scope runs are never allowed to reduce it implicitly.
 AMP overflow skips are recorded but do not consume the optimizer-update budget,
 and every training or matrix JSON is serialized with non-finite values rejected.
 
+## Result
+
+Execution completed on 2026-08-13 from source commit
+`8e79a4740c9fd0fd98977c4b29feb3d28a45aa6e`. The frozen train-side contract was
+not changed during execution.
+
+### Observation: execution and integrity
+
+The real non-claim preflight loaded the registered endpoint revisions:
+
+- source: `deepseek-ai/deepseek-coder-1.3b-base` at
+  `e5babb80b8539a4e85dd2418c0ee611522276987`, with safetensors disabled;
+- receiver: `NousResearch/Meta-Llama-3-8B-Instruct` at
+  `53346005fb0ef11d3b6a83b12c895cca40156b6c`, with safetensors and registered
+  4-bit receiver loading enabled;
+- model extraction was sequential, never co-resident.
+
+The preflight bundle was explicitly marked `extraction_scope=preflight` and
+contained six real tasks: two train, two development-selection, two
+development-gate, and zero confirmation tasks. Its source tensors had shape
+`[24, 32, 2048]`, its receiver targets had shape `[8, 24, 4096]`, and its
+manifest hash was
+`d7bb926601d9b76a24223ae592b79fada4a35c0a36fdc638d89196478f1839e9`.
+Bundle validation passed. Frozen receiver self-replay on task 761 had maximum
+absolute logit delta `0.0`.
+
+The two-update `component_contrastive`, seed-4001 training smoke test completed
+on CUDA with 20,030,976 trainable parameters. The best checkpoint was step 2;
+the configured batch size remained four and the recorded effective batch size
+was two because only two preflight training tasks existed. One AMP overflow
+step was skipped without consuming the optimizer-update budget, as specified by
+the contract. The checkpoint hash was
+`5bc9605707c05db411aec94c92e18e94f7f665bf667422ca429ba62f00eed189`, the run
+summary hash was
+`1c9a337c966131f478bea163da8c51ba191d0daf8c8fd41b5e3ee80bc2fc899b`, and the
+target-statistics hash was
+`dadf5f8884e988d0a88ee7cbc11b42849e993714157883e2a870e21443ff974e`.
+The preflight correctly remained non-claim and not ready for confirmation.
+
+The runtime was a standard Tesla T4 with 15,360 MiB total memory. A dedicated
+preflight peak-memory trace was not retained, so no preflight peak is inferred.
+Scoped monitors later observed maxima of 6,063 MiB during confirmation bundle
+extraction and 6,103 MiB during confirmation generation on the same T4 class.
+This is a telemetry limitation, not a protocol divergence.
+
+After the preflight passed, the full extraction produced 320 records: 256
+train, 32 development-selection, 32 development-gate, and zero confirmation
+records, in 40 shards. Its manifest hash was
+`ad501e9537283b26f3b889ed7f355f69b47dd2e7967e6a92554a70ca5a7a3744`;
+validation passed and task-761 self-replay again had maximum absolute logit
+delta `0.0`.
+
+The registered three-system by three-seed development matrix then completed.
+All three `component_contrastive` replicas passed the joint/core/name gate, as
+did all three `structured_linear_regression` replicas;
+`centered_regression` passed zero of three. The primary aggregate rule required
+at least two of three primary replicas and therefore opened the still-sealed
+confirmation population only after the primary system passed three of three.
+The matrix summary hash was
+`3a7228915e8a8639b9120c2dc7ec3394dd025ffffd1dfb2397a0386df492ea48`.
+
+Selection yielded 32 disjoint confirmation tasks, balanced as 16 tasks in each
+registered function-name stratum. The selection-report hash was
+`8b85806b230e0e63520c47538ffa53d14af230b2ca6b96b25e96f2c335fa1a04`.
+The confirmation-only bundle had 32 tasks, manifest hash
+`9af9c80afead6612b19bb28647f7c0fa119a4f4f11b9ca7abfe2065bffe58a22`,
+and task-79 self-replay maximum absolute logit delta `0.0`.
+
+Confirmation generation completed all 1,344 registered cells. The condition
+counts were 96 each for neutral, text-only, oracle-matched, oracle-shuffled, and
+mean-scaffold; 288 each for learned-matched, learned-shuffled, and
+random-residual-norm-matched. Generation metadata reported `complete=true` and
+`claim_eligible=true`. The random control preserved the registered residual
+norm to maximum absolute delta `1.0967254638671875e-05` and maximum relative
+delta `1.5038014793745127e-06`, below the `5e-6` tolerance. All 32 donor tasks
+were unique and no task donated to itself.
+
+The strict syntax audit completed all 1,344 cells with no missing records. It
+correctly reported `execution_mode=syntax_only`, `claim_eligible=false`, and
+`semantic_transport_supported=false`, because syntax-only evaluation is not a
+functional claim path. The independent hardened functional audit also completed
+all cells and reported `execution_mode=functional_hardened_namespace`,
+`claim_eligible=true`, and `subprocess_is_security_sandbox=true`. Its isolated
+worker ran as UID/GID 65534 under `python -I`, with empty effective
+capabilities, `no_new_privileges`, private mount and network namespaces,
+read-only source input, inaccessible result and host-secret paths, and only
+loopback networking. Every registered sandbox check passed.
+
+No NaN or infinity was found in the generation or scored evaluation records;
+the training and matrix serializers also reject non-finite numeric payloads.
+No frozen-contract divergence was observed. The only runtime warnings were an
+unauthenticated Hugging Face download warning, the registered
+`max_new_tokens=256` taking precedence over `max_length=4096`, and a tokenizer
+BPE-cleanup warning; none changed the pinned revisions, tensor layouts, task
+design, or inference contract.
+
+### Result: sealed functional confirmation
+
+The hardened functional rates were:
+
+| Condition | Functional passes | Rate |
+| --- | ---: | ---: |
+| Neutral, no LIP | 0/96 | 0.0000% |
+| Text only, no LIP | 89/96 | 92.7083% |
+| Oracle teacher matched | 84/96 | 87.5000% |
+| Oracle teacher shuffled | 0/96 | 0.0000% |
+| Mean scaffold | 0/96 | 0.0000% |
+| Learned matched | 1/288 | 0.3472% |
+| Learned shuffled | 1/288 | 0.3472% |
+| Random residual, norm matched | 0/288 | 0.0000% |
+
+The preregistered oracle identity anchor passed, but the Holm-controlled learned
+transport family did not:
+
+| Task-clustered contrast | Mean difference | 95% interval | One-sided `p` | Holm `p` | Confirmed |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Oracle matched - oracle shuffled | 0.875000 | [0.760417, 0.968750] | 0.0000099999 | n/a | yes |
+| Learned matched - learned shuffled | 0.000000 | [0.000000, 0.000000] | 1.0 | 1.0 | no |
+| Learned matched - mean scaffold | 0.003472 | [0.000000, 0.010417] | 0.5 | 1.0 | no |
+| Learned matched - random norm matched | 0.003472 | [0.000000, 0.010417] | 0.5 | 1.0 | no |
+
+The oracle contrast had 29 nonzero task clusters. The learned identity contrast
+had zero. In the experiment's causal notation,
+
+\[
+\widehat\tau_{\mathrm{oracle}}
+= \mathbb{E}[Y(\Delta_i^{\mathrm{oracle}})
+- Y(\Delta_{\pi(i)}^{\mathrm{oracle}})]
+= 0.875,
+\]
+
+whereas
+
+\[
+\widehat\tau_{\mathrm{learned}}
+= \mathbb{E}[Y(\widehat\Delta_i)
+- Y(\widehat\Delta_{\pi(i)})]
+= 0.
+\]
+
+Thus the overall semantic gate failed and the final hardened summary reported
+`semantic_transport_supported=false`. The observed identity-recovery ratio was
+`0.0`; learned-over-neutral gain was `0.003472`, while text-over-neutral gain
+was `0.927083` and oracle identity effect was `0.875`.
+
+### Interpretation
+
+The positive oracle anchor shows that this receiver prompt, insertion path, and
+first-eight-layer carrier can causally express task identity on the selected
+population. The high text-only rate separately shows that the receiver can
+solve most of these tasks when task information is supplied textually. These
+observations make a receiver-side impossibility or a broken replay mechanism
+poor explanations for the learned result.
+
+They do not, however, identify a single failure location within the learned
+path. Under the frozen DeepSeek source observation, 32 x 512 code, bridge
+families, objectives, training population, prompts, and Llama receiver, the
+learned packet did not preserve functionally detectable task identity. Passing
+development retrieval and component-margin gates was therefore insufficient
+for downstream causal transport. The eligible scientific result is negative
+for this complete registered system, not a proof that heterogeneous latent
+transport is impossible.
+
+### Hypothesis generated by the result
+
+A plausible follow-up hypothesis is that the development objectives learned
+geometric separation that was adequate for held-out retrieval but did not
+preserve the receiver-specific directions needed to change generation
+causally. Other explanations remain live, including insufficient source-state
+information at the pinned layers, an inadequate scaffold/residual
+factorization, bridge capacity or optimization limits, and distribution shift
+between development margins and executable confirmation behavior. These are
+post-result hypotheses only. They do not retrospectively alter this protocol
+or select a redesign without new evidence.
+
+### Artifact record
+
+The canonical artifact is stored at `lip-artifacts/LIP-PROTO-014` on Drive.
+`SHA256SUMS` binds exactly 23 scientific payloads, and all entries passed
+`sha256sum -c`. Operational logs remain beside the scientific outputs but are
+excluded from the manifest; no large bundle or checkpoint was duplicated into
+the repository.
+
+- `SOURCE_COMMIT.txt`: `8e79a4740c9fd0fd98977c4b29feb3d28a45aa6e`
+- `SHA256SUMS`: `2066ebe36d61da87e3d1c0f5dc8f8f6f2e93ca472e4405d783f0a7a64caa1db1`
+- frozen config: `3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f`
+- full training matrix summary: `3a7228915e8a8639b9120c2dc7ec3394dd025ffffd1dfb2397a0386df492ea48`
+- confirmation generations: `9b3e5ac7f0fc33d1dee2b0b73eb9f582a33f44e0a59f59e5594914629670c38a`
+- confirmation generation metadata: `ca9767ca30a09c4a0500425fc343e454d12bbbdf8618730a4ebced0f11055890`
+- strict syntax summary: `c03f799dd9d57714a17024f370b11554fd0c85bc218c170645361812b88dc419`
+- hardened functional summary: `99e425d85bfc0aad3b03e0d42a90912d3789f273d7ba8ec25d354581c1897f38`
+- hardened sandbox report: `1e670ba28f64f82d16a00842173284032fc995395c4a73c34bd576734f768883`
+
 ## Claim boundary
 
-A positive 014 permits the statement that, in this bounded environment, a
-learned bridge transformed source-model latent states into a receiver-side
-latent packet carrying causally useful task identity without transmitting the
-task text to the receiver.
+The registered positive claim boundary was not crossed. This execution does
+not support the statement that the learned bridge transported causally useful
+task identity. It supports the narrower negative statement that the complete
+registered A-to-B bridge system failed its claim-eligible functional transport
+gate despite a strong positive oracle carrier anchor.
 
-It does not yet permit the statement that the 32 x 512 internal code is a
-universal language, that arbitrary models can communicate through it, or that
-text has been replaced generally. Those require unseen endpoint composition,
-broader task families, and an independently registered non-inferiority design.
+Even a positive 014 would not have permitted the statement that the 32 x 512
+internal code is a universal language, that arbitrary models can communicate
+through it, or that text has been replaced generally. Those claims still
+require unseen endpoint composition, broader task families, and independently
+registered designs. With only A-to-B training, the intermediate code is not
+identifiable as a model-independent interlingua.
