@@ -1,0 +1,84 @@
+experiment_id: "LIP-EVAL-034"
+protocol_version: "lip-alias-normalized-functional-diagnostic-v1"
+claim_status: "post_hoc_development_only_nonclaim"
+
+source:
+  experiment_id: "LIP-EVAL-033"
+  protocol_version: "lip-functional-bridge-screen-v1"
+  run_commit: "fbba79892f84f07936e1daf9d227c8865d2f3439"
+  registry: "experiments/registry/LIP-EVAL-033_functional_bridge_screen.json"
+  registry_sha256: "23583f232b4cce5495bd7c35eeb60ec8e1edc1693810230f1b72e7d6849bcfbe"
+  config: "config/LIP-EVAL-033_functional_bridge_screen.yaml"
+  config_sha256: "66da6bc098bf89fd996f0cd81b421b714e77a5b395035619f5dd71df75fa63ce"
+  design_sha256: "8368135d1a62eca029d21730b26a291d9601a5e57735f3fb525f9b81f04be6e1"
+  drive_root: "lip-artifacts/LIP-EVAL-033/full-v1"
+  generations: "generations.jsonl"
+  generations_sha256: "071332b5dc93b933d31a9bf11156f7b3387311689afbbef8b568a9136d4ee84d"
+  metadata: "generations.metadata.json"
+  metadata_sha256: "09f17aef707d4ffa6a2e92a9cc0001c716bc2f2d7863bb36ec7a1a52b4d35c1e"
+  functional_summary: "functional-evaluation/summary.json"
+  functional_summary_sha256: "c499a6e7e0713f43f24c837a0d42b1cfad78aec3f85377b409668a2933ef73d9"
+  scored_generations: "functional-evaluation/scored_generations.jsonl"
+  scored_generations_sha256: "cc5bdb4eeac8f99a5b6a516a58af404ca3a72abcf15e4c4050975de8e2f0c3c"
+  expected_records: 576
+  task_count: 32
+  complete: true
+  claim_eligible: false
+  exact_entry_point_declarations: 0
+  conditions: ["learned_matched", "learned_shuffled"]
+  training_seeds: [4001, 4003, 4007]
+  generation_seeds: [4127, 4241, 4357]
+
+normalization:
+  method: "single_top_level_function_alias_binding"
+  eligibility:
+    syntax_valid: true
+    exact_top_level_function_count: 1
+  binding_template: "{expected_entry_point} = {generated_function_name}"
+  preserve_original_code: true
+  body_rewrite: false
+  argument_rewrite: false
+  control_flow_rewrite: false
+  test_rewrite: false
+  ambiguous_multiple_functions: "ineligible"
+  missing_top_level_function: "ineligible"
+
+evaluation:
+  metric: "alias_functional_pass"
+  cluster_unit: "task_id"
+  replicates_per_task_condition: 9
+  primary_treatment: "learned_matched"
+  primary_control: "learned_shuffled"
+  alternative: "greater"
+  confidence: 0.95
+  alpha: 0.05
+  bootstrap_iterations: 10000
+  statistics_seed: 4499
+  minimum_positive_bridge_seeds: 2
+  require_hardened_namespace: true
+  ineligible_counts_as_failure: true
+  report_eligible_rate_separately: true
+  claim_eligible: false
+
+decision:
+  zero_matched_passes:
+    route: "no_alias_normalized_core_recovery"
+    action: "design_dynamic_closed_loop_trajectory_bridge"
+  positive_matched_task_difference_with_seed_guardrail:
+    route: "matched_specific_alias_recovery_candidate"
+    action: "design_name_or_readout_mechanism_branch"
+  otherwise:
+    route: "non_specific_or_seed_sensitive_alias_recovery"
+    action: "do_not_make_name_only_claim"
+  can_upgrade_EVAL_033: false
+  fresh_holdout_spend_authorized: false
+  proto_015_execution_authorized: false
+
+compute:
+  generation_required: false
+  gpu_required: false
+  preferred_runtime: "colab_cpu"
+
+output:
+  generations_jsonl: "runs/LIP-EVAL-033/generations.jsonl"
+  evaluation_dir: "runs/LIP-EVAL-034/evaluation"

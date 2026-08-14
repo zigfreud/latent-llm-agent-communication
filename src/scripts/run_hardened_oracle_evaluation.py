@@ -36,6 +36,9 @@ from src.scripts.evaluate_packet_bridge_confirmation import (
 from src.scripts.evaluate_functional_bridge_screen import (
     evaluate as evaluate_functional_bridge_screen,
 )
+from src.scripts.evaluate_alias_normalized_diagnostic import (
+    evaluate as evaluate_alias_normalized_diagnostic,
+)
 
 
 NOBODY_UID = 65534
@@ -115,6 +118,8 @@ def evaluator_for_config(config: dict[str, Any]):
         return evaluate_packet_bridge_confirmation
     if config.get("experiment_id") == "LIP-EVAL-033":
         return evaluate_functional_bridge_screen
+    if config.get("experiment_id") == "LIP-EVAL-034":
+        return evaluate_alias_normalized_diagnostic
     return evaluate_oracle_packet_semantics
 
 
@@ -258,10 +263,14 @@ def _run_parent(args: argparse.Namespace) -> None:
     print("Hardened functional evaluation completed")
     print(f"execution_mode: {summary['execution_mode']}")
     print(f"claim_eligible: {summary['claim_eligible']}")
-    signal_key = (
-        "semantic_transport_supported"
-        if "semantic_transport_supported" in summary
-        else "development_functional_signal_detected"
+    signal_key = next(
+        key
+        for key in (
+            "diagnostic_route",
+            "semantic_transport_supported",
+            "development_functional_signal_detected",
+        )
+        if key in summary
     )
     print(f"{signal_key}: {summary[signal_key]}")
     print(f"summary: {output_dir / 'summary.json'}")
