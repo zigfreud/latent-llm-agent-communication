@@ -199,9 +199,10 @@ def _load_p014_cohort(
         if strata[by_id[target]] != strata[by_id[donor]]:
             raise ValueError("P014 donor crosses tokenizer strata")
 
-    validation = validate_packet_bundle(confirmation_bundle_dir, require_real=True)
+    validation = validate_packet_bundle(confirmation_bundle_dir)
     if (
-        validation["extraction_scope"] != "confirmation"
+        validation["extraction_mode"] != "real"
+        or validation["extraction_scope"] != "confirmation"
         or validation["split_counts"]["confirmation"] != len(task_ids)
         or tuple(validation["source_shape"]) != tuple(config["packets"]["source_shape"])
         or tuple(validation["target_shape"])
