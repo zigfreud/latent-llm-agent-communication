@@ -194,7 +194,7 @@
     "stable_property": "Name identity is strong across all three seeds, and core retrieval is 75% in every cell; joint retrieval and joint/core inferential strength remain initialization-sensitive.",
     "causal_limit": "Only seed 4007 has the directly paired H0-013 random-batch contrast. Seeds 4001 and 4003 replicate the frozen system, not the causal batch-membership effect, because seed-matched controls do not exist.",
     "not_supported": "H0-016 does not establish 3/3 robustness, functional task transmission, cross-seed causal replication, authorization to execute a confirmation evaluation, or readiness for PROTO-015.",
-    "next_test": "Preregister a bounded LIP-EVAL-033 confirmation evaluation whose single primary endpoint is task-clustered learned-matched minus learned-shuffled functional performance across all three fixed bridge seeds."
+    "next_test": "Preregister a bounded development-only LIP-EVAL-033 on the already-open P014 functional cohort. Its single primary endpoint is task-clustered learned-matched minus learned-shuffled performance across all three fixed bridge seeds; a positive result may authorize design of a fresh-cohort PROTO-015."
   },
   "decision": {
     "cross_seed_system_replication_passed": true,
@@ -202,6 +202,7 @@
     "paired_causal_effect_replicated_across_seeds": false,
     "LIP_EVAL_033_design_authorized": true,
     "LIP_EVAL_033_execution_authorized": false,
+    "LIP_EVAL_033_claim_scope": "development_only_reused_open_P014_functional_cohort",
     "functional_confirmation_design_authorized": true,
     "functional_confirmation_execution_authorized": false,
     "dynamic_mining_authorized": false,

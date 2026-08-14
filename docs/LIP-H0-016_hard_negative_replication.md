@@ -39,5 +39,7 @@ retrieval and joint/core statistical strength remained initialization-sensitive.
 Only seed 4007 retains a paired causal comparison against the H0-013 random
 batch policy. The two new cells test system robustness, not cross-seed causal
 replication. The result authorizes preregistration of LIP-EVAL-033 as a bounded
-functional learned-matched versus learned-shuffled test across all three fixed
-bridge seeds. It does not authorize execution inside H0-016.
+development-only learned-matched versus learned-shuffled test across all three
+fixed bridge seeds. The P014 functional cohort is already open, so reusing it
+cannot produce independent confirmation. A positive EVAL-033 may authorize a
+fresh-cohort PROTO-015 design. It does not authorize execution inside H0-016.

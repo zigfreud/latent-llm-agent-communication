@@ -33,9 +33,13 @@ seeds: only seed 4007 has a matched H0-013 random-batch control. Nor does
 identity geometry establish functional task transmission.
 
 H0-016 authorizes preregistration of a bounded LIP-EVAL-033 design, not its
-execution. The recommended primary endpoint is learned-matched minus
-learned-shuffled functional performance, task-clustered across all three fixed
-bridge seeds. Dynamic mining and PROTO-015 remain premature.
+execution. The existing P014 functional cohort has already been opened, so a
+new evaluation on it must remain development-only rather than masquerade as
+independent confirmation. The recommended primary endpoint is learned-matched
+minus learned-shuffled functional performance, task-clustered across all three
+fixed bridge seeds. A positive result may authorize design of a fresh-cohort
+PROTO-015; it cannot itself supply that confirmation. Dynamic mining and
+PROTO-015 remain premature.
 
 - Run commit: `7ec2ed17a3b45a30c8d84b8a28fcafe971c5326c`.
 - Seed 4001: best step 128, 117.13 seconds, strong gate failed.

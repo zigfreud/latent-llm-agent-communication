@@ -115,4 +115,7 @@ def test_replication_registry_preserves_threshold_level_decision():
     assert registry["cells"]["4003"]["holm_family_passed"] is True
     assert registry["decision"]["LIP_EVAL_033_design_authorized"] is True
     assert registry["decision"]["LIP_EVAL_033_execution_authorized"] is False
+    assert registry["decision"]["LIP_EVAL_033_claim_scope"].startswith(
+        "development_only"
+    )
     assert registry["decision"]["proto_015_status"] == "premature"
