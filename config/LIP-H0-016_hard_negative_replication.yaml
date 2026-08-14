@@ -1,0 +1,159 @@
+experiment_id: "LIP-H0-016"
+protocol_version: "lip-hard-negative-replication-v1"
+claim_status: "development_only_hard_negative_replication"
+
+predecessor:
+  protocol: "LIP-H0-015"
+  registry: "experiments/registry/LIP-H0-015_hard_negative_batches.json"
+  registry_sha256: "d84e46239bdc132c9e55302127e765b8002252585839d87ee2bfeb53bff43c7b"
+  screen_sha256: "b0b3a9b87b5825a45bdb3085bded4c4cef31d7310ec667e66dbc0beff40d5f54"
+  frozen_seed: 4007
+  conclusion: "87.5% frozen global-hardest coverage passed the complete joint/core/name Holm family on seed 4007"
+
+reference:
+  protocol: "LIP-H0-015"
+  config: "config/LIP-H0-015_hard_negative_batches.yaml"
+  config_sha256: "c812852975e57b7f0baab1f63228be463de16fe9b841ec4973ddfef16bb7ecba"
+
+parent:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
+
+hypothesis:
+  statement: "The strong joint/core/name identity geometry of the frozen hard-negative-batch system is not specific to bridge initialization and dropout seed 4007."
+  intervention: "repeat the exact H0-015 system for seeds 4001 and 4003 without changing its frozen 224/256 batch partition"
+  claim_limit: "the two new cells replicate system robustness, not a new paired causal effect, because seed-matched random-batch lambda-margin-1.0 controls do not exist"
+
+diagnostic_source:
+  protocol: "LIP-EVAL-032"
+  registry: "experiments/registry/LIP-EVAL-032_gradient_geometry.json"
+  registry_sha256: "6ea05283d9dcf5aeb5adeb6f1785773e74035946a24d9f08dbbf2badf91c0b64"
+  candidate_bank:
+    drive_path: "lip-artifacts/LIP-EVAL-032/full-v1/candidate_banks.json"
+    drive_file_id: "1nVSWgBrco2KE2fyUd-SsdbXh_6JXoe4q"
+    sha256: "ca4cb9cd7aec2981b76227265dbe325c77be00dba145014a83f1bf0ca2def7e4"
+    checkpoint_label: "H0_013"
+    diagnostic_partition_coverage: 0.04296875
+    measurement_limit: "the 4.30% estimate describes the EVAL-032 static partition, not cumulative H0-013 shuffled-epoch coverage"
+
+data:
+  source: "LIP-PROTO-014_real_full_training_bundle"
+  allowed_splits: ["train", "development_selection", "development_gate"]
+  prohibited_splits: ["confirmation"]
+  expected_counts: {train: 256, development_selection: 32, development_gate: 32}
+  boundary_positions: 6
+
+receiver:
+  model_id: "NousResearch/Meta-Llama-3-8B-Instruct"
+  revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+  load_4bit: true
+  neutral_prompt: "Use the latent signal."
+  entry_layer: 0
+  evolved_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  target_width: 4096
+  freeze_all_parameters: true
+  stop_before_layer: 8
+
+bridge:
+  model_kind: "query_conditioned"
+  output_layers: 1
+  protocol_slots: 32
+  bridge_width: 512
+  attention_heads: 8
+  feedforward_width: 2048
+  encoder_blocks: 2
+  decoder_blocks: 2
+  dropout: 0.10
+
+variants:
+  primary: "hard_negative_batches_unrolled"
+  systems:
+    hard_negative_batches_unrolled:
+      role: "global_hard_negative_batch_replication"
+      training_loss_scope: "induced_layers1_through7_plus_entry_regularizer"
+      lambda_entry_snapshot: 0.25
+      lambda_induced_trajectory: 1.0
+
+loss:
+  entry_snapshot:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 0.10
+    lambda_norm: 0.0
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+  induced_trajectory:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 1.00
+    lambda_norm: 0.05
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+
+training:
+  seeds: [4001, 4003]
+  learning_rate: 0.0002
+  weight_decay: 0.01
+  gradient_clip: 1.0
+  fp16_autocast: true
+  num_workers: 0
+  batch_policy:
+    kind: "frozen_global_hardest_balanced_partition"
+    candidate_label: "H0_013"
+    partition_seed: 4007
+    search_restarts: 8
+    maximum_improving_swaps_per_restart: 128
+    expected_global_hardest_covered_anchors: 224
+    expected_global_hardest_coverage: 0.875
+    random_partition_expected_coverage: 0.058823529411764705
+    one_exposure_per_task_per_epoch: true
+    freeze_partition_across_epochs: true
+    shuffle_batch_order_each_epoch: true
+    shuffle_row_order_each_epoch: true
+  pilot:
+    variant: "hard_negative_batches_unrolled"
+    seed: 4007
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_updates: 4
+    validation_interval: 2
+    output_dir: "runs/LIP-H0-015/pilot"
+  full_matrix:
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_updates: 128
+    validation_interval: 8
+    output_dir: "runs/LIP-H0-016/replication"
+
+development_selection:
+  checkpoint_metric: "induced_trajectory_joint_core_name_retrieval_margin_then_rmse"
+
+development_gate:
+  alpha: 0.05
+  statistics_seed: 4481
+  cell_strong_criterion: "the complete joint/core/name Holm family passes"
+  frozen_seed: 4007
+  new_seeds: [4001, 4003]
+  minimum_strong_total_seeds: 2
+  minimum_strong_new_seeds: 1
+  aggregate_strong_criterion: "at least two of three total seeds pass the complete family and at least one passing seed is new"
+  all_new_pass_action: "authorize_preregistration_of_a_matched_vs_shuffled_functional_confirmation_eval"
+  aggregate_pass_action: "authorize_preregistration_of_a_bounded_functional_confirmation_eval_with_seed_robustness_limit"
+  aggregate_fail_action: "do_not_open_confirmation; reject_cross_seed_robustness_of_the_frozen_static_partition"
+
+confirmation:
+  status: "prohibited_in_H0-016"
+  functional_eval_status: "design_only_if_aggregate_strong_gate_passes"
+  proto_015_status: "premature_until_functional_matched_vs_shuffled_evidence"
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  receiver_forward_scope: "blocks_0_through_7_only"
+  bridge_and_receiver_device: "cuda"

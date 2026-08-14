@@ -242,7 +242,9 @@ def build_hard_negative_batch_plan(
     return batches, metadata
 
 
-def _train_loader_builder(experiment: Mapping, candidate_bank_path: Path):
+def hard_negative_train_loader_builder(
+    experiment: Mapping, candidate_bank_path: Path
+):
     def build(dataset, *, batch_size: int, seed: int, num_workers: int):
         frozen_batch_size = int(experiment["training"]["full_matrix"]["batch_size"])
         if batch_size != frozen_batch_size:
@@ -275,5 +277,7 @@ def run_hard_negative_coverage_training(
         contract_validator=validate_hard_negative_coverage_contract,
         result_experiment_id="LIP-H0-015",
         result_protocol_version=HARD_NEGATIVE_COVERAGE_PROTOCOL_VERSION,
-        train_loader_builder=_train_loader_builder(experiment, candidate_bank_path),
+        train_loader_builder=hard_negative_train_loader_builder(
+            experiment, candidate_bank_path
+        ),
     )
