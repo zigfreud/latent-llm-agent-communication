@@ -103,6 +103,47 @@ def test_packet_loss_is_finite_and_differentiable():
     assert torch.isfinite(prediction.grad).all()
 
 
+def test_core_only_margin_uses_core_region_without_changing_other_metrics():
+    generator = torch.Generator().manual_seed(19)
+    prediction = torch.randn(4, 2, 8, 5, generator=generator)
+    target = torch.randn(4, 2, 8, 5, generator=generator)
+    masks = build_terminal_component_masks(
+        torch.tensor([2, 2, 2, 2]),
+        target_positions=8,
+        boundary_positions=2,
+    )
+    criterion = ComponentAwarePacketLoss(
+        lambda_huber=0.0,
+        lambda_cosine=0.0,
+        lambda_symmetric_nce=0.0,
+        lambda_margin=1.0,
+        lambda_norm=0.0,
+        margin_region_weights={"joint": 0.0, "core": 1.0, "name": 0.0},
+    )
+
+    metrics = criterion(prediction, target, masks)
+
+    assert metrics["margin_loss"].item() == pytest.approx(
+        metrics["core_margin_loss"].item()
+    )
+    assert metrics["total_loss"].item() == pytest.approx(
+        metrics["core_margin_loss"].item()
+    )
+
+
+@pytest.mark.parametrize(
+    "weights",
+    [
+        {"joint": 0.0, "core": 0.0, "name": 0.0},
+        {"joint": 0.0, "core": 1.0},
+        {"joint": 0.0, "core": -1.0, "name": 0.0},
+    ],
+)
+def test_packet_loss_rejects_invalid_margin_region_weights(weights):
+    with pytest.raises(ValueError, match="margin region weights|margin_region_weights"):
+        ComponentAwarePacketLoss(margin_region_weights=weights)
+
+
 def test_disabled_norm_term_is_not_evaluated_for_zero_norm_target():
     prediction = torch.full((2, 1, 8, 5), 1e20)
     target = torch.zeros_like(prediction)

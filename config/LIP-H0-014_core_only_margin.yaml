@@ -1,0 +1,154 @@
+experiment_id: "LIP-H0-014"
+protocol_version: "lip-core-only-margin-v1"
+claim_status: "development_only_core_only_margin_screen"
+
+predecessor:
+  protocol: "LIP-EVAL-032"
+  registry: "experiments/registry/LIP-EVAL-032_gradient_geometry.json"
+  registry_sha256: "6ea05283d9dcf5aeb5adeb6f1785773e74035946a24d9f08dbbf2badf91c0b64"
+  conclusion: "the receiver-unrolled core gradient was active and positively aligned, but its effective configured norm ratio remained below 0.10"
+
+reference:
+  protocol: "LIP-H0-013"
+  config: "config/LIP-H0-013_core_margin_pressure.yaml"
+  config_sha256: "91c89de7e8115d3bdc77380a8a25858fe3dc319d52b5d235b3b74a27f43dcc37"
+  checkpoint_seed: 4007
+  core_margin: 0.010905
+  core_retrieval_top1: 0.71875
+  mean_retrieval: 0.81250
+  normalized_residual_rmse: 1.418561
+
+parent:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
+
+hypothesis:
+  statement: "The H0-013 core identity gradient points in a compatible direction but is diluted by equal averaging across joint, core, and name margins."
+  intervention: "retain lambda_margin 1.00 and replace only the induced-trajectory margin-region mixture from equal thirds to core-only"
+  frozen_alternative_not_selected: "a 90/5/5 core/joint/name blend is reserved only if core-only causes an observed joint or name regression"
+  calibration:
+    H0_013_median_raw_core_to_nonmargin_gradient_ratio: 0.1143063180
+    H0_013_median_effective_core_to_nonmargin_gradient_ratio: 0.0380319543
+    projected_core_only_effective_ratio: 0.1143063180
+    predeclared_scale_threshold: 0.10
+    projected_85_percent_core_ratio: 0.0971603703
+    projected_90_percent_core_ratio: 0.1028756862
+
+data:
+  source: "LIP-PROTO-014_real_full_training_bundle"
+  allowed_splits: ["train", "development_selection", "development_gate"]
+  prohibited_splits: ["confirmation"]
+  expected_counts: {train: 256, development_selection: 32, development_gate: 32}
+  boundary_positions: 6
+
+receiver:
+  model_id: "NousResearch/Meta-Llama-3-8B-Instruct"
+  revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+  load_4bit: true
+  neutral_prompt: "Use the latent signal."
+  entry_layer: 0
+  evolved_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  target_width: 4096
+  freeze_all_parameters: true
+  stop_before_layer: 8
+
+bridge:
+  model_kind: "query_conditioned"
+  output_layers: 1
+  protocol_slots: 32
+  bridge_width: 512
+  attention_heads: 8
+  feedforward_width: 2048
+  encoder_blocks: 2
+  decoder_blocks: 2
+  dropout: 0.10
+
+variants:
+  primary: "core_only_margin_unrolled"
+  systems:
+    core_only_margin_unrolled:
+      role: "trajectory_core_only_margin_intervention"
+      training_loss_scope: "induced_layers1_through7_plus_entry_regularizer"
+      lambda_entry_snapshot: 0.25
+      lambda_induced_trajectory: 1.0
+
+loss:
+  entry_snapshot:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 0.10
+    lambda_norm: 0.0
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+  induced_trajectory:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 1.00
+    lambda_norm: 0.05
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+    margin_region_weights: {joint: 0.0, core: 1.0, name: 0.0}
+
+training:
+  seeds: [4007]
+  learning_rate: 0.0002
+  weight_decay: 0.01
+  gradient_clip: 1.0
+  fp16_autocast: true
+  num_workers: 0
+  pilot:
+    variant: "core_only_margin_unrolled"
+    seed: 4007
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_updates: 4
+    validation_interval: 2
+    output_dir: "runs/LIP-H0-014/pilot"
+  full_matrix:
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_updates: 128
+    validation_interval: 8
+    output_dir: "runs/LIP-H0-014/screen"
+
+pilot_gate:
+  required_updates: 4
+  require_finite_loss: true
+  require_nonzero_bridge_gradient_each_update: true
+  maximum_amp_overflow_events: 2
+  maximum_peak_allocated_vram_bytes: 22500000000
+  pass_action: "run_the_frozen_single_seed_128_update_core_only_screen"
+  fail_action: "stop_without_running_the_screen"
+
+development_selection:
+  checkpoint_metric: "induced_trajectory_joint_core_name_retrieval_margin_then_rmse"
+
+development_gate:
+  alpha: 0.05
+  statistics_seed: 4481
+  reference_protocol: "LIP-H0-013"
+  reference_seed: 4007
+  reference_core_margin: 0.010905
+  reference_core_retrieval_top1: 0.71875
+  reference_mean_retrieval: 0.81250
+  directional_success: "core margin improves, core retrieval is not lower, and mean retrieval is not lower than frozen H0-013 seed 4007"
+  strong_success: "directional success holds and the complete joint/core/name Holm family passes"
+  strong_pass_action: "replicate_the_exact_core_only_intervention_on_seeds_4001_and_4003_before_confirmation"
+  directional_only_action: "do_not_replicate_or_confirm; next test the already measured cross-batch hard-negative coverage deficit"
+  fail_action: "reject_core_only_margin_scope_as_the_next_missing_property"
+
+confirmation:
+  status: "prohibited_in_H0-014"
+  proto_015_status: "premature"
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  receiver_forward_scope: "blocks_0_through_7_only"
+  bridge_and_receiver_device: "cuda"

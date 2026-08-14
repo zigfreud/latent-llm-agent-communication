@@ -149,6 +149,7 @@ class ComponentAwarePacketLoss(nn.Module):
         lambda_margin: float = 0.1,
         lambda_norm: float = 0.05,
         component_weights: Mapping[str, float] | None = None,
+        margin_region_weights: Mapping[str, float] | None = None,
         eps: float = 1e-8,
     ) -> None:
         super().__init__()
@@ -187,6 +188,21 @@ class ComponentAwarePacketLoss(nn.Module):
             raise ValueError("component weights must have positive total")
         self.component_weights = {
             name: float(weights[name]) / total for name in COMPONENT_NAMES
+        }
+        margin_weights = dict(
+            margin_region_weights
+            or {name: 1.0 for name in CONTRASTIVE_REGIONS}
+        )
+        if set(margin_weights) != set(CONTRASTIVE_REGIONS):
+            raise ValueError("margin_region_weights must define joint, core, and name")
+        if any(float(value) < 0.0 for value in margin_weights.values()):
+            raise ValueError("margin region weights must be non-negative")
+        margin_total = sum(float(value) for value in margin_weights.values())
+        if margin_total <= 0.0:
+            raise ValueError("margin region weights must have positive total")
+        self.margin_region_weights = {
+            name: float(margin_weights[name]) / margin_total
+            for name in CONTRASTIVE_REGIONS
         }
 
     def forward(
@@ -234,8 +250,9 @@ class ComponentAwarePacketLoss(nn.Module):
             region_metrics[name]["symmetric_nce"] for name in CONTRASTIVE_REGIONS
         ) / len(CONTRASTIVE_REGIONS)
         margin_loss = sum(
-            region_metrics[name]["margin_loss"] for name in CONTRASTIVE_REGIONS
-        ) / len(CONTRASTIVE_REGIONS)
+            self.margin_region_weights[name] * region_metrics[name]["margin_loss"]
+            for name in CONTRASTIVE_REGIONS
+        )
 
         norm_components = {}
         for name in COMPONENT_NAMES:
