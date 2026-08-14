@@ -1,0 +1,127 @@
+{
+  "experiment_id": "LIP-EVAL-033",
+  "protocol_version": "lip-functional-bridge-screen-v1",
+  "claim_status": "development_functional_screen_negative_zero_task_identity",
+  "run_commit": "fbba79892f84f07936e1daf9d227c8865d2f3439",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-EVAL-033/full-v1",
+    "generations": {
+      "path": "generations.jsonl",
+      "sha256": "071332b5dc93b933d31a9bf11156f7b3387311689afbbef8b568a9136d4ee84d",
+      "bytes": 1754211
+    },
+    "metadata": {
+      "path": "generations.metadata.json",
+      "sha256": "09f17aef707d4ffa6a2e92a9cc0001c716bc2f2d7863bb36ec7a1a52b4d35c1e",
+      "bytes": 6888
+    },
+    "scored_generations": {
+      "path": "functional-evaluation/scored_generations.jsonl",
+      "sha256": "cc5bdb4eeac8f99a5b6a516a58af404ca3a72abcf15e4c4050975de8e2f0c3c",
+      "bytes": 2054957
+    },
+    "functional_summary": {
+      "path": "functional-evaluation/summary.json",
+      "sha256": "c499a6e7e0713f43f24c837a0d42b1cfad78aec3f85377b409668a2933ef73d9",
+      "bytes": 15426
+    },
+    "sandbox_report": {
+      "path": "functional-evaluation/sandbox_report.json",
+      "sha256": "c481c955fefd72b9d53edea38b78c3bea7395df30f13d1615e21e35322782989",
+      "bytes": 1531
+    }
+  },
+  "provenance": {
+    "experiment_config_sha256": "66da6bc098bf89fd996f0cd81b421b714e77a5b395035619f5dd71df75fa63ce",
+    "design_sha256": "8368135d1a62eca029d21730b26a291d9601a5e57735f3fb525f9b81f04be6e1",
+    "predecessor_registry_sha256": "336ea451e6714903bd1f20db08fd6d18853774fa2ec6cd983e0eb4f92f90451a",
+    "P014_generations_sha256": "9b3e5ac7f0fc33d1dee2b0b73eb9f582a33f44e0a59f59e5594914629670c38a",
+    "P014_metadata_sha256": "ca9767ca30a09c4a0500425fc343e454d12bbbdf8618730a4ebced0f11055890",
+    "P014_functional_summary_sha256": "99e425d85bfc0aad3b03e0d42a90912d3789f273d7ba8ec25d354581c1897f38",
+    "confirmation_bundle_manifest_sha256": "9af9c80afead6612b19bb28647f7c0fa119a4f4f11b9ca7abfe2065bffe58a22",
+    "target_statistics_sha256": "fc508ebbbcfe2f81bf17d640e7c8272ed032274625ed04439a2898651355bca6"
+  },
+  "frozen_system": {
+    "training_seeds": [4001, 4003, 4007],
+    "generation_seeds": [4127, 4241, 4357],
+    "conditions": ["learned_matched", "learned_shuffled"],
+    "tasks": 32,
+    "records": 576,
+    "entry_layer": 0,
+    "packet_offsets": [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1],
+    "target_model_revision": "53346005fb0ef11d3b6a83b12c895cca40156b6c",
+    "claim_eligible": false
+  },
+  "execution": {
+    "complete": true,
+    "first_runtime_atomic_rows_recovered": 512,
+    "replacement_runtime_new_rows": 64,
+    "duplicate_rows": 0,
+    "gpu_name": "NVIDIA L4",
+    "execution_mode": "functional_hardened_namespace",
+    "subprocess_is_security_sandbox": true,
+    "sandbox_validated": true
+  },
+  "outcomes": {
+    "learned_matched": {
+      "records": 288,
+      "syntax_passes": 228,
+      "syntax_rate": 0.7916666666666666,
+      "entry_point_declared": 0,
+      "functional_passes": 0,
+      "functional_rate": 0.0
+    },
+    "learned_shuffled": {
+      "records": 288,
+      "syntax_passes": 226,
+      "syntax_rate": 0.7847222222222222,
+      "entry_point_declared": 0,
+      "functional_passes": 0,
+      "functional_rate": 0.0
+    }
+  },
+  "primary_endpoint": {
+    "cluster_unit": "task_id",
+    "task_count": 32,
+    "nonzero_task_count": 0,
+    "mean_difference": 0.0,
+    "bootstrap_95": [0.0, 0.0],
+    "alternative": "greater",
+    "p_value": 1.0,
+    "p_value_method": "exact",
+    "passed": false
+  },
+  "seed_guardrail": {
+    "minimum_positive_bridge_seeds": 2,
+    "positive_bridge_seeds": 0,
+    "by_seed": {
+      "4001": {"mean_difference": 0.0, "positive": false},
+      "4003": {"mean_difference": 0.0, "positive": false},
+      "4007": {"mean_difference": 0.0, "positive": false}
+    },
+    "passed": false
+  },
+  "P014_calibration": {
+    "text_only": {"passes": 89, "records": 96, "rate": 0.9270833333333334},
+    "oracle_teacher_matched": {"passes": 84, "records": 96, "rate": 0.875},
+    "oracle_teacher_shuffled": {"passes": 0, "records": 96, "rate": 0.0},
+    "P014_learned_matched": {"passes": 1, "records": 288, "rate": 0.003472222222222222},
+    "P014_learned_shuffled": {"passes": 1, "records": 288, "rate": 0.003472222222222222}
+  },
+  "interpretation": {
+    "supported": "Across all three fixed bridge seeds and all three generation seeds, the H0-015/H0-016 identity geometry produced no task-specific functional behavior under the frozen layer-0 initial-condition interface.",
+    "failure_signature": "Most outputs were syntactically valid Python, but no output declared the exact required task entry point in either condition. Geometric identity did not become symbolic program identity.",
+    "causal_boundary": "The positive P014 oracle-matched anchor and text-only control show that the receiver, carrier, prompt family, and scorer can express and detect task identity; the negative result is localized to the learned path under this interface.",
+    "not_supported": "This development-only reused-cohort result does not prove heterogeneous latent transport impossible, distinguish missing core computation from alias/name failure, or authorize PROTO-015.",
+    "post_hoc_hypothesis": "A deterministic alias-normalized hardened diagnostic can test whether generated programs contain target computation under a non-exact function name. It must not alter or rescue the frozen EVAL-033 endpoint."
+  },
+  "decision": {
+    "development_functional_signal_detected": false,
+    "identity_geometry_sufficient_under_interface": false,
+    "proto_015_design_authorized": false,
+    "proto_015_execution_authorized": false,
+    "fresh_holdout_spend_authorized": false,
+    "return_to_bridge_or_intervention_mechanism": true,
+    "recommended_next_design": "development_only_post_hoc_alias_normalized_functional_diagnostic_on_existing_outputs"
+  }
+}
