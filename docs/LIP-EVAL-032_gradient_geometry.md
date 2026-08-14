@@ -41,6 +41,12 @@ Record loss values, gradient norms, pairwise cosine similarities, active-hinge
 fractions, and the effective margin/non-margin norm ratio after applying the
 checkpoint's configured coefficient.
 
+Because the configured trajectory margin is the mean of joint, core, and name,
+the diagnostic reports the actual core contribution to the configured total as
+`lambda_margin / 3`. The unscaled core-gradient norm and the aggregate
+configured-total gradient are retained separately, so this accounting choice
+is auditable rather than implicit.
+
 Separately, construct the full 256-task train candidate bank from each frozen
 checkpoint. For every anchor, compare its all-train hardest negative with the
 hardest negative available inside its assigned batch. Report global-hardest
@@ -65,6 +71,10 @@ between H0-011 and H0-013.
 All summaries must include per-batch rows, bootstrap intervals over batches,
 checkpoint hashes, bundle hash, receiver revision, code commit, peak VRAM, wall
 time, and visible Colab compute units.
+
+Bootstrap intervals are 95% percentile intervals with 10,000 deterministic
+resamples and seed 4501. Any interval crossing a routing threshold yields the
+predeclared mixed/unresolved outcome.
 
 ## Decision boundary
 

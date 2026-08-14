@@ -1,0 +1,79 @@
+experiment_id: "LIP-EVAL-032"
+protocol_version: "lip-receiver-unrolled-gradient-geometry-v1"
+claim_status: "development_only_mechanism_evaluation"
+
+question: "After receiver evolution, is the core identity gradient scale-limited, conflict-limited, or coverage-limited?"
+
+frozen_inputs:
+  parent_config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  checkpoints:
+    H0_011:
+      experiment_config: "config/LIP-H0-011_core_negative_coverage.yaml"
+      registry: "experiments/registry/LIP-H0-011_core_negative_coverage.json"
+      drive_root: "lip-artifacts/LIP-H0-011/screen-v1"
+      expected_seed: 4007
+      expected_best_step: 120
+      expected_variant: "large_negative_batch_unrolled"
+      expected_lambda_margin: 0.10
+    H0_013:
+      experiment_config: "config/LIP-H0-013_core_margin_pressure.yaml"
+      registry: "experiments/registry/LIP-H0-013_core_margin_pressure.json"
+      drive_root: "lip-artifacts/LIP-H0-013/screen-v1"
+      expected_seed: 4007
+      expected_best_step: 120
+      expected_variant: "core_margin_pressure_unrolled"
+      expected_lambda_margin: 1.00
+
+data:
+  allowed_splits: ["train"]
+  prohibited_splits: ["development_selection", "development_gate", "confirmation"]
+  expected_train_tasks: 256
+  ordering: "task_id_ascending"
+  batch_size: 16
+  batch_count: 16
+  boundary_positions: 6
+
+receiver:
+  model_id: "NousResearch/Meta-Llama-3-8B-Instruct"
+  revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+  load_4bit: true
+  evolved_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  gradient_objective_layers: [1, 2, 3, 4, 5, 6, 7]
+  freeze_all_parameters: true
+
+measurements:
+  gradient_target: "predicted_normalized_layer0_entry_condition"
+  objectives: ["core_margin", "symmetric_nce", "reconstruction", "non_margin", "configured_total"]
+  gradient_accumulation_dtype: "float32"
+  candidate_bank_size: 256
+  report_active_row_and_column_hinges: true
+  configured_core_contribution_coefficient: "lambda_margin_divided_by_three_regions"
+
+bootstrap:
+  confidence: 0.95
+  resamples: 10000
+  seed: 4501
+
+routing:
+  scale_limited:
+    maximum_median_effective_core_to_nonmargin_gradient_ratio: 0.10
+    minimum_median_core_nonmargin_cosine: -0.10
+  conflict_limited:
+    maximum_core_nonmargin_cosine: -0.10
+    minimum_conflicting_batches: 12
+  coverage_limited:
+    maximum_global_hardest_negative_coverage: 0.25
+  crossing_bootstrap_interval_action: "mixed_or_unresolved"
+
+compute:
+  preferred_accelerator: "L4"
+  amp_receiver_path: true
+  allow_silent_fallback: false
+  pilot_batches_per_checkpoint: 1
+
+decision_boundary:
+  authorized_output: "one_H0_014_development_intervention"
+  replication_authorized: false
+  functional_confirmation_authorized: false
+  proto_015_status: "premature"
