@@ -1,0 +1,142 @@
+experiment_id: "LIP-EVAL-033"
+protocol_version: "lip-functional-bridge-screen-v1"
+claim_status: "development_only_reused_open_P014_functional_cohort"
+
+predecessor:
+  protocol: "LIP-H0-016"
+  registry: "experiments/registry/LIP-H0-016_hard_negative_replication.json"
+  registry_sha256: "336ea451e6714903bd1f20db08fd6d18853774fa2ec6cd983e0eb4f92f90451a"
+  required_decision: "LIP_EVAL_033_design_authorized"
+
+references:
+  H0_015_registry: "experiments/registry/LIP-H0-015_hard_negative_batches.json"
+  H0_015_registry_sha256: "d84e46239bdc132c9e55302127e765b8002252585839d87ee2bfeb53bff43c7b"
+
+cohort:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
+  already_open: true
+  claim_scope: "development_only"
+  task_count: 32
+  tokenizer_strata: {2: 16, 3: 16}
+  generation_seeds: [4127, 4241, 4357]
+  derangement_seed: 4513
+  source_artifacts:
+    generations: "LIP-PROTO-014/confirmation/generations.jsonl"
+    generations_sha256: "9b3e5ac7f0fc33d1dee2b0b73eb9f582a33f44e0a59f59e5594914629670c38a"
+    metadata: "LIP-PROTO-014/confirmation/generations.metadata.json"
+    metadata_sha256: "ca9767ca30a09c4a0500425fc343e454d12bbbdf8618730a4ebced0f11055890"
+    functional_summary: "LIP-PROTO-014/confirmation/functional-evaluation/summary.json"
+    functional_summary_sha256: "99e425d85bfc0aad3b03e0d42a90912d3789f273d7ba8ec25d354581c1897f38"
+    confirmation_bundle: "LIP-PROTO-014/confirmation-bundle"
+    confirmation_bundle_manifest_sha256: "9af9c80afead6612b19bb28647f7c0fa119a4f4f11b9ca7abfe2065bffe58a22"
+
+models:
+  source:
+    model_id: "deepseek-ai/deepseek-coder-1.3b-base"
+    revision: "e5babb80b8539a4e85dd2418c0ee611522276987"
+  target:
+    model_id: "NousResearch/Meta-Llama-3-8B-Instruct"
+    revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+    load_4bit: true
+
+prompt_protocols:
+  source:
+    version: "lip-prompt-v1"
+    mode: "raw"
+    add_generation_prompt: false
+    system_prompt: null
+    raw_prefix: "You are a Python code generator. Return only Python code and define exactly the required function name.\n\nTask:\n"
+  target:
+    version: "lip-prompt-v1"
+    mode: "chat_template"
+    add_generation_prompt: true
+    system_prompt: "You are a Python code generator. Return only Python code and define exactly the required function name."
+
+packets:
+  source_shape: [24, 32, 2048]
+  bridge_target_shape: [1, 24, 4096]
+  receiver_target_shape: [8, 24, 4096]
+  target:
+    neutral_prompt: "Use the latent signal."
+    entry_layer: 0
+    offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+
+bridge:
+  kind: "query_conditioned"
+  protocol_slots: 32
+  bridge_width: 512
+  attention_heads: 8
+  feedforward_width: 2048
+  encoder_blocks: 2
+  decoder_blocks: 2
+  dropout: 0.10
+
+systems:
+  training_seeds: [4001, 4003, 4007]
+  conditions: ["learned_matched", "learned_shuffled"]
+  checkpoints:
+    4001:
+      protocol: "LIP-H0-016"
+      strong_identity_gate: false
+      best_step: 128
+      directory: "LIP-H0-016/replication-v1/4001"
+      run_summary_sha256: "59aa46c26a9c210cc6763f6fdbbaf21a08047b43cdca3ecb60d07ca745a425d7"
+      checkpoint_sha256: "cf62b96d6cb8332d6d23ae9628fcc9da9cefdc8b95676df68d17205b93e17bb6"
+    4003:
+      protocol: "LIP-H0-016"
+      strong_identity_gate: true
+      best_step: 120
+      directory: "LIP-H0-016/replication-v1/4003"
+      run_summary_sha256: "694e29c989a48489067d44c440669c49ae1d4a06f6b4e975eea6281e1c9c2f22"
+      checkpoint_sha256: "0da15e222c675211cf66ef2eb76c224573e232ef6abf368ae5a483d34e37c588"
+    4007:
+      protocol: "LIP-H0-015"
+      strong_identity_gate: true
+      best_step: 120
+      directory: "LIP-H0-015/screen-v1"
+      run_summary_sha256: "b0b3a9b87b5825a45bdb3085bded4c4cef31d7310ec667e66dbc0beff40d5f54"
+      checkpoint_sha256: "f5a6435dee9df6a16204be8b6c00dc3e2438222ee99dcc30018c9f822fbeb405"
+  target_statistics_sha256: "fc508ebbbcfe2f81bf17d640e7c8272ed032274625ed04439a2898651355bca6"
+
+generation:
+  max_new_tokens: 256
+  do_sample: true
+  temperature: 0.2
+  top_p: 0.95
+  repetition_penalty: 1.0
+  expected_records: 576
+  resume_granularity: "one_atomic_jsonl_row"
+
+evaluation:
+  metric: "functional_pass"
+  cluster_unit: "task_id"
+  replicates_within_task: "three_generation_seeds_times_three_fixed_bridge_seeds"
+  primary_treatment: "learned_matched"
+  primary_control: "learned_shuffled"
+  alpha: 0.05
+  alternative: "greater"
+  confidence: 0.95
+  bootstrap_iterations: 10000
+  statistics_seed: 4481
+  minimum_positive_bridge_seeds: 2
+  require_hardened_namespace: true
+  claim_eligible: false
+
+decision:
+  pass_action: "authorize_design_only_of_fresh_capability_calibrated_PROTO_015"
+  primary_only_action: "retain_seed_sensitive_functional_clue_without_PROTO_015"
+  fail_action: "reject_identity_geometry_as_sufficient_for_functional_transport_under_this_interface"
+  proto_015_execution_authorized: false
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  prediction_batch_size: 4
+  new_generation_cells: 576
+  P014_matrix_fraction: 0.42857142857142855
+
+output:
+  generations_jsonl: "runs/LIP-EVAL-033/generations.jsonl"
+  evaluation_dir: "runs/LIP-EVAL-033/evaluation"

@@ -57,8 +57,10 @@ mean difference:
 
 `D_i = mean(learned_matched_i) - mean(learned_shuffled_i)`.
 
-Report the mean of `D_i`, a task-bootstrap 95% interval, and a one-sided exact
-sign-flip p-value over the 32 task clusters. The primary endpoint passes only
+Report the mean of `D_i`, a task-bootstrap 95% interval, and a one-sided
+sign-flip p-value over the 32 task clusters. The implementation enumerates the
+test exactly when at most 20 task differences are nonzero and otherwise uses
+the frozen-seed 100,000-draw Monte Carlo form. The primary endpoint passes only
 if the mean is positive and the one-sided p-value is at most 0.05.
 
 ## Robustness guardrail

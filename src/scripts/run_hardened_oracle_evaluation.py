@@ -33,6 +33,9 @@ from src.scripts.evaluate_oracle_packet_semantics import (
 from src.scripts.evaluate_packet_bridge_confirmation import (
     evaluate as evaluate_packet_bridge_confirmation,
 )
+from src.scripts.evaluate_functional_bridge_screen import (
+    evaluate as evaluate_functional_bridge_screen,
+)
 
 
 NOBODY_UID = 65534
@@ -110,6 +113,8 @@ def sha256_file(path: Path) -> str:
 def evaluator_for_config(config: dict[str, Any]):
     if config.get("experiment_id") == "LIP-PROTO-014":
         return evaluate_packet_bridge_confirmation
+    if config.get("experiment_id") == "LIP-EVAL-033":
+        return evaluate_functional_bridge_screen
     return evaluate_oracle_packet_semantics
 
 
