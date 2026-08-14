@@ -258,7 +258,12 @@ def _run_parent(args: argparse.Namespace) -> None:
     print("Hardened functional evaluation completed")
     print(f"execution_mode: {summary['execution_mode']}")
     print(f"claim_eligible: {summary['claim_eligible']}")
-    print(f"semantic_transport_supported: {summary['semantic_transport_supported']}")
+    signal_key = (
+        "semantic_transport_supported"
+        if "semantic_transport_supported" in summary
+        else "development_functional_signal_detected"
+    )
+    print(f"{signal_key}: {summary[signal_key]}")
     print(f"summary: {output_dir / 'summary.json'}")
 
 

@@ -1,4 +1,5 @@
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ from src.pipelines.functional_bridge_screen import (
 )
 from src.pipelines.oracle_experiment import load_yaml
 from src.scripts.evaluate_functional_bridge_screen import (
+    evaluate,
     validate_functional_bridge_screen_grid,
 )
 from src.scripts.run_hardened_oracle_evaluation import evaluator_for_config
@@ -229,3 +231,41 @@ def test_primary_endpoint_requires_the_two_seed_guardrail():
 def test_hardened_dispatch_selects_the_eval033_evaluator():
     evaluator = evaluator_for_config(_config())
     assert evaluator.__module__ == "src.scripts.evaluate_functional_bridge_screen"
+
+
+def test_functional_summary_exposes_validated_sandbox_marker(tmp_path, monkeypatch):
+    config, rows, metadata = _grid(complete=False)
+    rows = rows[:2]
+    generations = tmp_path / "generations.jsonl"
+    generations.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+    )
+    generations.with_suffix(".metadata.json").write_text(
+        json.dumps(metadata), encoding="utf-8"
+    )
+
+    def fake_evaluate_generation(row, task, **kwargs):
+        return {
+            **row,
+            "syntax_pass": True,
+            "functional_pass": False,
+            "extracted_code": "def answer():\n    return 1",
+        }
+
+    monkeypatch.setattr(
+        "src.scripts.evaluate_functional_bridge_screen.evaluate_generation",
+        fake_evaluate_generation,
+    )
+    summary = evaluate(
+        config,
+        generations,
+        tmp_path / "evaluation",
+        functional=True,
+        allow_incomplete=True,
+        overwrite=False,
+        security_context={"validated": True},
+    )
+
+    assert summary["execution_mode"] == "functional_hardened_namespace"
+    assert summary["subprocess_is_security_sandbox"] is True
+    assert summary["claim_eligible"] is False

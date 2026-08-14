@@ -282,6 +282,9 @@ def evaluate(
             else "syntax_only"
         ),
         "claim_eligible": False,
+        "subprocess_is_security_sandbox": (
+            sandbox_validated if functional else None
+        ),
         "development_functional_signal_detected": signal,
         "design_validation": design_validation,
         "inference": inference,
