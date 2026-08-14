@@ -1,0 +1,174 @@
+experiment_id: "LIP-H0-015"
+protocol_version: "lip-hard-negative-batches-v1"
+claim_status: "development_only_hard_negative_batch_screen"
+
+predecessor:
+  protocol: "LIP-H0-014"
+  registry: "experiments/registry/LIP-H0-014_core_only_margin.json"
+  registry_sha256: "4751aee933c3fee62c7f17cf2824b5e814ecc8007b1f370466526762d94f5f3d"
+  conclusion: "core-only weighting reduced the local core hinge but worsened held identity geometry, so scale redistribution is insufficient"
+
+reference:
+  protocol: "LIP-H0-013"
+  config: "config/LIP-H0-013_core_margin_pressure.yaml"
+  config_sha256: "91c89de7e8115d3bdc77380a8a25858fe3dc319d52b5d235b3b74a27f43dcc37"
+  registry: "experiments/registry/LIP-H0-013_core_margin_pressure.json"
+  registry_sha256: "033da0aea088523f5a91fb25cee61cb4e53921464b4b87fe5270de2614231b0d"
+  checkpoint_seed: 4007
+  core_margin: 0.010905
+  core_retrieval_top1: 0.71875
+  mean_retrieval: 0.81250
+  normalized_residual_rmse: 1.418561
+
+diagnostic_source:
+  protocol: "LIP-EVAL-032"
+  registry: "experiments/registry/LIP-EVAL-032_gradient_geometry.json"
+  registry_sha256: "6ea05283d9dcf5aeb5adeb6f1785773e74035946a24d9f08dbbf2badf91c0b64"
+  candidate_bank:
+    drive_path: "lip-artifacts/LIP-EVAL-032/full-v1/candidate_banks.json"
+    drive_file_id: "1nVSWgBrco2KE2fyUd-SsdbXh_6JXoe4q"
+    sha256: "ca4cb9cd7aec2981b76227265dbe325c77be00dba145014a83f1bf0ca2def7e4"
+    checkpoint_label: "H0_013"
+    diagnostic_partition_coverage: 0.04296875
+    measurement_limit: "the 4.30% estimate describes the EVAL-032 static partition, not cumulative coverage across H0-013 shuffled epochs"
+
+parent:
+  protocol: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
+
+hypothesis:
+  statement: "The H0-013 objective optimizes against whichever negatives happen to share a random batch, while the frozen global hardest negative is usually absent from any individual batch."
+  intervention: "replace only random batch membership with one deterministic balanced partition that colocates as many frozen H0-013 global-hardest pairs as possible"
+  causal_bound: "the test identifies the effect of high within-batch coverage of frozen H0-013 hard negatives; it does not estimate historical cumulative H0-013 coverage or test dynamic mining"
+  exposure_control: "every one of the 256 train tasks appears exactly once per epoch; batch order and row order remain deterministically shuffled"
+
+data:
+  source: "LIP-PROTO-014_real_full_training_bundle"
+  allowed_splits: ["train", "development_selection", "development_gate"]
+  prohibited_splits: ["confirmation"]
+  expected_counts: {train: 256, development_selection: 32, development_gate: 32}
+  boundary_positions: 6
+
+receiver:
+  model_id: "NousResearch/Meta-Llama-3-8B-Instruct"
+  revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+  load_4bit: true
+  neutral_prompt: "Use the latent signal."
+  entry_layer: 0
+  evolved_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  target_width: 4096
+  freeze_all_parameters: true
+  stop_before_layer: 8
+
+bridge:
+  model_kind: "query_conditioned"
+  output_layers: 1
+  protocol_slots: 32
+  bridge_width: 512
+  attention_heads: 8
+  feedforward_width: 2048
+  encoder_blocks: 2
+  decoder_blocks: 2
+  dropout: 0.10
+
+variants:
+  primary: "hard_negative_batches_unrolled"
+  systems:
+    hard_negative_batches_unrolled:
+      role: "global_hard_negative_batch_coverage_intervention"
+      training_loss_scope: "induced_layers1_through7_plus_entry_regularizer"
+      lambda_entry_snapshot: 0.25
+      lambda_induced_trajectory: 1.0
+
+loss:
+  entry_snapshot:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 0.10
+    lambda_norm: 0.0
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+  induced_trajectory:
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 1.00
+    lambda_norm: 0.05
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+
+training:
+  seeds: [4007]
+  learning_rate: 0.0002
+  weight_decay: 0.01
+  gradient_clip: 1.0
+  fp16_autocast: true
+  num_workers: 0
+  batch_policy:
+    kind: "frozen_global_hardest_balanced_partition"
+    candidate_label: "H0_013"
+    partition_seed: 4007
+    search_restarts: 8
+    maximum_improving_swaps_per_restart: 128
+    expected_global_hardest_covered_anchors: 224
+    expected_global_hardest_coverage: 0.875
+    random_partition_expected_coverage: 0.058823529411764705
+    one_exposure_per_task_per_epoch: true
+    freeze_partition_across_epochs: true
+    shuffle_batch_order_each_epoch: true
+    shuffle_row_order_each_epoch: true
+  pilot:
+    variant: "hard_negative_batches_unrolled"
+    seed: 4007
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_updates: 4
+    validation_interval: 2
+    output_dir: "runs/LIP-H0-015/pilot"
+  full_matrix:
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_updates: 128
+    validation_interval: 8
+    output_dir: "runs/LIP-H0-015/screen"
+
+pilot_gate:
+  required_updates: 4
+  require_finite_loss: true
+  require_nonzero_bridge_gradient_each_update: true
+  maximum_amp_overflow_events: 2
+  maximum_peak_allocated_vram_bytes: 22500000000
+  pass_action: "run_the_frozen_single_seed_128_update_hard_negative_batch_screen"
+  fail_action: "stop_without_running_the_screen"
+
+development_selection:
+  checkpoint_metric: "induced_trajectory_joint_core_name_retrieval_margin_then_rmse"
+
+development_gate:
+  alpha: 0.05
+  statistics_seed: 4481
+  reference_protocol: "LIP-H0-013"
+  reference_seed: 4007
+  reference_core_margin: 0.010905
+  reference_core_retrieval_top1: 0.71875
+  reference_mean_retrieval: 0.81250
+  directional_success: "core margin improves, core retrieval is not lower, and mean retrieval is not lower than frozen H0-013 seed 4007"
+  strong_success: "directional success holds and the complete joint/core/name Holm family passes"
+  strong_pass_action: "replicate_the_exact_frozen_hard_negative_partition_on_seeds_4001_and_4003_before_confirmation"
+  directional_only_action: "do_not_confirm; evaluate whether hard-negative coverage remains effective across seeds or requires dynamic mining"
+  fail_action: "reject_static_frozen_hard_negative_batch_coverage_as_the_missing_property"
+
+confirmation:
+  status: "prohibited_in_H0-015"
+  proto_015_status: "premature"
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  receiver_forward_scope: "blocks_0_through_7_only"
+  bridge_and_receiver_device: "cuda"
