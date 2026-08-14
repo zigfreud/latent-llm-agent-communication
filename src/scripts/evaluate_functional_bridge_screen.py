@@ -261,7 +261,8 @@ def evaluate(
             [("learned_matched", "learned_shuffled")],
             **statistics_kwargs,
         )
-        inference = summarize_functional_bridge_screen(scored, config)
+        if design_validation["complete"]:
+            inference = summarize_functional_bridge_screen(scored, config)
     sandbox_validated = bool(security_context and security_context.get("validated"))
     signal = bool(
         functional
