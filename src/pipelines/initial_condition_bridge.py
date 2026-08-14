@@ -8,7 +8,7 @@ import json
 import math
 import subprocess
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 import torch
@@ -338,6 +338,7 @@ def run_initial_condition_training(
     contract_validator=_validate_contract,
     result_experiment_id: str = "LIP-H0-010",
     result_protocol_version: str = INITIAL_CONDITION_PROTOCOL_VERSION,
+    train_loader_builder: Callable | None = None,
 ) -> dict:
     experiment = load_yaml(experiment_path)
     parent = load_yaml(parent_path)
@@ -438,13 +439,30 @@ def run_initial_condition_training(
     max_updates = int(stage["max_updates"])
     validation_interval = int(stage["validation_interval"])
     boundary_positions = int(experiment["data"]["boundary_positions"])
-    loader = _make_loader(
-        datasets["train"],
-        batch_size=batch_size,
-        shuffle=True,
-        seed=int(seed),
-        num_workers=int(stage["num_workers"]),
-    )
+    training_batch_plan = None
+    training_batch_plan_path = None
+    training_batch_plan_sha256 = None
+    if train_loader_builder is None:
+        loader = _make_loader(
+            datasets["train"],
+            batch_size=batch_size,
+            shuffle=True,
+            seed=int(seed),
+            num_workers=int(stage["num_workers"]),
+        )
+    else:
+        loader, training_batch_plan = train_loader_builder(
+            datasets["train"],
+            batch_size=batch_size,
+            seed=int(seed),
+            num_workers=int(stage["num_workers"]),
+        )
+        if not isinstance(training_batch_plan, Mapping):
+            raise ValueError("custom train loader must return batch-plan metadata")
+        training_batch_plan = dict(training_batch_plan)
+        training_batch_plan_path = output_dir / "training_batch_plan.json"
+        _atomic_json(training_batch_plan_path, training_batch_plan)
+        training_batch_plan_sha256 = sha256_file(training_batch_plan_path)
     use_amp = bool(stage["fp16_autocast"])
     scaler = _grad_scaler(use_amp)
     variant = systems[variant_name]
@@ -666,6 +684,11 @@ def run_initial_condition_training(
             ),
             "bundle_manifest_sha256": sha256_file(bundle_dir / "manifest.json"),
             "target_statistics_sha256": sha256_file(statistics_path),
+            **(
+                {"training_batch_plan_sha256": training_batch_plan_sha256}
+                if training_batch_plan_sha256 is not None
+                else {}
+            ),
         },
         "bundle_validation": validation,
         "training": {
@@ -679,6 +702,17 @@ def run_initial_condition_training(
             "model_config": model_config,
             "parameter_count": sum(parameter.numel() for parameter in bridge.parameters()),
             "amp_overflow_events": amp_overflow_events,
+            **(
+                {
+                    "batch_policy": {
+                        key: value
+                        for key, value in training_batch_plan.items()
+                        if key != "batches"
+                    }
+                }
+                if training_batch_plan is not None
+                else {}
+            ),
         },
         "development_selection": checkpoint["selection_metrics"],
         "development_gate_metrics": gate_metrics,
