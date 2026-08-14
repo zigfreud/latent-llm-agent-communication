@@ -35,7 +35,7 @@ diagnostic_source:
     sha256: "ca4cb9cd7aec2981b76227265dbe325c77be00dba145014a83f1bf0ca2def7e4"
     checkpoint_label: "H0_013"
     diagnostic_partition_coverage: 0.04296875
-    measurement_limit: "the 4.30% estimate describes the EVAL-032 static partition, not cumulative H0-013 shuffled-epoch coverage"
+    measurement_limit: "the 4.30% estimate describes the EVAL-032 static partition, not cumulative coverage across H0-013 shuffled epochs"
 
 data:
   source: "LIP-PROTO-014_real_full_training_bundle"
