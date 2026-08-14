@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPERIMENT = ROOT / "config" / "LIP-H0-016_hard_negative_replication.yaml"
 PARENT = ROOT / "config" / "LIP-PROTO-014_source_conditioned_residual_packet.yaml"
 PREDECESSOR = ROOT / "experiments" / "registry" / "LIP-H0-015_hard_negative_batches.json"
+REGISTRY = ROOT / "experiments" / "registry" / "LIP-H0-016_hard_negative_replication.json"
 
 
 def _validate(experiment):
@@ -101,3 +103,16 @@ def test_aggregate_rejects_batch_plan_drift():
                 4003: _summary(4003, passed=True, plan_hash=plan_hash),
             },
         )
+
+
+def test_replication_registry_preserves_threshold_level_decision():
+    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
+
+    assert registry["aggregate_gate"]["strong_replication_passed"] is True
+    assert registry["aggregate_gate"]["strong_seed_ids"] == [4003, 4007]
+    assert registry["aggregate_gate"]["all_new_seeds_passed"] is False
+    assert registry["cells"]["4001"]["holm_family_passed"] is False
+    assert registry["cells"]["4003"]["holm_family_passed"] is True
+    assert registry["decision"]["LIP_EVAL_033_design_authorized"] is True
+    assert registry["decision"]["LIP_EVAL_033_execution_authorized"] is False
+    assert registry["decision"]["proto_015_status"] == "premature"

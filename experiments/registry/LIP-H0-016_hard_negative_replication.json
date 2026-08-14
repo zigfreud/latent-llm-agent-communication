@@ -1,0 +1,210 @@
+{
+  "experiment_id": "LIP-H0-016",
+  "protocol_version": "lip-hard-negative-replication-v1",
+  "claim_status": "aggregate_cross_seed_strong_gate_passed_at_preregistered_threshold",
+  "run_commit": "7ec2ed17a3b45a30c8d84b8a28fcafe971c5326c",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-016/replication-v1",
+    "seed_4001": {
+      "run_summary": {
+        "path": "4001/run_summary.json",
+        "sha256": "59aa46c26a9c210cc6763f6fdbbaf21a08047b43cdca3ecb60d07ca745a425d7"
+      },
+      "train_history": {
+        "path": "4001/train_history.json",
+        "sha256": "22d1733c4fbbf88982dedf9bebbf5366bd8e2415370eadcde0621a7fec12b4e5"
+      },
+      "best_checkpoint": {
+        "path": "4001/best_checkpoint.pt",
+        "sha256": "cf62b96d6cb8332d6d23ae9628fcc9da9cefdc8b95676df68d17205b93e17bb6"
+      },
+      "training_batch_plan": {
+        "path": "4001/training_batch_plan.json",
+        "sha256": "2057fbc1f146058cbf4da4687d1eae7e158d3c48afa788cdad02827172963783"
+      }
+    },
+    "seed_4003": {
+      "run_summary": {
+        "path": "4003/run_summary.json",
+        "sha256": "694e29c989a48489067d44c440669c49ae1d4a06f6b4e975eea6281e1c9c2f22"
+      },
+      "train_history": {
+        "path": "4003/train_history.json",
+        "sha256": "879cef26ff1225d00fd38bb64a3c6ba8d2a71c1593a83289c72dbd3661587c14"
+      },
+      "best_checkpoint": {
+        "path": "4003/best_checkpoint.pt",
+        "sha256": "0da15e222c675211cf66ef2eb76c224573e232ef6abf368ae5a483d34e37c588"
+      },
+      "training_batch_plan": {
+        "path": "4003/training_batch_plan.json",
+        "sha256": "2057fbc1f146058cbf4da4687d1eae7e158d3c48afa788cdad02827172963783"
+      }
+    },
+    "aggregate_summary": {
+      "path": "aggregate_summary.json",
+      "sha256": "141083dab2d22156b64059c19fbf4be62a2a692e2529ab32b236c65404df25bd"
+    }
+  },
+  "provenance": {
+    "experiment_config_sha256": "267f2f2be260895c500be6bb631bc3a0ce03c57e5fbf8eb41fcf136d1ec4421d",
+    "predecessor_registry_sha256": "d84e46239bdc132c9e55302127e765b8002252585839d87ee2bfeb53bff43c7b",
+    "candidate_bank_sha256": "ca4cb9cd7aec2981b76227265dbe325c77be00dba145014a83f1bf0ca2def7e4",
+    "bundle_manifest_sha256": "ad501e9537283b26f3b889ed7f355f69b47dd2e7967e6a92554a70ca5a7a3744",
+    "target_statistics_sha256": "fc508ebbbcfe2f81bf17d640e7c8272ed032274625ed04439a2898651355bca6",
+    "frozen_training_batch_plan_sha256": "2057fbc1f146058cbf4da4687d1eae7e158d3c48afa788cdad02827172963783"
+  },
+  "frozen_system": {
+    "reference": "LIP-H0-015",
+    "training_seeds_added": [4001, 4003],
+    "frozen_seed_retained": 4007,
+    "batch_size": 16,
+    "updates_per_seed": 128,
+    "examples_seen_per_seed": 2048,
+    "global_hardest_covered_anchors": 224,
+    "global_hardest_coverage": 0.875,
+    "random_partition_expected_coverage": 0.058823529411764705,
+    "partition_seed": 4007,
+    "batch_plan_identical_for_all_seeds": true,
+    "all_loss_model_receiver_selection_and_gate_terms_unchanged": true,
+    "confirmation_used": false
+  },
+  "cells": {
+    "4001": {
+      "best_step": 128,
+      "normalized_residual_rmse": 1.4250556230545044,
+      "mean_retrieval": 0.7604166666666666,
+      "regions": {
+        "joint": {
+          "retrieval_top1": 0.65625,
+          "mean_diagonal_margin": 0.017111250199377537,
+          "p_value_holm": 0.06101938980610194,
+          "rejected": false
+        },
+        "core": {
+          "retrieval_top1": 0.75,
+          "mean_diagonal_margin": 0.01051698112860322,
+          "p_value_holm": 0.06101938980610194,
+          "rejected": false
+        },
+        "name": {
+          "retrieval_top1": 0.875,
+          "mean_diagonal_margin": 0.07044964795932174,
+          "p_value_holm": 0.00002999970000299997,
+          "rejected": true
+        }
+      },
+      "holm_family_passed": false
+    },
+    "4003": {
+      "best_step": 120,
+      "normalized_residual_rmse": 1.458475947380066,
+      "mean_retrieval": 0.78125,
+      "regions": {
+        "joint": {
+          "retrieval_top1": 0.8125,
+          "mean_diagonal_margin": 0.02394395659212023,
+          "p_value_holm": 0.0000999990000099999,
+          "rejected": true
+        },
+        "core": {
+          "retrieval_top1": 0.75,
+          "mean_diagonal_margin": 0.009519463579636067,
+          "p_value_holm": 0.03882961170388296,
+          "rejected": true
+        },
+        "name": {
+          "retrieval_top1": 0.78125,
+          "mean_diagonal_margin": 0.07071877177804708,
+          "p_value_holm": 0.00002999970000299997,
+          "rejected": true
+        }
+      },
+      "holm_family_passed": true
+    },
+    "4007_frozen_H0_015": {
+      "best_step": 120,
+      "normalized_residual_rmse": 1.4557148218154907,
+      "mean_retrieval": 0.84375,
+      "regions": {
+        "joint": {
+          "retrieval_top1": 0.875,
+          "mean_diagonal_margin": 0.03343887208029628,
+          "p_value_holm": 0.00002999970000299997,
+          "rejected": true
+        },
+        "core": {
+          "retrieval_top1": 0.75,
+          "mean_diagonal_margin": 0.017437051283195615,
+          "p_value_holm": 0.005529944700552994,
+          "rejected": true
+        },
+        "name": {
+          "retrieval_top1": 0.90625,
+          "mean_diagonal_margin": 0.07284745294600725,
+          "p_value_holm": 0.00003999960000399996,
+          "rejected": true
+        }
+      },
+      "holm_family_passed": true
+    }
+  },
+  "aggregate_gate": {
+    "criterion": "at least two of three total seeds pass the complete family and at least one passing seed is new",
+    "strong_passing_new_seeds": 1,
+    "strong_new_seeds_required": 1,
+    "strong_passing_total_seeds": 2,
+    "strong_total_seeds_required": 2,
+    "strong_seed_ids": [4003, 4007],
+    "non_strong_seed_ids": [4001],
+    "strong_replication_passed": true,
+    "all_new_seeds_passed": false,
+    "passed_at_minimum_preregistered_threshold": true
+  },
+  "post_hoc_training_diagnostic": {
+    "scope": "descriptive only; last-16-update training-batch hinge medians were not part of the gate",
+    "seed_4001": {
+      "joint_hinge_last16_median": 0.01599884033203125,
+      "core_hinge_last16_median": 0.0341644287109375,
+      "name_hinge_last16_median": 0.014682769775390625
+    },
+    "seed_4003": {
+      "joint_hinge_last16_median": 0.0122222900390625,
+      "core_hinge_last16_median": 0.02800750732421875,
+      "name_hinge_last16_median": 0.01177215576171875
+    },
+    "seed_4007": {
+      "joint_hinge_last16_median": 0.01340484619140625,
+      "core_hinge_last16_median": 0.03058624267578125,
+      "name_hinge_last16_median": 0.012378692626953125
+    },
+    "interpretation": "Seed 4001 retained somewhat more late core and joint hinge pressure, but the difference is small and post hoc; it does not establish the cause of its held-gate miss."
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "peak_allocated_vram_bytes_each_cell": 8238644224,
+    "seed_4001_wall_seconds": 117.12547839800027,
+    "seed_4003_wall_seconds": 118.76242364799964,
+    "amp_overflow_events_each_cell": 1,
+    "colab_compute_units": "not visible at execution time"
+  },
+  "interpretation": {
+    "supported": "The exact frozen H0-015 hard-negative-batch system passes its preregistered cross-seed development robustness gate: one of two new seeds passes the complete Holm family, producing two strong seeds among three total.",
+    "heterogeneity": "The result is threshold-level rather than uniform. Seed 4001 had positive margins in all regions but missed the joint and core Holm decisions at p=0.0610, while seed 4003 and frozen seed 4007 passed all three regions.",
+    "stable_property": "Name identity is strong across all three seeds, and core retrieval is 75% in every cell; joint retrieval and joint/core inferential strength remain initialization-sensitive.",
+    "causal_limit": "Only seed 4007 has the directly paired H0-013 random-batch contrast. Seeds 4001 and 4003 replicate the frozen system, not the causal batch-membership effect, because seed-matched controls do not exist.",
+    "not_supported": "H0-016 does not establish 3/3 robustness, functional task transmission, cross-seed causal replication, authorization to execute a confirmation evaluation, or readiness for PROTO-015.",
+    "next_test": "Preregister a bounded LIP-EVAL-033 confirmation evaluation whose single primary endpoint is task-clustered learned-matched minus learned-shuffled functional performance across all three fixed bridge seeds."
+  },
+  "decision": {
+    "cross_seed_system_replication_passed": true,
+    "all_new_seed_replication_passed": false,
+    "paired_causal_effect_replicated_across_seeds": false,
+    "LIP_EVAL_033_design_authorized": true,
+    "LIP_EVAL_033_execution_authorized": false,
+    "functional_confirmation_design_authorized": true,
+    "functional_confirmation_execution_authorized": false,
+    "dynamic_mining_authorized": false,
+    "proto_015_status": "premature"
+  }
+}
