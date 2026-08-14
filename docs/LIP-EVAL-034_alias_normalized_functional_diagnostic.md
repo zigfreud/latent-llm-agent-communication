@@ -93,3 +93,28 @@ python -m src.scripts.run_hardened_oracle_evaluation \
 The hardened wrapper copies the exact source inputs into its read-only
 namespace, verifies their hashes, evaluates eligible aliases as the restricted
 candidate UID, and binds the sandbox input hashes into the output summary.
+
+## Completed result
+
+The hardened run completed on the exact frozen EVAL-033 source and selected
+`matched_specific_alias_recovery_candidate`:
+
+- learned matched: 29/288 functional passes after alias exposure;
+- learned shuffled: 0/288 functional passes;
+- 8/32 tasks with a nonzero matched-minus-shuffled difference;
+- task-clustered mean difference `0.1006944`;
+- exploratory bootstrap 95% interval `[0.0347222, 0.1875]`;
+- exact one-sided sign-flip value `0.00390625`;
+- all three fixed bridge seeds positive.
+
+Alias eligibility was nearly balanced, 208/288 matched versus 206/288
+shuffled, so the functional contrast is not explained by one condition simply
+producing more single-function syntax. The result is nevertheless sparse and
+concentrated: two tasks contribute 15 of 29 matched passes.
+
+The registered interpretation and artifact hashes are in
+`experiments/registry/LIP-EVAL-034_alias_normalized_functional_diagnostic.json`.
+EVAL-033 remains negative and neither PROTO-015 nor a fresh holdout is
+authorized. The recommended next design is an EVAL-035 screen that gives every
+task the same opaque receiver entry point, isolating variable symbolic binding
+without semantic function-name leakage.

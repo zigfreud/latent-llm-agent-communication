@@ -1,0 +1,130 @@
+{
+  "experiment_id": "LIP-EVAL-034",
+  "protocol_version": "lip-alias-normalized-functional-diagnostic-v1",
+  "claim_status": "post_hoc_development_diagnostic_positive_alias_specific_recovery",
+  "run_commit": "fe8208aa97cdd813e1312156aad35153164cb223",
+  "completed_date": "2026-08-14",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-EVAL-034/diagnostic-v1/evaluation",
+    "summary": {
+      "path": "summary.json",
+      "sha256": "6ebb679928e387d2adc43e099aa8b341fec039b4dd1df4c6193bafdab652dd30",
+      "bytes": 14867
+    },
+    "scored_generations": {
+      "path": "scored_generations.jsonl",
+      "sha256": "bf4bb4cdbba308b766e4e00bf9fc45074aacdae7aefc58159a20098c50b0b866",
+      "bytes": 2467543
+    },
+    "sandbox_report": {
+      "path": "sandbox_report.json",
+      "sha256": "c481c955fefd72b9d53edea38b78c3bea7395df30f13d1615e21e35322782989",
+      "bytes": 1531
+    }
+  },
+  "provenance": {
+    "experiment_config_sha256": "63dbb739986cd2f7a5e52e68b3cb2fb10534a50fed9b4055f8ae3051b724e190",
+    "design_sha256": "94d3dfd0fdf9d9cfda304129ae57418c0e725c8194772c4ba6333617c0028e9c",
+    "source_registry_sha256": "23583f232b4cce5495bd7c35eeb60ec8e1edc1693810230f1b72e7d6849bcfbe",
+    "source_generations_sha256": "071332b5dc93b933d31a9bf11156f7b3387311689afbbef8b568a9136d4ee84d",
+    "source_metadata_sha256": "09f17aef707d4ffa6a2e92a9cc0001c716bc2f2d7863bb36ec7a1a52b4d35c1e",
+    "source_functional_summary_sha256": "c499a6e7e0713f43f24c837a0d42b1cfad78aec3f85377b409668a2933ef73d9"
+  },
+  "execution": {
+    "source_experiment_id": "LIP-EVAL-033",
+    "source_rows": 576,
+    "source_tasks": 32,
+    "source_complete": true,
+    "source_exact_entry_point_declarations": 0,
+    "new_generations": 0,
+    "gpu_required": false,
+    "execution_mode": "functional_hardened_namespace",
+    "subprocess_is_security_sandbox": true,
+    "sandbox_validated": true,
+    "claim_eligible": false,
+    "can_upgrade_EVAL_033": false
+  },
+  "normalization": {
+    "single_function_aliased": 414,
+    "ambiguous_multiple_top_level_functions": 40,
+    "syntax_invalid": 122,
+    "missing_top_level_function": 0,
+    "body_rewrites": 0,
+    "argument_rewrites": 0,
+    "test_rewrites": 0
+  },
+  "outcomes": {
+    "learned_matched": {
+      "records": 288,
+      "alias_eligible": 208,
+      "alias_eligible_rate": 0.7222222222222222,
+      "alias_functional_passes": 29,
+      "alias_functional_rate_all_rows": 0.10069444444444445,
+      "alias_functional_rate_eligible_only": 0.13942307692307693
+    },
+    "learned_shuffled": {
+      "records": 288,
+      "alias_eligible": 206,
+      "alias_eligible_rate": 0.7152777777777778,
+      "alias_functional_passes": 0,
+      "alias_functional_rate_all_rows": 0.0,
+      "alias_functional_rate_eligible_only": 0.0
+    }
+  },
+  "primary_diagnostic": {
+    "cluster_unit": "task_id",
+    "task_count": 32,
+    "nonzero_task_count": 8,
+    "mean_difference": 0.10069444444444445,
+    "bootstrap_95": [0.034722222222222224, 0.1875],
+    "alternative": "greater",
+    "p_value": 0.00390625,
+    "p_value_method": "exact",
+    "exploratory_only": true
+  },
+  "seed_guardrail": {
+    "minimum_positive_bridge_seeds": 2,
+    "positive_bridge_seeds": 3,
+    "by_seed": {
+      "4001": {"matched_passes": 12, "mean_difference": 0.125, "positive": true},
+      "4003": {"matched_passes": 5, "mean_difference": 0.05208333333333333, "positive": true},
+      "4007": {"matched_passes": 12, "mean_difference": 0.125, "positive": true}
+    },
+    "passed": true
+  },
+  "generation_seed_balance": {
+    "4127": 10,
+    "4241": 9,
+    "4357": 10
+  },
+  "recovered_tasks": {
+    "62": {"entry_point": "smallest_num", "passes": 6, "generated_names": ["min_max", "min_list", "min_min"]},
+    "96": {"entry_point": "divisor", "passes": 1, "generated_names": ["scul"]},
+    "127": {"entry_point": "multiply_int", "passes": 1, "generated_names": ["multiply_and_add"]},
+    "152": {"entry_point": "merge_sort", "passes": 9, "generated_names": ["sort_lists", "sort_list"]},
+    "365": {"entry_point": "count_Digit", "passes": 3, "generated_names": ["count_digits"]},
+    "372": {"entry_point": "heap_assending", "passes": 3, "generated_names": ["name_sort"]},
+    "377": {"entry_point": "remove_Char", "passes": 3, "generated_names": ["remove_characters"]},
+    "418": {"entry_point": "Find_Max", "passes": 3, "generated_names": ["find_max_sum_of_subarray"]}
+  },
+  "interpretation": {
+    "supported": "Under deterministic single-function alias exposure, a subset of learned-matched outputs contains executable target-task computation that is absent from all learned-shuffled outputs.",
+    "failure_property": "The frozen layer-0 bridge can sometimes induce task-specific program content but does not reliably bind that computation to the exact symbolic entry point required by the task interface.",
+    "replication_signature": "The matched-minus-shuffled difference is positive for all three fixed bridge seeds and recovered passes are balanced across the three fixed generation seeds.",
+    "concentration_limit": "Only 8 of 32 tasks recover, and tasks 152 and 62 contribute 15 of the 29 matched passes; the result does not establish broad functional transport.",
+    "causal_boundary": "The matched-versus-frozen-shuffled contrast localizes the recovered behavior to task-packet correspondence within the reused open cohort, but alias normalization was selected post hoc and cannot create a confirmatory claim.",
+    "not_supported": "The result does not upgrade EVAL-033, prove general heterogeneous latent communication, authorize a fresh holdout, or establish that name binding is the only remaining failure mode."
+  },
+  "decision": {
+    "diagnostic_route": "matched_specific_alias_recovery_candidate",
+    "name_or_readout_mechanism_design_authorized": true,
+    "recommended_next_design": "LIP-EVAL-035_constant_opaque_entry_point_receiver_screen",
+    "recommended_next_question": "Does matched task-specific functional recovery survive when the receiver is instructed to emit one constant opaque entry point shared by every task, with no semantic name leakage?",
+    "LIP_EVAL_035_design_authorized": true,
+    "LIP_EVAL_035_execution_authorized": false,
+    "dynamic_trajectory_bridge_design_remains_authorized": true,
+    "proto_015_execution_authorized": false,
+    "fresh_holdout_spend_authorized": false,
+    "EVAL_033_remains_negative": true
+  }
+}
