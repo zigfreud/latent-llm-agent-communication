@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ PARENT = ROOT / "config" / "LIP-PROTO-014_source_conditioned_residual_packet.yam
 PREDECESSOR = (
     ROOT / "experiments" / "registry" / "LIP-EVAL-032_gradient_geometry.json"
 )
+REGISTRY = ROOT / "experiments" / "registry" / "LIP-H0-014_core_only_margin.json"
 
 
 def _validate(experiment):
@@ -58,3 +60,15 @@ def test_core_only_margin_rejects_training_budget_drift():
     experiment["training"]["full_matrix"]["max_updates"] = 129
     with pytest.raises(ValueError, match="drifted from H0-013"):
         _validate(experiment)
+
+
+def test_core_only_margin_registry_records_bounded_negative_decision():
+    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
+
+    assert registry["paired_to_H0_013_seed_4007"]["directional_success"] is False
+    assert registry["paired_to_H0_013_seed_4007"]["strong_success"] is False
+    assert registry["decision"]["soft_blend_90_5_5_authorized"] is False
+    assert registry["decision"]["H0_015_development_intervention_authorized"] is True
+    assert registry["decision"]["H0_015_exact_family"] == "global_hard_negative_coverage"
+    assert registry["decision"]["functional_confirmation_authorized"] is False
+    assert registry["decision"]["proto_015_status"] == "premature"

@@ -1,0 +1,150 @@
+{
+  "experiment_id": "LIP-H0-014",
+  "protocol_version": "lip-core-only-margin-v1",
+  "claim_status": "directional_gate_failed_core_only_margin",
+  "run_commit": "566d722a8c11054364403e7429b77a46574fad67",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-H0-014",
+    "pilot": {
+      "path": "pilot-v1/run_summary.json",
+      "sha256": "bb5bc9207549cce0a54c194c946c378e11bcc041a90df82e6fa3596d340969a8"
+    },
+    "screen": {
+      "run_summary": {
+        "path": "screen-v1/run_summary.json",
+        "sha256": "08c6a12e5daa6df148568eefa000da502e90411a1f87535c5cc8fe7a4ae715a9"
+      },
+      "train_history": {
+        "path": "screen-v1/train_history.json",
+        "sha256": "1c55f4425c46e5f8934bfba3b7aa88550e91a54285983b8556261806ba50b963"
+      },
+      "best_checkpoint": {
+        "path": "screen-v1/best_checkpoint.pt",
+        "sha256": "49912e083278ee8e34840b8549c7245c01f4642c0f201f201ddb4f551b5e5515"
+      }
+    }
+  },
+  "provenance": {
+    "experiment_config_sha256": "d6c842972b97d17a875a6a8cec2bfc2a950c474a6400c974965cb124d3951c2b",
+    "parent_config_sha256": "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f",
+    "predecessor_registry_sha256": "6ea05283d9dcf5aeb5adeb6f1785773e74035946a24d9f08dbbf2badf91c0b64",
+    "bundle_manifest_sha256": "ad501e9537283b26f3b889ed7f355f69b47dd2e7967e6a92554a70ca5a7a3744",
+    "target_statistics_sha256": "fc508ebbbcfe2f81bf17d640e7c8272ed032274625ed04439a2898651355bca6"
+  },
+  "frozen_intervention": {
+    "reference": "LIP-H0-013",
+    "seed": 4007,
+    "batch_size": 16,
+    "updates": 128,
+    "examples_seen": 2048,
+    "lambda_margin": 1.0,
+    "margin_region_weights_before": {
+      "joint": 0.3333333333333333,
+      "core": 0.3333333333333333,
+      "name": 0.3333333333333333
+    },
+    "margin_region_weights_after": {
+      "joint": 0.0,
+      "core": 1.0,
+      "name": 0.0
+    },
+    "all_other_loss_and_training_terms_unchanged": true,
+    "confirmation_used": false
+  },
+  "pilot_gate": {
+    "passed": true,
+    "updates_completed": 4,
+    "finite_loss": true,
+    "nonzero_bridge_gradient_each_update": true,
+    "amp_overflow_events": 1,
+    "best_step": 2,
+    "peak_allocated_vram_bytes": 8238644224,
+    "peak_reserved_vram_bytes": 8474591232,
+    "wall_seconds": 27.625016224
+  },
+  "screen": {
+    "best_step": 128,
+    "normalized_residual_rmse": 1.4055436849594116,
+    "regions": {
+      "joint": {
+        "retrieval_top1": 0.8125,
+        "mean_diagonal_margin": 0.028645243495702744,
+        "p_value_holm": 0.00017999820001799983,
+        "rejected": true
+      },
+      "core": {
+        "retrieval_top1": 0.65625,
+        "mean_diagonal_margin": 0.004402206279337406,
+        "p_value_holm": 0.2863471365286347,
+        "rejected": false
+      },
+      "name": {
+        "retrieval_top1": 0.8125,
+        "mean_diagonal_margin": 0.06522955745458603,
+        "p_value_holm": 0.00002999970000299997,
+        "rejected": true
+      }
+    },
+    "mean_retrieval": 0.7604166666666666,
+    "holm_family_passed": false,
+    "amp_overflow_events": 1,
+    "wall_seconds": 109.1488031089998
+  },
+  "paired_to_H0_013_seed_4007": {
+    "reference": {
+      "normalized_residual_rmse": 1.418561,
+      "core_retrieval_top1": 0.71875,
+      "core_margin": 0.010905,
+      "mean_retrieval": 0.8125
+    },
+    "deltas_H0_014_minus_H0_013": {
+      "normalized_residual_rmse": -0.013017315040588372,
+      "core_retrieval_top1": -0.0625,
+      "core_margin": -0.006502793720662594,
+      "mean_retrieval": -0.05208333333333337
+    },
+    "core_margin_improved": false,
+    "core_retrieval_not_lower": false,
+    "mean_retrieval_not_lower": false,
+    "rmse_not_higher": true,
+    "directional_success": false,
+    "strong_success": false
+  },
+  "training_margin_diagnostic": {
+    "H0_013_equal_region_weights": {
+      "core_hinge_median": 0.0378112793,
+      "core_hinge_final": 0.0247344971
+    },
+    "H0_014_core_only": {
+      "core_hinge_median": 0.0359191895,
+      "core_hinge_final": 0.0215759277
+    },
+    "interpretation": "Core-only weighting modestly reduced the local batch-level core hinge, but the held development core geometry worsened. The scale intervention was absorbed locally and did not generalize."
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "cuda_runtime": "12.8",
+    "peak_allocated_vram_bytes": 8238644224,
+    "peak_reserved_vram_bytes": 8474591232,
+    "pilot_wall_seconds": 27.625016224,
+    "screen_wall_seconds": 109.1488031089998,
+    "screen_updates_per_hour": 4221.759532624733,
+    "colab_compute_units": "not visible at execution time"
+  },
+  "interpretation": {
+    "supported": "At fixed receiver evolution, data exposure, objective family, and seed, removing regional dilution modestly lowers the optimized core hinge on local training batches.",
+    "not_supported": "Core-only margin weighting does not improve held development core identity geometry and does not authorize a soft regional blend, replication, functional confirmation, or PROTO-015.",
+    "mechanistic_update": "The scale-limited gradient diagnosis was locally correct but not sufficient for generalization. Together with LIP-EVAL-032's 4.30% global-hardest-negative batch coverage, the next identified property is hard-negative coverage.",
+    "next_test": "Return to the H0-013 objective and isolate one development-only global-hard-negative coverage intervention, preferably explicit hard-negative batch construction before adding a stateful memory bank."
+  },
+  "decision": {
+    "soft_blend_90_5_5_authorized": false,
+    "exact_replication_authorized": false,
+    "functional_confirmation_authorized": false,
+    "H0_015_development_intervention_authorized": true,
+    "H0_015_exact_family": "global_hard_negative_coverage",
+    "preferred_first_mechanism": "explicit_hard_negative_batch_construction",
+    "cross_batch_memory_bank_status": "fallback_if_explicit_batch_construction_is_infeasible_or_insufficient",
+    "proto_015_status": "premature"
+  }
+}
