@@ -1,6 +1,6 @@
 # LIP-EVAL-032 — receiver-unrolled gradient geometry
 
-Status: design frozen, not yet executed.
+Status: executed; the predeclared scale-limited route was selected.
 
 ## Why this is an evaluation
 
@@ -82,3 +82,19 @@ LIP-EVAL-032 may authorize one H0-014 development intervention. It cannot
 authorize replication, functional confirmation, or PROTO-015. Those remain
 blocked until a learned bridge passes the existing joint/core/name family on a
 replicated development result.
+
+## Executed result
+
+The H0-013 median effective core/non-margin gradient ratio was `0.0380`
+(`95% bootstrap [0.0328, 0.0411]`), below the `0.10` threshold, while the
+median gradient cosine was positive at `+0.4093`
+(`95% bootstrap [+0.3743, +0.4305]`). Zero of 16 batches met the conflict
+criterion, and no bootstrap interval crossed a routing threshold.
+
+The selected route is therefore **scale-limited**, authorizing one H0-014
+development intervention using an explicit core-only objective or adaptive
+core-gradient weighting. Candidate-bank coverage was only `4.30%` in H0-013,
+but remains a secondary deficit under the frozen routing precedence.
+
+Full provenance and artifact hashes are recorded in
+`experiments/registry/LIP-EVAL-032_gradient_geometry.json`.

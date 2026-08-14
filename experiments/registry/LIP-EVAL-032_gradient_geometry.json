@@ -1,0 +1,99 @@
+{
+  "experiment_id": "LIP-EVAL-032",
+  "protocol_version": "lip-receiver-unrolled-gradient-geometry-v1",
+  "claim_status": "mechanism_resolved_scale_limited",
+  "run_commit": "b334c293899f4afb114537e577fe4cdb0c11619b",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-EVAL-032",
+    "pilot": {
+      "path": "pilot-v1/run_summary.json"
+    },
+    "full": {
+      "run_summary": {
+        "path": "full-v1/run_summary.json",
+        "sha256": "9b08adbd8550bed45fffb3ea0cc8d045da1fbc6f81139bdbaaf2b513d73f9ae7"
+      },
+      "batch_rows": {
+        "path": "full-v1/batch_rows.json",
+        "sha256": "b0c9d53b668f80d8799f6e9ae0908624d410d96c856d91d8b181de336f7c2fb7"
+      },
+      "candidate_banks": {
+        "path": "full-v1/candidate_banks.json",
+        "sha256": "ca4cb9cd7aec2981b76227265dbe325c77be00dba145014a83f1bf0ca2def7e4"
+      }
+    }
+  },
+  "provenance": {
+    "experiment_config_sha256": "28319f15a09a9c2db6d9e0340f6ba4e733d3a9f35e51171545bb2b92009eb81c",
+    "bundle_manifest_sha256": "ad501e9537283b26f3b889ed7f355f69b47dd2e7967e6a92554a70ca5a7a3744",
+    "target_statistics_sha256": "fc508ebbbcfe2f81bf17d640e7c8272ed032274625ed04439a2898651355bca6",
+    "H0_011": {
+      "checkpoint_sha256": "9b4417888e24ef883e871de3f7e04f7dae5a7fc08194bcb7ed3064f1f5b4d8f0",
+      "run_summary_sha256": "9fab01ec20b1a691911b24dc2e276eae8ecfa1f498a2f555cacd1bf436bfb08a"
+    },
+    "H0_013": {
+      "checkpoint_sha256": "1c278a77407f31ca793c674247e9de59376c9d8494be236582a927a169f98a29",
+      "run_summary_sha256": "80792ddaa130ea9d9de9d2baddbe433cafb7b497bc09ec1949841f932d49d0b6"
+    }
+  },
+  "gradient_geometry": {
+    "H0_011": {
+      "median_effective_core_to_nonmargin_gradient_ratio": 0.0037200295,
+      "median_core_nonmargin_cosine": 0.405529139,
+      "median_combined_active_hinge_fraction": 0.5,
+      "median_raw_core_to_nonmargin_gradient_ratio": 0.1116008844
+    },
+    "H0_013": {
+      "median_effective_core_to_nonmargin_gradient_ratio": 0.0380319543,
+      "ratio_bootstrap_95": [0.0327504910, 0.0411085764],
+      "median_core_nonmargin_cosine": 0.4093383253,
+      "cosine_bootstrap_95": [0.3743256516, 0.4304997205],
+      "conflicting_batches": 0,
+      "conflicting_batch_fraction_bootstrap_95": [0.0, 0.0],
+      "median_combined_active_hinge_fraction": 0.484375,
+      "median_raw_core_to_nonmargin_gradient_ratio": 0.1143063180,
+      "median_core_configured_total_cosine": 0.4418699921,
+      "median_nonmargin_configured_total_cosine": 0.9990354996,
+      "median_core_reconstruction_cosine": 0.1126825663,
+      "median_core_symmetric_nce_cosine": 0.4409459776
+    }
+  },
+  "candidate_bank": {
+    "H0_011": {
+      "global_hardest_negative_coverage": 0.03515625,
+      "mean_local_minus_global_margin": 0.0525743118
+    },
+    "H0_013": {
+      "global_hardest_negative_coverage": 0.04296875,
+      "coverage_bootstrap_95": [0.01953125, 0.0703125],
+      "mean_local_minus_global_margin": 0.0527452002
+    },
+    "global_hard_negative_identity_agreement_H0_011_H0_013": 0.7109375
+  },
+  "routing": {
+    "selected": "scale_limited",
+    "bootstrap_threshold_crossings": false,
+    "authorized_H0_014_intervention_family": "explicit_core_only_or_adaptive_gradient_weight",
+    "coverage_is_secondary_observed_deficit": true
+  },
+  "compute": {
+    "gpu_name": "NVIDIA L4",
+    "cuda_runtime": "12.8",
+    "peak_allocated_vram_bytes": 8064463360,
+    "peak_reserved_vram_bytes": 8445231104,
+    "full_wall_seconds": 68.730003585,
+    "colab_compute_units": "not visible at execution time"
+  },
+  "interpretation": {
+    "supported": "After receiver evolution, the core-margin gradient is active and positively aligned with the non-margin objective, but its configured contribution remains far below the predeclared 0.10 ratio threshold even after the H0-013 tenfold aggregate coefficient.",
+    "secondary_observation": "Only 4.30% of H0-013 anchors contain their global hardest train negative inside the assigned batch. Under the predeclared precedence this does not replace the scale-limited route, but it remains a bounded coverage deficit.",
+    "not_supported": "The evaluation does not establish a functional bridge, authorize replication, or justify PROTO-015."
+  },
+  "decision": {
+    "H0_014_development_intervention_authorized": true,
+    "exact_family": "explicit_core_only_or_adaptive_gradient_weight",
+    "replication_authorized": false,
+    "functional_confirmation_authorized": false,
+    "proto_015_status": "premature"
+  }
+}

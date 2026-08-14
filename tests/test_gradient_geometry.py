@@ -11,14 +11,24 @@ from src.pipelines.gradient_geometry import (
     validate_gradient_geometry_contract,
 )
 from src.pipelines.oracle_experiment import load_yaml
+from src.pipelines.oracle_experiment import load_json_object
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "config" / "LIP-EVAL-032_gradient_geometry.yaml"
+REGISTRY = ROOT / "experiments" / "registry" / "LIP-EVAL-032_gradient_geometry.json"
 
 
 def test_frozen_gradient_geometry_contract_validates():
     validate_gradient_geometry_contract(load_yaml(CONFIG))
+
+
+def test_registered_result_selects_only_the_scale_intervention():
+    registry = load_json_object(REGISTRY)
+    assert registry["routing"]["selected"] == "scale_limited"
+    assert registry["decision"]["H0_014_development_intervention_authorized"] is True
+    assert registry["decision"]["replication_authorized"] is False
+    assert registry["decision"]["functional_confirmation_authorized"] is False
 
 
 def test_gradient_geometry_contract_rejects_gate_access():
