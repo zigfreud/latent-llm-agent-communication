@@ -2,13 +2,17 @@
   "title": "Receiver-Anchored Tests for Latent Communication: Constant-Capacity Causal Localization and a Negative Cross-Model Result",
   "upload_type": "publication",
   "publication_type": "preprint",
+  "publication_date": "2026-08-15",
+  "doi": "10.5281/zenodo.21943476",
+  "concept_doi": "10.5281/zenodo.21943475",
+  "record_id": "21943476",
   "creators": [
     {
       "name": "Silva, Cristiano",
       "affiliation": "Independent Researcher, Brazil"
     }
   ],
-  "description": "A receiver-anchored evaluation protocol for latent communication, combining receiver-native oracle replay, constant-capacity identity controls, sealed task-level functional confirmation, and a registered negative DeepSeek-Coder-to-Llama result.",
+  "description": "This preprint presents a receiver-anchored evaluation protocol for latent communication between language models. It separates receiver-carrier viability from learned cross-model transport using receiver-native oracle replay, constant-capacity matched-versus-shuffled identity controls, sealed task-level functional confirmation, and hardened code execution.\n\nIn Study A, receiver-native residual packets produced 79/96 functional passes for the terminal matched packet versus 0/96 for the same-capacity shuffled control. A registered 2 x 2 x 2 factorial localized positive contributions to the terminal instruction core and function-name states under the tested Llama-3-8B-Instruct receiver.\n\nIn Study B, the receiver-native oracle anchor again succeeded (84/96 matched versus 0/96 shuffled), but the registered DeepSeek-Coder-to-Llama learned bridge produced 1/288 functional passes in both matched and shuffled conditions. The result is therefore negative for this complete registered cross-model system despite successful held-out geometric gates. It does not establish that heterogeneous latent communication is impossible.\n\nThe manuscript's priority claim is limited to the documented LIP evaluation protocol, its constant-capacity causal localization experiment, and its receiver-anchored negative cross-model finding. Source code, protocol specifications, claim ledger, and machine-readable result snapshot are linked through the public repository.\n\nRepository: https://github.com/zigfreud/latent-llm-agent-communication\nCorrespondence: ziwehdafe@gmail.com",
   "keywords": [
     "latent communication",
     "language-model agents",
@@ -16,16 +20,47 @@
     "residual stream",
     "cross-model alignment",
     "causal evaluation",
-    "negative results"
+    "negative results",
+    "reproducible AI research"
   ],
+  "language": "eng",
   "access_right": "open",
   "license": "cc-by-4.0",
+  "copyright": "Copyright (C) 2026 Cristiano Silva",
+  "publisher": "Zenodo",
   "version": "0.1",
+  "contact_email": "ziwehdafe@gmail.com",
+  "software_url": "https://github.com/zigfreud/latent-llm-agent-communication",
+  "programming_languages": [
+    "Python"
+  ],
+  "development_status": "active",
+  "deposit_files": [
+    "Receiver-Anchored_Tests_for_Latent_Communication_v0.1.pdf",
+    "LIP_PREPRINT_001.tex",
+    "result_snapshot.json"
+  ],
   "related_identifiers": [
     {
       "identifier": "https://github.com/zigfreud/latent-llm-agent-communication",
       "relation": "isSupplementedBy",
-      "scheme": "url"
+      "scheme": "url",
+      "resource_type": "software"
     }
+  ],
+  "references": [
+    "V. Ramesh and K. Li. Communicating Activations Between Language Model Agents. Proceedings of the 42nd International Conference on Machine Learning, PMLR 267:51094-51116, 2025. https://proceedings.mlr.press/v267/ramesh25a.html",
+    "Y. Tang, W. Su, Y. Zhou, Y. Liu, M. Zhang, S. Ma, and Q. Ai. Augmenting Multi-Agent Communication with State Delta Trajectory. arXiv:2506.19209, 2025. https://arxiv.org/abs/2506.19209",
+    "Z. Du, R. Wang, H. Bai, Z. Cao, X. Zhu, B. Zheng, W. Chen, and H. Ying. Enabling Agents to Communicate Entirely in Latent Space. arXiv:2511.09149, 2025. https://arxiv.org/abs/2511.09149",
+    "T. Fu, Z. Min, H. Zhang, J. Yan, G. Dai, W. Ouyang, and Y. Wang. Cache-to-Cache: Direct Semantic Communication Between Large Language Models. arXiv:2510.03215, 2025. https://arxiv.org/abs/2510.03215",
+    "M. Wenzel. Latent Communication Between Language Model Agents: Channels, Alignment, and the Limits of Text. arXiv:2607.14103, 2026. https://arxiv.org/abs/2607.14103",
+    "T. Heo, R. Shafipour, R. Zhao, M. Golub, M. M. Kamani, R. Borkar, M. T. Chandran, P. Zardoshti, and B. D. Rouhani. Cross-Model KV Cache Transfer in LLM Families: A Closed-Form Linear Mapping for Prefill Reuse. arXiv:2608.03893, 2026. https://arxiv.org/abs/2608.03893",
+    "Y. Liu. Beyond Tokens: A Unified Framework for Latent Communication in LLM-Based Multi-Agent Systems. arXiv:2606.05711, 2026. https://arxiv.org/abs/2606.05711",
+    "A. Geiger, H. Lu, T. Icard, and C. Potts. Causal Abstractions of Neural Networks. Advances in Neural Information Processing Systems, 34, 2021. https://arxiv.org/abs/2106.02997",
+    "F. Zhang and N. Nanda. Towards Best Practices of Activation Patching in Language Models: Metrics and Methods. arXiv:2309.16042, 2023. https://arxiv.org/abs/2309.16042",
+    "S. Holm. A Simple Sequentially Rejective Multiple Test Procedure. Scandinavian Journal of Statistics, 6(2):65-70, 1979.",
+    "J. Austin, A. Odena, M. Nye, M. Bosma, H. Michalewski, D. Dohan, E. Jiang, C. Cai, M. Terry, Q. Le, and C. Sutton. Program Synthesis with Large Language Models. arXiv:2108.07732, 2021. https://arxiv.org/abs/2108.07732",
+    "A. Grattafiori et al. The Llama 3 Herd of Models. arXiv:2407.21783, 2024. https://arxiv.org/abs/2407.21783",
+    "D. Guo et al. DeepSeek-Coder: When the Large Language Model Meets Programming - The Rise of Code Intelligence. arXiv:2401.14196, 2024. https://arxiv.org/abs/2401.14196"
   ]
 }

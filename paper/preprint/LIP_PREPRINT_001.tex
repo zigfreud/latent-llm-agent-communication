@@ -12,6 +12,7 @@
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{microtype}
+\usepackage{seqsplit}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning}
 \usepackage{fancyhdr}
@@ -48,7 +49,7 @@
 
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small LIP-PREPRINT-001}
+\fancyhead[L]{\small LIP - Latent Injection Protocol Preprint v0.1}
 \fancyhead[R]{\small Cristiano Silva}
 \fancyfoot[C]{\thepage}
 \renewcommand{\headrulewidth}{0.3pt}
@@ -69,6 +70,8 @@
 
 \begin{center}
 \small
+Correspondence: \href{mailto:ziwehdafe@gmail.com}{ziwehdafe@gmail.com}\\
+DOI: \href{https://doi.org/10.5281/zenodo.21943476}{10.5281/zenodo.21943476}\\
 Repository: \href{https://github.com/zigfreud/latent-llm-agent-communication}{github.com/zigfreud/latent-llm-agent-communication}\\
 Manuscript CC BY 4.0 \(\cdot\) Code MIT
 \end{center}
@@ -436,8 +439,8 @@ They bind the task selectors, packet contracts, statistical gates, model revisio
 \begin{itemize}
   \item Study A: 1,152 registered confirmation records, zero missing cells, and zero maximum self-replay logit error for \(K=32\) and \(K=24\).
   \item Study B: source commit \texttt{8e79a4740c9fd0fd98977c4b29feb3d28a45aa6e}, 1,344 complete confirmation cells, and a passing independent hardened functional audit.
-  \item Study B payload: 23 content-addressed scientific files; \texttt{SHA256SUMS} digest \texttt{2066ebe36d61da87e3d1c0f5dc8f8f6f2e93ca472e4405d783f0a7a64caa1db1}.
-  \item Hardened functional summary digest: \texttt{99e425d85bfc0aad3b03e0d42a90912d3789f273d7ba8ec25d354581c1897f38}.
+  \item Study B payload: 23 content-addressed scientific files; \texttt{SHA256SUMS} digest \texttt{\seqsplit{2066ebe36d61da87e3d1c0f5dc8f8f6f2e93ca472e4405d783f0a7a64caa1db1}}.
+  \item Hardened functional summary digest: \texttt{\seqsplit{99e425d85bfc0aad3b03e0d42a90912d3789f273d7ba8ec25d354581c1897f38}}.
 \end{itemize}
 
 The repository includes a machine-readable result snapshot and a claim ledger beside this manuscript. Large model-derived tensors and checkpoints are not embedded in the paper. Their content hashes and validation reports bind the executed artifacts; an archival release should deposit redistributable claim-level artifacts with the manuscript and code snapshot.

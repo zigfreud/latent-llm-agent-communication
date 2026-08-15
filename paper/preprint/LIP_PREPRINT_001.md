@@ -3,9 +3,11 @@ title: Receiver-Anchored Tests for Latent Communication
 subtitle: Constant-Capacity Causal Localization and a Negative Cross-Model Result
 author: Cristiano Silva
 affiliation: Independent Researcher, Brazil
+correspondence: ziwehdafe@gmail.com
 project: LIP — Latent Injection Protocol
 version: 0.1
 date: 15 August 2026
+doi: https://doi.org/10.5281/zenodo.21943476
 repository: https://github.com/zigfreud/latent-llm-agent-communication
 status: Preprint
 license: Manuscript CC BY 4.0 · Code MIT

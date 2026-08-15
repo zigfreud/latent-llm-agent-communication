@@ -736,6 +736,13 @@ def manuscript_story(metadata: dict[str, str], lines: list[str], width: float) -
             STYLES["meta"],
         )
     )
+    story.append(
+        Paragraph(
+            inline_markup(f'Correspondence: {metadata["correspondence"]}'),
+            STYLES["meta"],
+        )
+    )
+    story.append(Paragraph(inline_markup(f'DOI: {metadata["doi"]}'), STYLES["meta"]))
     story.append(Paragraph(inline_markup(metadata["repository"]), STYLES["meta"]))
     story.append(Paragraph(inline_markup(metadata["license"]), STYLES["meta"]))
     story.append(Spacer(1, 10))
