@@ -1,0 +1,31 @@
+{
+  "title": "Receiver-Anchored Tests for Latent Communication: Constant-Capacity Causal Localization and a Negative Cross-Model Result",
+  "upload_type": "publication",
+  "publication_type": "preprint",
+  "creators": [
+    {
+      "name": "Silva, Cristiano",
+      "affiliation": "Independent Researcher, Brazil"
+    }
+  ],
+  "description": "A receiver-anchored evaluation protocol for latent communication, combining receiver-native oracle replay, constant-capacity identity controls, sealed task-level functional confirmation, and a registered negative DeepSeek-Coder-to-Llama result.",
+  "keywords": [
+    "latent communication",
+    "language-model agents",
+    "activation intervention",
+    "residual stream",
+    "cross-model alignment",
+    "causal evaluation",
+    "negative results"
+  ],
+  "access_right": "open",
+  "license": "cc-by-4.0",
+  "version": "0.1",
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/zigfreud/latent-llm-agent-communication",
+      "relation": "isSupplementedBy",
+      "scheme": "url"
+    }
+  ]
+}

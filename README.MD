@@ -1,7 +1,10 @@
 # 🧬 LIP — Latent Injection Protocol
 ### Research Prototype for Heterogeneous LLM Latent-Space Experiments
 
-**Status: Research Prototype / Contrastive Bridge v2 — functional but under active metric and fidelity improvement.**
+**Status: Active independent research program. `LIP-PROTO-013` confirmed a
+receiver-native residual-packet identity effect; `LIP-PROTO-014` found no
+functional identity transport in the registered learned DeepSeek-to-Llama
+bridge despite successful development geometry.**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -9,12 +12,39 @@
 
 ---
 
+## Preprint and authorship
+
+**Cristiano Silva — Independent Researcher, Brazil**
+
+The current paper is **“Receiver-Anchored Tests for Latent Communication:
+Constant-Capacity Causal Localization and a Negative Cross-Model Result.”**
+
+- [Preprint PDF](output/pdf/LIP_PREPRINT_001.pdf)
+- [Canonical manuscript](paper/preprint/LIP_PREPRINT_001.md)
+- [Claim ledger](paper/preprint/CLAIM_LEDGER.md)
+- [Machine-readable result snapshot](paper/preprint/result_snapshot.json)
+- [Citation metadata](CITATION.cff)
+- [Preprint license: CC BY 4.0](paper/preprint/LICENSE.md)
+
+The priority claim is deliberately narrow: the documented LIP evaluation
+protocol, its constant-capacity terminal-source experiment, and its
+receiver-anchored negative cross-model finding. This repository does not claim
+to have invented latent communication generally or to have demonstrated a
+universal latent language.
+
+The manuscript text and figures use CC BY 4.0, which permits reuse with
+attribution. Repository code uses the MIT license.
+
+---
+
 ## 📖 Abstract
 
 LIP (Latent Injection Protocol) is a research prototype for studying whether
-latent vectors from one model can be mapped into a usable target-model vector
-space. The current mainline promotes the contrastive bridge and remote CPU smoke
-infrastructure used for small, auditable experiments.
+latent states can carry task identity into a receiver and whether learned
+cross-model mappings preserve that identity functionally. The current
+paper-facing method validates the receiver carrier with native oracle replay,
+holds packet capacity constant under identity shuffles, and requires sealed
+task-level functional confirmation before a learned transport claim.
 
 The active prototype focuses on a **DeepSeek-Coder-1.3B** source vector shape and
 a **Llama-3-8B** target vector shape via a trained adapter
@@ -140,12 +170,12 @@ to be scaled.*
 If you use this code in your research, please cite:
 
 ```
-@misc{silva2025lip,
-  title={LIP: A Universal Latent Injection Protocol for Heterogeneous Model Communication},
+@misc{silva2026receiveranchored,
+  title={Receiver-Anchored Tests for Latent Communication:
+         Constant-Capacity Causal Localization and a Negative Cross-Model Result},
   author={Silva, Cristiano},
-  year={2025},
-  publisher={GitHub},
-  journal={GitHub repository},
-  howpublished={\url{[https://github.com/zigfreud/latent-llm-agent-communication](https://github.com/zigfreud/latent-llm-agent-communication)}}
+  year={2026},
+  note={Preprint, version 0.1},
+  url={https://github.com/zigfreud/latent-llm-agent-communication}
 }
 ```

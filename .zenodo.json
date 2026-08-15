@@ -1,0 +1,23 @@
+{
+  "title": "LIP: Receiver-Anchored Evaluation for Latent Communication",
+  "upload_type": "software",
+  "creators": [
+    {
+      "name": "Silva, Cristiano",
+      "affiliation": "Independent Researcher, Brazil"
+    }
+  ],
+  "description": "Code and reproducibility materials for a receiver-anchored latent-communication evaluation protocol, including receiver-native oracle replay, constant-capacity identity controls, sealed task-level functional confirmation, and a registered negative DeepSeek-Coder-to-Llama result.",
+  "keywords": [
+    "latent communication",
+    "language-model agents",
+    "activation intervention",
+    "residual stream",
+    "cross-model alignment",
+    "causal evaluation",
+    "negative results"
+  ],
+  "access_right": "open",
+  "license": "MIT",
+  "version": "0.1.0"
+}
