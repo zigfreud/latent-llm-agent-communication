@@ -24,4 +24,5 @@ preferred-citation:
     - family-names: Silva
       given-names: Cristiano
   year: 2026
-  url: "https://github.com/zigfreud/latent-llm-agent-communication"
+  doi: "10.5281/zenodo.21943476"
+  url: "https://doi.org/10.5281/zenodo.21943476"

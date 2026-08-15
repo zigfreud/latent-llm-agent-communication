@@ -1,25 +1,27 @@
 # 🧬 LIP — Latent Injection Protocol
 ### Research Prototype for Heterogeneous LLM Latent-Space Experiments
 
-**Status: Active independent research program. `LIP-PROTO-013` confirmed a
-receiver-native residual-packet identity effect; `LIP-PROTO-014` found no
-functional identity transport in the registered learned DeepSeek-to-Llama
-bridge despite successful development geometry.**
+**Status: Preprint v0.1 published on 15 August 2026. Active independent research
+program. `LIP-PROTO-013` confirmed a receiver-native residual-packet identity
+effect; `LIP-PROTO-014` found no functional identity transport in the registered
+learned DeepSeek-to-Llama bridge despite successful development geometry.**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Validation: In Progress](https://img.shields.io/badge/Validation-In%20Progress-yellow.svg)]()
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21943476.svg)](https://doi.org/10.5281/zenodo.21943476)
 
 ---
 
-## Preprint and authorship
+## Published preprint and authorship
 
 **Cristiano Silva — Independent Researcher, Brazil**
 
 The current paper is **“Receiver-Anchored Tests for Latent Communication:
 Constant-Capacity Causal Localization and a Negative Cross-Model Result.”**
 
-- [Preprint PDF](output/pdf/LIP_PREPRINT_001.pdf)
+- **[Read and cite the published preprint on Zenodo](https://doi.org/10.5281/zenodo.21943476)**
+- [Archival PDF](output/pdf/Receiver-Anchored_Tests_for_Latent_Communication_v0.1.pdf)
+- [LaTeX source](paper/preprint/LIP_PREPRINT_001.tex)
 - [Canonical manuscript](paper/preprint/LIP_PREPRINT_001.md)
 - [Claim ledger](paper/preprint/CLAIM_LEDGER.md)
 - [Machine-readable result snapshot](paper/preprint/result_snapshot.json)
@@ -34,6 +36,20 @@ universal latent language.
 
 The manuscript text and figures use CC BY 4.0, which permits reuse with
 attribution. Repository code uses the MIT license.
+
+### Main result in one minute
+
+- **Receiver carrier:** receiver-native oracle replay produced `79/96`
+  functional passes for the terminal matched packet versus `0/96` for a
+  same-capacity shuffled control.
+- **Cross-model bridge:** the receiver-native oracle anchor produced `84/96`
+  matched versus `0/96` shuffled passes, while the registered learned
+  DeepSeek-Coder-to-Llama bridge produced `1/288` passes in both matched and
+  shuffled conditions.
+- **Interpretation:** the tested carrier can express task identity, but this
+  learned bridge did not transport it functionally under the registered
+  protocol. This is a bounded negative result, not evidence that heterogeneous
+  latent communication is impossible.
 
 ---
 
@@ -175,7 +191,10 @@ If you use this code in your research, please cite:
          Constant-Capacity Causal Localization and a Negative Cross-Model Result},
   author={Silva, Cristiano},
   year={2026},
+  publisher={Zenodo},
+  version={0.1},
   note={Preprint, version 0.1},
-  url={https://github.com/zigfreud/latent-llm-agent-communication}
+  doi={10.5281/zenodo.21943476},
+  url={https://doi.org/10.5281/zenodo.21943476}
 }
 ```

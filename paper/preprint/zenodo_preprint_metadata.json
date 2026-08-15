@@ -3,9 +3,12 @@
   "upload_type": "publication",
   "publication_type": "preprint",
   "publication_date": "2026-08-15",
+  "publication_status": "published",
   "doi": "10.5281/zenodo.21943476",
+  "doi_status": "registered",
   "concept_doi": "10.5281/zenodo.21943475",
   "record_id": "21943476",
+  "record_url": "https://zenodo.org/records/21943476",
   "creators": [
     {
       "name": "Silva, Cristiano",

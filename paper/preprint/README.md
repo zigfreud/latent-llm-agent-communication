@@ -35,11 +35,10 @@ Licensing is deliberately separated: manuscript text and figures are CC BY
 publication deposit. The root `.zenodo.json` describes a GitHub software
 release and must not be reused as the preprint metadata.
 
-The Zenodo draft for version 0.1 is record `21943476`. Its reserved version DOI
-is `10.5281/zenodo.21943476`, and its concept DOI is
+The published Zenodo record for version 0.1 is `21943476`. Its registered
+version DOI is `10.5281/zenodo.21943476`, and its concept DOI is
 `10.5281/zenodo.21943475`. The version DOI is synchronized into both manuscript
-sources and the verified archival PDF. It remains reserved rather than
-registered until the draft is published in Zenodo.
+sources and the verified archival PDF.
 
 The version 0.1 deposit contains the archival PDF, its LaTeX source, and the
 machine-readable `result_snapshot.json`. The canonical Markdown, claim ledger,
@@ -48,10 +47,10 @@ than being duplicated in the Zenodo file bundle. The Zenodo `References` field
 mirrors all 13 works cited in the manuscript; the repository alone is recorded
 under `Related works` with the relation `Is supplemented by`.
 
-Before an archival upload:
+For future archival versions:
 
 1. review every scientific statement against the frozen protocols;
-2. confirm that a DOI shown before publication is identified as reserved;
+2. reserve the version DOI before compiling the archival PDF;
 3. deposit the archival PDF and LaTeX source, and bind supporting code and
    claim-level artifacts through the linked public repository;
 4. keep the versioned record immutable after publication; issue a new version for corrections.
