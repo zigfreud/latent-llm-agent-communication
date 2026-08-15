@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "paper_id": "LIP-PREPRINT-001",
+  "title": "Receiver-Anchored Tests for Latent Communication",
+  "author": {
+    "name": "Cristiano Silva",
+    "affiliation": "Independent Researcher, Brazil",
+    "github": "https://github.com/zigfreud"
+  },
+  "version": "0.1",
+  "snapshot_date": "2026-08-15",
+  "licenses": {
+    "manuscript_text_and_figures": "CC-BY-4.0",
+    "repository_code": "MIT"
+  },
+  "repository": "https://github.com/zigfreud/latent-llm-agent-communication",
+  "base_commit": "02f72d12",
+  "studies": {
+    "LIP-PROTO-013": {
+      "design": "receiver-native constant-capacity terminal-source factorial",
+      "model": "NousResearch/Meta-Llama-3-8B-Instruct",
+      "model_revision": "53346005fb0ef11d3b6a83b12c895cca40156b6c",
+      "tasks": 32,
+      "conditions": 12,
+      "generation_seeds": 3,
+      "registered_records": 1152,
+      "complete": true,
+      "claim_eligible": true,
+      "results": {
+        "full_k32_matched": {"passes": 85, "total": 96, "rate": 0.885417},
+        "full_k32_shuffled": {"passes": 0, "total": 96, "rate": 0.0},
+        "terminal_k24_MMM": {"passes": 79, "total": 96, "rate": 0.822917},
+        "terminal_k24_SSS": {"passes": 0, "total": 96, "rate": 0.0},
+        "core_contribution": {"mean_difference": 0.791667, "holm_p": 0.0000699993, "confirmed": true},
+        "function_name_contribution": {"mean_difference": 0.822917, "holm_p": 0.0000699993, "confirmed": true},
+        "boundary_contribution": {"mean_difference": 0.010417, "holm_p": 1.0, "confirmed": false}
+      },
+      "claim_boundary": "Bounded to the pinned receiver revision, prompt template, capability-screened MBPP population, native oracle source, and first-eight-block replay."
+    },
+    "LIP-PROTO-014": {
+      "design": "registered heterogeneous residual-packet bridge with receiver-native oracle anchor",
+      "source_commit": "8e79a4740c9fd0fd98977c4b29feb3d28a45aa6e",
+      "source_model": "deepseek-ai/deepseek-coder-1.3b-base",
+      "source_revision": "e5babb80b8539a4e85dd2418c0ee611522276987",
+      "receiver_model": "NousResearch/Meta-Llama-3-8B-Instruct",
+      "receiver_revision": "53346005fb0ef11d3b6a83b12c895cca40156b6c",
+      "confirmation_tasks": 32,
+      "registered_cells": 1344,
+      "complete": true,
+      "claim_eligible": true,
+      "semantic_transport_supported": false,
+      "development_primary_replicas_passed": 3,
+      "development_primary_replicas_total": 3,
+      "results": {
+        "text_only": {"passes": 89, "total": 96, "rate": 0.927083},
+        "oracle_matched": {"passes": 84, "total": 96, "rate": 0.875},
+        "oracle_shuffled": {"passes": 0, "total": 96, "rate": 0.0},
+        "mean_scaffold": {"passes": 0, "total": 96, "rate": 0.0},
+        "learned_matched": {"passes": 1, "total": 288, "rate": 0.003472},
+        "learned_shuffled": {"passes": 1, "total": 288, "rate": 0.003472},
+        "random_residual_norm_matched": {"passes": 0, "total": 288, "rate": 0.0},
+        "oracle_identity_effect": 0.875,
+        "learned_identity_effect": 0.0,
+        "identity_recovery_ratio": 0.0
+      },
+      "artifact_digests": {
+        "SHA256SUMS": "2066ebe36d61da87e3d1c0f5dc8f8f6f2e93ca472e4405d783f0a7a64caa1db1",
+        "functional_summary": "99e425d85bfc0aad3b03e0d42a90912d3789f273d7ba8ec25d354581c1897f38",
+        "sandbox_report": "1e670ba28f64f82d16a00842173284032fc995395c4a73c34bd576734f768883"
+      },
+      "claim_boundary": "The complete registered DeepSeek-to-Llama bridge failed its functional transport gate despite a positive receiver-native oracle anchor."
+    }
+  },
+  "supported_claims": [
+    "A receiver-native 24-position residual packet transported task identity above an equal-capacity donor control in LIP-PROTO-013.",
+    "Instruction-core and function-name identity made confirmed positive contributions in the registered terminal-source factorial.",
+    "The LIP-PROTO-014 receiver carrier was viable under a strong native oracle identity contrast.",
+    "The registered learned DeepSeek-to-Llama bridge had zero task-level matched-versus-shuffled identity effect despite passing its development geometry gates."
+  ],
+  "unsupported_claims": [
+    "LIP is the first latent-communication method.",
+    "The learned bridge transported semantic task identity.",
+    "The intermediate packet is a universal language.",
+    "The result generalizes to arbitrary models or tasks.",
+    "The 24-position packet is mathematically minimal.",
+    "Boundary states are equivalent to irrelevant."
+  ]
+}

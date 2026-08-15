@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use the LIP evaluation protocol or this repository, please cite the preprint below."
+title: "LIP: Receiver-Anchored Tests for Latent Communication"
+type: software
+authors:
+  - family-names: Silva
+    given-names: Cristiano
+version: 0.1.0
+date-released: 2026-08-15
+repository-code: "https://github.com/zigfreud/latent-llm-agent-communication"
+url: "https://github.com/zigfreud/latent-llm-agent-communication"
+license: MIT
+keywords:
+  - latent communication
+  - language models
+  - activation intervention
+  - residual stream
+  - cross-model alignment
+  - causal evaluation
+preferred-citation:
+  type: article
+  title: "Receiver-Anchored Tests for Latent Communication: Constant-Capacity Causal Localization and a Negative Cross-Model Result"
+  authors:
+    - family-names: Silva
+      given-names: Cristiano
+  year: 2026
+  doi: "10.5281/zenodo.21943476"
+  url: "https://doi.org/10.5281/zenodo.21943476"
