@@ -336,6 +336,7 @@ def generate_with_layer_input_replay(
     positions: torch.Tensor | None = None,
     layer_packets: Mapping[int, torch.Tensor] | None = None,
     replay_mode: str | Mapping[int, str] = "replace",
+    forced_completion_prefix_token_ids: Sequence[int] | None = None,
 ) -> str:
     """Generate while replaying oracle prompt states before selected blocks."""
 
@@ -353,16 +354,66 @@ def generate_with_layer_input_replay(
         replay_mode=replay_mode,
     )
     prompt_length = int(inputs["input_ids"].shape[1])
+    forced_prefix = tuple(
+        int(token_id) for token_id in (forced_completion_prefix_token_ids or ())
+    )
+    if any(token_id < 0 for token_id in forced_prefix):
+        raise ValueError("forced completion prefix token IDs must be non-negative")
+    generate_kwargs = dict(generation_kwargs)
+    if forced_prefix:
+        if generate_kwargs.get("logits_processor") is not None:
+            raise ValueError(
+                "forced completion prefix cannot be combined with logits_processor"
+            )
+        from transformers import LogitsProcessorList
+
+        generate_kwargs["logits_processor"] = LogitsProcessorList(
+            [_ForcedCompletionPrefixProcessor(prompt_length, forced_prefix)]
+        )
     try:
         with torch.inference_mode():
-            generated = model.generate(**inputs, **dict(generation_kwargs))
+            generated = model.generate(**inputs, **generate_kwargs)
     finally:
         for handle in handles:
             handle.remove()
     continuation = generated[0, prompt_length:]
-    return tokenizer.decode(continuation, skip_special_tokens=True).replace(
+    output = tokenizer.decode(continuation, skip_special_tokens=True).replace(
         "</s>", ""
     ).strip()
+    if forced_prefix:
+        decoded_prefix = tokenizer.decode(
+            list(forced_prefix),
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=False,
+        ).strip()
+        if not decoded_prefix or not output.startswith(decoded_prefix):
+            raise RuntimeError("generated output does not realize the forced prefix")
+    return output
+
+
+class _ForcedCompletionPrefixProcessor:
+    """Force a fixed token sequence at the start of a decoder-only completion."""
+
+    def __init__(self, prompt_length: int, token_ids: Sequence[int]):
+        if prompt_length <= 0:
+            raise ValueError("prompt_length must be positive")
+        self.prompt_length = int(prompt_length)
+        self.token_ids = tuple(int(token_id) for token_id in token_ids)
+        if not self.token_ids or any(token_id < 0 for token_id in self.token_ids):
+            raise ValueError("token_ids must be a non-empty non-negative sequence")
+
+    def __call__(self, input_ids: torch.Tensor, scores: torch.Tensor) -> torch.Tensor:
+        generated_count = int(input_ids.shape[-1]) - self.prompt_length
+        if generated_count < 0:
+            raise ValueError("generation input is shorter than the frozen prompt")
+        if generated_count >= len(self.token_ids):
+            return scores
+        token_id = self.token_ids[generated_count]
+        if token_id >= scores.shape[-1]:
+            raise ValueError("forced prefix token is outside the model vocabulary")
+        constrained = torch.full_like(scores, -torch.inf)
+        constrained[:, token_id] = 0.0
+        return constrained
 
 
 def _normalize_replay_modes(

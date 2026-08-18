@@ -1,0 +1,132 @@
+experiment_id: "LIP-EVAL-036"
+protocol_version: "lip-constrained-prefix-receiver-screen-v1"
+claim_status: "development_only_open_cohort_sequential_mechanism_screen"
+
+predecessor:
+  experiment_id: "LIP-EVAL-035"
+  registry: "experiments/registry/LIP-EVAL-035_constant_opaque_entry_point_receiver_screen.json"
+  registry_sha256: "43573666986ea26a986d29d1844b2fd619e9f335b53b29f78cefff9549a438a7"
+  required_route: "constant_carrier_oracle_capacity_failure"
+
+source_screen:
+  experiment_id: "LIP-EVAL-035"
+  config: "config/LIP-EVAL-035_constant_opaque_entry_point_receiver_screen.yaml"
+  config_sha256: "b7f676123af59d28c1870a7e9103f8e6151a4e454d98a8275afdc80db9fb5a8f"
+  reuse_models: true
+  reuse_checkpoints: true
+  reuse_open_P014_cohort: true
+  reuse_generation_seeds: true
+  reuse_effective_generation_seed_schedule: true
+
+receiver_interface:
+  entry_point: "f_0"
+  prompt_kind: "constant_opaque_entry_point_with_constrained_prefix"
+  prompt: "Define a Python function named f_0. The required function name is fixed and must be copied exactly. Infer its arguments and behavior only from the latent signal. Return only executable Python code. Do not include explanations, examples, tests, or Markdown fences. The latent signal is the only source of task content."
+  same_prompt_for_every_task: true
+  semantic_task_text_in_prompt: false
+  original_entry_point_in_prompt: false
+  minimum_tokens_after_entry_point: 32
+  intervention_suffix_tokens: 24
+  require_entry_point_outside_intervention_suffix: true
+
+decoding_interface:
+  mode: "forced_completion_prefix"
+  prefix: "def f_0"
+  same_prefix_for_every_task: true
+  semantic_task_text_in_prefix: false
+  original_entry_point_in_prefix: false
+  require_exact_output_start: true
+  argument_list_forced: false
+  body_tokens_forced: false
+
+conditions:
+  control_phase:
+    - "canonical_no_packet"
+    - "oracle_teacher_matched"
+    - "oracle_teacher_shuffled"
+  learned_phase:
+    - "learned_matched"
+    - "learned_shuffled"
+  training_seeds: [4001, 4003, 4007]
+  generation_seeds: [4127, 4241, 4357]
+  control_expected_records: 288
+  learned_expected_records: 576
+  expected_records: 864
+
+packets:
+  offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  learned_layer_indices: [0]
+  oracle_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  replay_mode: "replace"
+  replay_gain: 1.0
+
+generation:
+  max_new_tokens: 256
+  do_sample: true
+  temperature: 0.2
+  top_p: 0.95
+  repetition_penalty: 1.0
+  resume_granularity: "one_atomic_jsonl_row"
+
+evaluation:
+  exact_metric: "functional_pass"
+  core_metric: "core_functional_pass"
+  alias_backoff_metric: "alias_functional_pass"
+  binding_gap_metric: "binding_gap"
+  cluster_unit: "task_id"
+  primary_treatment: "learned_matched"
+  primary_control: "learned_shuffled"
+  alpha: 0.05
+  alternative: "greater"
+  confidence: 0.95
+  bootstrap_iterations: 10000
+  statistics_seed: 4607
+  minimum_positive_bridge_seeds: 2
+  forced_prefix_realization_minimum: 1.0
+  oracle_core_capacity_minimum: 0.75
+  oracle_shuffled_core_maximum: 0.10
+  no_packet_core_maximum: 0.10
+  require_hardened_namespace: true
+  claim_eligible: false
+
+decision:
+  learned_phase_requires_control_lock: true
+  controls_passed:
+    route: "constrained_prefix_controls_passed"
+    action: "authorize_locked_learned_phase_within_EVAL_036"
+  prefix_realization_failure:
+    route: "forced_prefix_mechanism_failure"
+    action: "debug_decoder_constraint_without_interpreting_packets"
+  oracle_capacity_failure:
+    route: "constrained_prefix_oracle_capacity_failure"
+    action: "design_oracle_only_native_to_packet_blend_sweep"
+  specificity_control_failure:
+    route: "constrained_prefix_specificity_failure"
+    action: "reject_receiver_carrier_interpretation"
+  exact_signal:
+    route: "constrained_binding_preserves_learned_transport_candidate"
+    action: "design_trajectory_extension_for_coverage"
+  core_only_signal:
+    route: "constrained_prefix_still_has_internal_binding_gap"
+    action: "audit_recursive_and_multifunction_binding_failures"
+  no_signal:
+    route: "constrained_prefix_removes_learned_signal"
+    action: "prioritize_dynamic_closed_loop_trajectory_bridge"
+  can_upgrade_EVAL_033: false
+  can_upgrade_EVAL_034: false
+  can_upgrade_EVAL_035: false
+  fresh_holdout_spend_authorized: false
+  proto_015_execution_authorized: false
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  prediction_batch_size: 4
+  control_phase_maximum_new_generation_cells: 288
+  learned_phase_maximum_new_generation_cells: 576
+  maximum_new_generation_cells: 864
+
+output:
+  generations_jsonl: "runs/LIP-EVAL-036/generations.jsonl"
+  control_evaluation_dir: "runs/LIP-EVAL-036/control-evaluation"
+  evaluation_dir: "runs/LIP-EVAL-036/evaluation"
