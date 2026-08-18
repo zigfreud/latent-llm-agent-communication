@@ -1,0 +1,163 @@
+{
+  "experiment_id": "LIP-EVAL-036",
+  "protocol_version": "lip-constrained-prefix-receiver-screen-v1",
+  "claim_status": "development_only_oracle_capacity_failure_controls_only",
+  "run_commit": "c9fd47dfb838d8e4ef7a07d26714a33cd9697de9",
+  "completed_date": "2026-08-18",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-EVAL-036/screen-v1",
+    "generations": {
+      "path": "generations.jsonl",
+      "sha256": "bfef48894fd8f007abd3defdf546eaec10985e175871c7eeae477e2095416871",
+      "bytes": 970443
+    },
+    "generation_metadata": {
+      "path": "generations.metadata.json",
+      "sha256": "bbc54e193938ee1733866d6451cefe9f8003de1e8d6c65a93cec0621fe9fc5b6",
+      "bytes": 7927
+    },
+    "control_summary": {
+      "path": "control-evaluation/summary.json",
+      "sha256": "336dbd99b588551ee56917216625dc5c0813e27c63e5692abb479da93cb5b600",
+      "bytes": 22297
+    },
+    "scored_generations": {
+      "path": "control-evaluation/scored_generations.jsonl",
+      "sha256": "86e4cc47fa84451d2793b4ccf442e4f3fffe274ee5b94754fd0375c48f4b94b1",
+      "bytes": 1226315
+    },
+    "sandbox_report": {
+      "path": "control-evaluation/sandbox_report.json",
+      "sha256": "c481c955fefd72b9d53edea38b78c3bea7395df30f13d1615e21e35322782989",
+      "bytes": 1531
+    }
+  },
+  "provenance": {
+    "experiment_config_sha256": "f417da2327e432b54a4beee78cc1ebf6a07d13602f0bf22baa0cd8548591ee54",
+    "design_sha256": "9f7b4d19f1d5a101f42619cafb16ba0e14345f413b2954b1280411c69f862ec2",
+    "predecessor_registry_sha256": "43573666986ea26a986d29d1844b2fd619e9f335b53b29f78cefff9549a438a7",
+    "source_screen_run_commit": "fbba79892f84f07936e1daf9d227c8865d2f3439",
+    "source_model_revision": "e5babb80b8539a4e85dd2418c0ee611522276987",
+    "target_model_revision": "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+  },
+  "execution": {
+    "accelerator": "NVIDIA L4",
+    "phase": "controls",
+    "record_count": 288,
+    "control_expected_record_count": 288,
+    "full_expected_record_count": 864,
+    "missing_record_count": 576,
+    "task_count": 32,
+    "generation_seeds": [4127, 4241, 4357],
+    "canonical_entry_point": "f_0",
+    "forced_completion_prefix": "def f_0",
+    "forced_completion_prefix_token_ids": [755, 282, 62, 15],
+    "forced_completion_prefix_sha256": "cf63d4315c95b7acb636b2c402b90d9dcb52d0b4c8418dad4a51344c333e9397",
+    "forced_completion_prefix_token_ids_sha256": "23986f7c0cb621e3aec6b266eca7d75b3fab8f0e46376aab1c0c0c83a883bdbd",
+    "run_scope": "development_only_reused_open_P014_cohort",
+    "execution_mode": "functional_hardened_namespace",
+    "subprocess_is_security_sandbox": true,
+    "sandbox_validated": true,
+    "claim_eligible": false
+  },
+  "receiver_position_audit": {
+    "entry_point_token_positions": [34, 35, 36],
+    "intervention_position_min": 72,
+    "intervention_position_max": 95,
+    "tokens_after_entry_point": 59,
+    "positionally_separated": true
+  },
+  "normalization": {
+    "already_exact": 287,
+    "missing_top_level_function": 1,
+    "body_rewrites": 0,
+    "argument_rewrites": 0,
+    "test_rewrites": 0
+  },
+  "outcomes": {
+    "canonical_no_packet": {
+      "records": 96,
+      "exact_functional_passes": 1,
+      "alias_functional_passes": 1,
+      "core_functional_passes": 1,
+      "binding_gap_passes": 0,
+      "forced_prefix_realized": 96
+    },
+    "oracle_teacher_matched": {
+      "records": 96,
+      "exact_functional_passes": 69,
+      "alias_functional_passes": 69,
+      "core_functional_passes": 69,
+      "binding_gap_passes": 0,
+      "forced_prefix_realized": 96
+    },
+    "oracle_teacher_shuffled": {
+      "records": 96,
+      "exact_functional_passes": 0,
+      "alias_functional_passes": 0,
+      "core_functional_passes": 0,
+      "binding_gap_passes": 0,
+      "forced_prefix_realized": 96
+    }
+  },
+  "control_gates": {
+    "forced_prefix": {
+      "realization_rate": 1.0,
+      "minimum": 1.0,
+      "passed": true
+    },
+    "oracle_teacher_matched": {
+      "core_functional_rate": 0.71875,
+      "minimum": 0.75,
+      "passed": false,
+      "shortfall_passes": 3
+    },
+    "oracle_teacher_shuffled": {
+      "core_functional_rate": 0.0,
+      "maximum": 0.1,
+      "passed": true
+    },
+    "canonical_no_packet": {
+      "core_functional_rate": 0.010416666666666666,
+      "maximum": 0.1,
+      "passed": true
+    }
+  },
+  "oracle_task_distribution": {
+    "core_passes_out_of_three": {"0": 7, "1": 2, "2": 2, "3": 21},
+    "nonfull_task_ids": {
+      "174": 0,
+      "208": 0,
+      "258": 1,
+      "362": 0,
+      "392": 0,
+      "427": 0,
+      "450": 0,
+      "453": 2,
+      "476": 0,
+      "49": 2,
+      "98": 1
+    }
+  },
+  "interpretation": {
+    "registered_result": "The prespecified route is constrained_prefix_oracle_capacity_failure because matched-oracle core recovery was 69/96, below the frozen 75% gate.",
+    "mechanism_success": "The forced task-invariant prefix realized in 288/288 rows and eliminated the oracle binding gap: matched-oracle exact, alias, and core recovery all equal 69/96.",
+    "capacity_limit": "Relative to EVAL-035 on the same open cohort, exact oracle recovery increased from 6 to 69 while core recovery increased only from 68 to 69. The remaining shortfall is therefore not primarily lexical binding.",
+    "coverage_signature": "Matched-oracle recovery was complete in 21 tasks, absent in 7, and partial in 4. The residual failure is task-structured rather than a broad prefix-realization failure.",
+    "next_hypothesis": "Full residual replacement may erase receiver-native state needed by the remaining tasks. A prespecified oracle-only convex native-to-packet blend screen should test this before any learned or trajectory-training spend.",
+    "causal_boundary": "Matched oracle strongly exceeds frozen shuffled oracle, but the failed capacity gate blocks learned execution and does not establish a learned bridge.",
+    "not_supported": "The result does not upgrade EVAL-033, EVAL-034, or EVAL-035, authorize a fresh holdout, authorize PROTO-015, or establish general latent communication."
+  },
+  "decision": {
+    "diagnostic_route": "constrained_prefix_oracle_capacity_failure",
+    "recommended_action": "design_oracle_only_native_to_packet_blend_sweep",
+    "learned_phase_authorized_by_frozen_gate": false,
+    "learned_phase_executed": false,
+    "native_to_packet_blend_sweep_authorized": false,
+    "proto_015_execution_authorized": false,
+    "fresh_holdout_spend_authorized": false,
+    "can_upgrade_EVAL_033": false,
+    "can_upgrade_EVAL_034": false,
+    "can_upgrade_EVAL_035": false
+  }
+}

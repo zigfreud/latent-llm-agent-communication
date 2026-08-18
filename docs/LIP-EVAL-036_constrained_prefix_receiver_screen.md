@@ -6,6 +6,13 @@ LIP-EVAL-036 is a frozen, sequential, development-only mechanism screen on the
 already open P014 cohort. It follows the EVAL-035 oracle-capacity failure and
 does not authorize PROTO-015, a fresh holdout, or an upgrade of EVAL-033/034/035.
 
+Execution completed on 2026-08-18 and stopped after the control phase. The
+registered route is `constrained_prefix_oracle_capacity_failure`: prefix
+realization was 288/288, shuffled oracle was 0/96, no packet was 1/96, and
+matched-oracle core recovery was `69/96 = 71.875%`, three rows below the frozen
+75% capacity gate. The learned phase was not authorized or executed. See
+`experiments/registry/LIP-EVAL-036_constrained_prefix_receiver_screen.md`.
+
 ## Question
 
 EVAL-035 placed the constant opaque name `f_0` outside the overwritten prompt
