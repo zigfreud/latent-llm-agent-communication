@@ -1,0 +1,110 @@
+experiment_id: "LIP-EVAL-035"
+protocol_version: "lip-constant-opaque-entry-point-screen-v1"
+claim_status: "development_only_open_cohort_mechanism_screen"
+
+predecessor:
+  experiment_id: "LIP-EVAL-034"
+  registry: "experiments/registry/LIP-EVAL-034_alias_normalized_functional_diagnostic.json"
+  registry_sha256: "a245b35ccafa546cb3ee6d4da7e4a7141b114e0de35e640a63519f390cb7e849"
+  required_decision: "LIP_EVAL_035_design_authorized"
+  required_route: "matched_specific_alias_recovery_candidate"
+
+source_screen:
+  experiment_id: "LIP-EVAL-033"
+  config: "config/LIP-EVAL-033_functional_bridge_screen.yaml"
+  config_sha256: "66da6bc098bf89fd996f0cd81b421b714e77a5b395035619f5dd71df75fa63ce"
+  registry: "experiments/registry/LIP-EVAL-033_functional_bridge_screen.json"
+  registry_sha256: "23583f232b4cce5495bd7c35eeb60ec8e1edc1693810230f1b72e7d6849bcfbe"
+  run_commit: "fbba79892f84f07936e1daf9d227c8865d2f3439"
+  reuse_models: true
+  reuse_checkpoints: true
+  reuse_open_P014_cohort: true
+  reuse_generation_seeds: true
+  reuse_effective_generation_seed_schedule: true
+
+receiver_interface:
+  entry_point: "f_0"
+  prompt_kind: "constant_opaque_entry_point"
+  prompt: "Define a Python function named f_0. The required function name is fixed and must be copied exactly. Infer its arguments and behavior only from the latent signal. Return only executable Python code. Do not include explanations, examples, tests, or Markdown fences. The latent signal is the only source of task content."
+  same_prompt_for_every_task: true
+  semantic_task_text_in_prompt: false
+  original_entry_point_in_prompt: false
+  minimum_tokens_after_entry_point: 32
+  intervention_suffix_tokens: 24
+  require_entry_point_outside_intervention_suffix: true
+
+conditions:
+  shared:
+    - "canonical_no_packet"
+    - "oracle_teacher_matched"
+    - "oracle_teacher_shuffled"
+  replicated:
+    - "learned_matched"
+    - "learned_shuffled"
+  training_seeds: [4001, 4003, 4007]
+  generation_seeds: [4127, 4241, 4357]
+  expected_records: 864
+
+packets:
+  offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  learned_layer_indices: [0]
+  oracle_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+
+generation:
+  max_new_tokens: 256
+  do_sample: true
+  temperature: 0.2
+  top_p: 0.95
+  repetition_penalty: 1.0
+  resume_granularity: "one_atomic_jsonl_row"
+
+evaluation:
+  exact_metric: "functional_pass"
+  core_metric: "core_functional_pass"
+  alias_backoff_metric: "alias_functional_pass"
+  binding_gap_metric: "binding_gap"
+  cluster_unit: "task_id"
+  primary_treatment: "learned_matched"
+  primary_control: "learned_shuffled"
+  alpha: 0.05
+  alternative: "greater"
+  confidence: 0.95
+  bootstrap_iterations: 10000
+  statistics_seed: 4507
+  minimum_positive_bridge_seeds: 2
+  oracle_core_capacity_minimum: 0.75
+  oracle_shuffled_core_maximum: 0.10
+  no_packet_core_maximum: 0.10
+  require_hardened_namespace: true
+  claim_eligible: false
+
+decision:
+  exact_signal:
+    route: "constant_binding_recovers_learned_transport_candidate"
+    action: "design_explicit_binding_channel_then_test_trajectory_extension"
+  core_only_signal:
+    route: "core_survives_but_prompt_binding_fails"
+    action: "prioritize_learned_symbol_readout_head"
+  oracle_capacity_failure:
+    route: "constant_carrier_oracle_capacity_failure"
+    action: "redesign_positionally_separated_receiver_carrier"
+  specificity_control_failure:
+    route: "non_specific_constant_prompt_or_oracle_control_failure"
+    action: "reject_name_binding_interpretation"
+  no_signal:
+    route: "carrier_reconditioning_erases_alias_recovery"
+    action: "prioritize_dynamic_closed_loop_trajectory_bridge"
+  can_upgrade_EVAL_033: false
+  can_upgrade_EVAL_034: false
+  fresh_holdout_spend_authorized: false
+  proto_015_execution_authorized: false
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  prediction_batch_size: 4
+  new_generation_cells: 864
+
+output:
+  generations_jsonl: "runs/LIP-EVAL-035/generations.jsonl"
+  evaluation_dir: "runs/LIP-EVAL-035/evaluation"

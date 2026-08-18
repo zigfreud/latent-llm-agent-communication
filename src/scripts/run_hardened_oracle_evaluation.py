@@ -39,6 +39,9 @@ from src.scripts.evaluate_functional_bridge_screen import (
 from src.scripts.evaluate_alias_normalized_diagnostic import (
     evaluate as evaluate_alias_normalized_diagnostic,
 )
+from src.scripts.evaluate_constant_entry_point_screen import (
+    evaluate as evaluate_constant_entry_point_screen,
+)
 
 
 NOBODY_UID = 65534
@@ -120,6 +123,8 @@ def evaluator_for_config(config: dict[str, Any]):
         return evaluate_functional_bridge_screen
     if config.get("experiment_id") == "LIP-EVAL-034":
         return evaluate_alias_normalized_diagnostic
+    if config.get("experiment_id") == "LIP-EVAL-035":
+        return evaluate_constant_entry_point_screen
     return evaluate_oracle_packet_semantics
 
 
