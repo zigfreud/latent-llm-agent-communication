@@ -7,6 +7,13 @@ P014 cohort. It follows the positive, post-hoc EVAL-034 alias diagnostic but
 cannot upgrade EVAL-033 or EVAL-034, spend a fresh holdout, or authorize
 PROTO-015.
 
+Execution completed on 2026-08-18. The registered route is
+`constant_carrier_oracle_capacity_failure`: matched-oracle core recovery was
+`68/96 = 70.83%`, below the frozen 75% capacity gate. Learned matched exceeded
+learned shuffled on both exact and core endpoints, but the gate hierarchy does
+not allow that secondary signal to select a positive mechanism route. See
+`experiments/registry/LIP-EVAL-035_constant_opaque_entry_point_receiver_screen.md`.
+
 ## Question
 
 EVAL-034 recovered executable task behavior in 29 learned-matched rows and zero

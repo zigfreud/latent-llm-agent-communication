@@ -1,0 +1,205 @@
+{
+  "experiment_id": "LIP-EVAL-035",
+  "protocol_version": "lip-constant-opaque-entry-point-screen-v1",
+  "claim_status": "development_only_oracle_capacity_failure_with_secondary_learned_signal",
+  "run_commit": "6811f6c7ec98b5306e599c645b8ebe10bc2d3b32",
+  "completed_date": "2026-08-18",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-EVAL-035/screen-v1",
+    "generations": {
+      "path": "generations.jsonl",
+      "sha256": "a7cc355c0eff3fb36a729cf5f2882c2b7621ef087267965a2687c3fcbd61ee07",
+      "bytes": 2556970
+    },
+    "generation_metadata": {
+      "path": "generations.metadata.json",
+      "sha256": "2578a6b61aea70d8adc2ad2c56235b61ab0c3d08904d0ec0dff919e13c5124dd",
+      "bytes": 7677
+    },
+    "functional_summary": {
+      "path": "functional-evaluation/summary.json",
+      "sha256": "9442e05b2fff7b423d7e7744412e41d5de8bb2d2af0d6c49051c891e3502ac51",
+      "bytes": 44501
+    },
+    "scored_generations": {
+      "path": "functional-evaluation/scored_generations.jsonl",
+      "sha256": "cad2be57fe77e64909b46bb31c9ffa4089a6126b36339d4707e4ccad5389181e",
+      "bytes": 3354873
+    },
+    "sandbox_report": {
+      "path": "functional-evaluation/sandbox_report.json",
+      "sha256": "c481c955fefd72b9d53edea38b78c3bea7395df30f13d1615e21e35322782989",
+      "bytes": 1531
+    }
+  },
+  "provenance": {
+    "experiment_config_sha256": "b7f676123af59d28c1870a7e9103f8e6151a4e454d98a8275afdc80db9fb5a8f",
+    "design_sha256": "0cf81f599ca473e9626d623cdef1aed8f6d4eb02a6bbae6fb8cc3ade0b9e14e8",
+    "source_screen_run_commit": "fbba79892f84f07936e1daf9d227c8865d2f3439",
+    "source_model_revision": "e5babb80b8539a4e85dd2418c0ee611522276987",
+    "target_model_revision": "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+  },
+  "execution": {
+    "accelerator": "NVIDIA L4",
+    "record_count": 864,
+    "expected_record_count": 864,
+    "missing_record_count": 0,
+    "task_count": 32,
+    "training_seeds": [4001, 4003, 4007],
+    "canonical_entry_point": "f_0",
+    "run_scope": "development_only_reused_open_P014_cohort",
+    "execution_mode": "functional_hardened_namespace",
+    "subprocess_is_security_sandbox": true,
+    "sandbox_validated": true,
+    "claim_eligible": false,
+    "can_upgrade_EVAL_033": false,
+    "can_upgrade_EVAL_034": false
+  },
+  "normalization": {
+    "already_exact": 434,
+    "single_function_aliased": 385,
+    "ambiguous_multiple_top_level_functions": 12,
+    "missing_top_level_function": 7,
+    "syntax_invalid": 26,
+    "body_rewrites": 0,
+    "argument_rewrites": 0,
+    "test_rewrites": 0
+  },
+  "outcomes": {
+    "canonical_no_packet": {
+      "records": 96,
+      "syntax_passes": 96,
+      "exact_entry_point_declarations": 96,
+      "alias_eligible": 96,
+      "exact_functional_passes": 1,
+      "alias_functional_passes": 1,
+      "core_functional_passes": 1,
+      "binding_gap_passes": 0
+    },
+    "learned_matched": {
+      "records": 288,
+      "syntax_passes": 272,
+      "exact_entry_point_declarations": 161,
+      "alias_eligible": 269,
+      "exact_functional_passes": 18,
+      "alias_functional_passes": 21,
+      "core_functional_passes": 21,
+      "binding_gap_passes": 3
+    },
+    "learned_shuffled": {
+      "records": 288,
+      "syntax_passes": 278,
+      "exact_entry_point_declarations": 160,
+      "alias_eligible": 275,
+      "exact_functional_passes": 0,
+      "alias_functional_passes": 1,
+      "core_functional_passes": 1,
+      "binding_gap_passes": 1
+    },
+    "oracle_teacher_matched": {
+      "records": 96,
+      "syntax_passes": 96,
+      "exact_entry_point_declarations": 11,
+      "alias_eligible": 89,
+      "exact_functional_passes": 6,
+      "alias_functional_passes": 65,
+      "core_functional_passes": 68,
+      "binding_gap_passes": 62
+    },
+    "oracle_teacher_shuffled": {
+      "records": 96,
+      "syntax_passes": 96,
+      "exact_entry_point_declarations": 10,
+      "alias_eligible": 90,
+      "exact_functional_passes": 0,
+      "alias_functional_passes": 0,
+      "core_functional_passes": 0,
+      "binding_gap_passes": 0
+    }
+  },
+  "control_gates": {
+    "oracle_teacher_matched": {
+      "core_functional_rate": 0.7083333333333334,
+      "minimum": 0.75,
+      "passed": false,
+      "shortfall_passes": 4
+    },
+    "oracle_teacher_shuffled": {
+      "core_functional_rate": 0.0,
+      "maximum": 0.1,
+      "passed": true
+    },
+    "canonical_no_packet": {
+      "core_functional_rate": 0.010416666666666666,
+      "maximum": 0.1,
+      "passed": true
+    }
+  },
+  "learned_endpoints": {
+    "exact_binding": {
+      "task_count": 32,
+      "nonzero_task_count": 5,
+      "mean_matched_minus_shuffled": 0.0625,
+      "bootstrap_95": [0.013888888888888888, 0.125],
+      "alternative": "greater",
+      "p_value": 0.03125,
+      "p_value_method": "exact",
+      "primary_passed": true,
+      "positive_bridge_seeds": 3,
+      "seed_guardrail_passed": true,
+      "by_seed_mean_difference": {
+        "4001": 0.05208333333333333,
+        "4003": 0.05208333333333333,
+        "4007": 0.08333333333333333
+      }
+    },
+    "core_recovery": {
+      "task_count": 32,
+      "nonzero_task_count": 6,
+      "mean_matched_minus_shuffled": 0.06944444444444445,
+      "bootstrap_95": [0.020833333333333332, 0.1284722222222222],
+      "alternative": "greater",
+      "p_value": 0.015625,
+      "p_value_method": "exact",
+      "primary_passed": true,
+      "positive_bridge_seeds": 3,
+      "seed_guardrail_passed": true,
+      "by_seed_mean_difference": {
+        "4001": 0.08333333333333333,
+        "4003": 0.05208333333333333,
+        "4007": 0.07291666666666667
+      }
+    },
+    "interpretation_allowed_by_gate_hierarchy": false
+  },
+  "responsive_tasks": {
+    "46": {"original_entry_point": "test_distinct", "exact_matched": 5, "exact_shuffled": 0, "core_matched": 5, "core_shuffled": 0},
+    "49": {"original_entry_point": "specified_element", "exact_matched": 2, "exact_shuffled": 0, "core_matched": 2, "core_shuffled": 0},
+    "62": {"original_entry_point": "smallest_num", "exact_matched": 0, "exact_shuffled": 0, "core_matched": 3, "core_shuffled": 0},
+    "152": {"original_entry_point": "merge_sort", "exact_matched": 6, "exact_shuffled": 0, "core_matched": 6, "core_shuffled": 1},
+    "372": {"original_entry_point": "heap_assending", "exact_matched": 3, "exact_shuffled": 0, "core_matched": 3, "core_shuffled": 0},
+    "418": {"original_entry_point": "Find_Max", "exact_matched": 2, "exact_shuffled": 0, "core_matched": 2, "core_shuffled": 0}
+  },
+  "oracle_task_distribution": {
+    "core_passes_out_of_three": {"0": 7, "1": 2, "2": 3, "3": 20},
+    "exact_passes_out_of_three": {"0": 30, "3": 2}
+  },
+  "interpretation": {
+    "registered_result": "The prespecified decision route is constant_carrier_oracle_capacity_failure because matched-oracle core recovery was 68/96, below the frozen 75% gate.",
+    "secondary_observation": "Learned matched exceeded learned shuffled on both prespecified endpoints, passed the task-clustered exact sign-flip tests, and was positive for all three bridge seeds.",
+    "binding_signature": "The no-packet prompt declared f_0 in 96/96 rows, but matched-oracle intervention declared f_0 in only 11/96 while retaining 68/96 core recovery and producing 62 binding-gap rows. The intervention changes downstream symbol realization even though the f_0 prompt tokens are positionally outside the overwritten suffix.",
+    "concentration_limit": "Exact recovery is confined to 5/32 tasks and core recovery to 6/32 tasks; this is not broad heterogeneous transport.",
+    "causal_boundary": "The matched-versus-frozen-shuffled contrast is informative on the reused open cohort, but the failed oracle capacity gate prevents the learned contrast from selecting a positive mechanism route under the frozen protocol.",
+    "not_supported": "The result does not upgrade EVAL-033 or EVAL-034, authorize a fresh holdout, establish general latent communication, or authorize PROTO-015."
+  },
+  "decision": {
+    "diagnostic_route": "constant_carrier_oracle_capacity_failure",
+    "recommended_action": "redesign_positionally_separated_receiver_carrier",
+    "receiver_carrier_redesign_authorized": false,
+    "trajectory_branch_execution_authorized": false,
+    "proto_015_execution_authorized": false,
+    "fresh_holdout_spend_authorized": false,
+    "EVAL_033_remains_negative": true,
+    "EVAL_034_remains_post_hoc": true
+  }
+}
