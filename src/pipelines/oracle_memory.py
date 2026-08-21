@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Mapping, Sequence
 
 import torch
@@ -118,6 +119,7 @@ def forward_with_packet_trajectory_capture(
     positions: torch.Tensor,
     layer_packets: Mapping[int, torch.Tensor] | None = None,
     replay_mode: str | Mapping[int, str] = "replace",
+    replay_alpha: float | Mapping[int, float] | None = None,
 ) -> tuple[Any, dict[str, dict[int, torch.Tensor]]]:
     """Capture native or replayed receiver states during one prefill forward."""
 
@@ -126,6 +128,9 @@ def forward_with_packet_trajectory_capture(
         raise ValueError("layer_indices must be a non-empty unique sequence")
     packets = {int(layer): value for layer, value in (layer_packets or {}).items()}
     replay_modes = _normalize_replay_modes(selected_layers, replay_mode)
+    replay_alphas = _normalize_replay_alphas(
+        selected_layers, replay_modes, replay_alpha
+    )
     unknown_packets = set(packets).difference(selected_layers)
     missing_packets = set(selected_layers).difference(packets) if packets else set()
     if unknown_packets or missing_packets:
@@ -156,8 +161,14 @@ def forward_with_packet_trajectory_capture(
             updated = hidden.clone()
             if replay_modes[layer_idx] == "replace":
                 injected = vectors
-            else:
+            elif replay_modes[layer_idx] == "add":
                 injected = hidden[0, selected, :] + vectors
+            else:
+                alpha = replay_alphas[layer_idx]
+                assert alpha is not None
+                injected = (
+                    (1.0 - alpha) * hidden[0, selected, :] + alpha * vectors
+                )
             captured["residual_input"][layer_idx] = (
                 injected.detach().float().cpu()
             )
@@ -311,8 +322,12 @@ def _register_replay_hooks(
     layer_packets: Mapping[int, torch.Tensor],
     *,
     replay_mode: str | Mapping[int, str] = "replace",
+    replay_alpha: float | Mapping[int, float] | None = None,
 ) -> list[Any]:
     replay_modes = _normalize_replay_modes(layer_packets, replay_mode)
+    replay_alphas = _normalize_replay_alphas(
+        layer_packets, replay_modes, replay_alpha
+    )
     handles = []
     for layer_idx, vectors in layer_packets.items():
         hook = make_lip_packet_pre_hook(
@@ -320,6 +335,7 @@ def _register_replay_hooks(
             positions,
             enable=True,
             mode=replay_modes[int(layer_idx)],
+            blend_alpha=replay_alphas[int(layer_idx)],
         )
         handles.append(
             model.model.layers[int(layer_idx)].register_forward_pre_hook(hook)
@@ -336,6 +352,7 @@ def generate_with_layer_input_replay(
     positions: torch.Tensor | None = None,
     layer_packets: Mapping[int, torch.Tensor] | None = None,
     replay_mode: str | Mapping[int, str] = "replace",
+    replay_alpha: float | Mapping[int, float] | None = None,
     forced_completion_prefix_token_ids: Sequence[int] | None = None,
 ) -> str:
     """Generate while replaying oracle prompt states before selected blocks."""
@@ -352,6 +369,7 @@ def generate_with_layer_input_replay(
         positions,
         packets,
         replay_mode=replay_mode,
+        replay_alpha=replay_alpha,
     )
     prompt_length = int(inputs["input_ids"].shape[1])
     forced_prefix = tuple(
@@ -429,7 +447,42 @@ def _normalize_replay_modes(
         modes = {int(layer): str(mode) for layer, mode in replay_mode.items()}
         if set(modes) != set(layers):
             raise ValueError("mapped replay_mode must cover exactly the replayed layers")
-    invalid = {mode for mode in modes.values() if mode not in {"replace", "add"}}
+    invalid = {
+        mode for mode in modes.values() if mode not in {"replace", "add", "blend"}
+    }
     if invalid:
-        raise ValueError("replay_mode must contain only replace or add")
+        raise ValueError("replay_mode must contain only replace, add, or blend")
     return modes
+
+
+def _normalize_replay_alphas(
+    layer_indices: Sequence[int] | Mapping[int, Any],
+    replay_modes: Mapping[int, str],
+    replay_alpha: float | Mapping[int, float] | None,
+) -> dict[int, float | None]:
+    """Resolve convex-blend weights while rejecting silently ignored values."""
+
+    layers = [int(layer) for layer in layer_indices]
+    blend_layers = {layer for layer in layers if replay_modes[layer] == "blend"}
+    if not blend_layers:
+        if replay_alpha is not None:
+            raise ValueError("replay_alpha is valid only when replay_mode uses blend")
+        return {layer: None for layer in layers}
+    if replay_alpha is None:
+        raise ValueError("blend replay requires replay_alpha")
+    if isinstance(replay_alpha, Mapping):
+        supplied = {int(layer): float(alpha) for layer, alpha in replay_alpha.items()}
+        if set(supplied) != blend_layers:
+            raise ValueError("mapped replay_alpha must cover exactly the blend layers")
+    else:
+        supplied = {layer: float(replay_alpha) for layer in blend_layers}
+    invalid = {
+        alpha
+        for alpha in supplied.values()
+        if not math.isfinite(alpha) or not 0.0 <= alpha <= 1.0
+    }
+    if invalid:
+        raise ValueError("replay_alpha must contain only finite values in [0, 1]")
+    return {
+        layer: supplied[layer] if layer in blend_layers else None for layer in layers
+    }

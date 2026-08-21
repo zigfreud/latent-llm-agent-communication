@@ -1,0 +1,132 @@
+experiment_id: "LIP-EVAL-037"
+protocol_version: "lip-oracle-native-packet-blend-screen-v1"
+claim_status: "development_only_open_cohort_sequential_oracle_mechanism_screen"
+
+predecessor:
+  experiment_id: "LIP-EVAL-036"
+  registry: "experiments/registry/LIP-EVAL-036_constrained_prefix_receiver_screen.json"
+  registry_sha256: "e4923864b651233eeaeb500d11fa5839242617623bd2088a2d7fa3973565c95e"
+  required_route: "constrained_prefix_oracle_capacity_failure"
+
+source_screen:
+  experiment_id: "LIP-EVAL-036"
+  config: "config/LIP-EVAL-036_constrained_prefix_receiver_screen.yaml"
+  config_sha256: "f417da2327e432b54a4beee78cc1ebf6a07d13602f0bf22baa0cd8548591ee54"
+  reuse_models: true
+  reuse_open_P014_cohort: true
+  reuse_generation_seeds: true
+  reuse_donor_map: true
+  reuse_constrained_prefix: true
+
+receiver_interface:
+  entry_point: "f_0"
+  prompt_kind: "constant_opaque_entry_point_with_constrained_prefix"
+  prompt: "Define a Python function named f_0. The required function name is fixed and must be copied exactly. Infer its arguments and behavior only from the latent signal. Return only executable Python code. Do not include explanations, examples, tests, or Markdown fences. The latent signal is the only source of task content."
+  same_prompt_for_every_task: true
+  semantic_task_text_in_prompt: false
+  original_entry_point_in_prompt: false
+  minimum_tokens_after_entry_point: 32
+  intervention_suffix_tokens: 24
+  require_entry_point_outside_intervention_suffix: true
+
+decoding_interface:
+  mode: "forced_completion_prefix"
+  prefix: "def f_0"
+  same_prefix_for_every_task: true
+  semantic_task_text_in_prefix: false
+  original_entry_point_in_prefix: false
+  require_exact_output_start: true
+  argument_list_forced: false
+  body_tokens_forced: false
+
+conditions:
+  names: ["oracle_blend_matched", "oracle_blend_shuffled"]
+  screen_alphas: [0.25, 0.50, 0.75]
+  screen_generation_seed: 4127
+  confirmation_generation_seeds: [4241, 4357]
+  screen_expected_records: 192
+  confirmation_expected_records: 128
+  expected_records: 320
+  effective_generation_seed_salt: 15017
+
+packets:
+  offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  oracle_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  replay_mode: "blend"
+  blend_formula: "(1-alpha)*native_residual + alpha*oracle_packet"
+
+reused_anchors:
+  experiment_id: "LIP-EVAL-036"
+  generations_sha256: "bfef48894fd8f007abd3defdf546eaec10985e175871c7eeae477e2095416871"
+  generation_metadata_sha256: "bbc54e193938ee1733866d6451cefe9f8003de1e8d6c65a93cec0621fe9fc5b6"
+  control_summary_sha256: "336dbd99b588551ee56917216625dc5c0813e27c63e5692abb479da93cb5b600"
+  alpha_0_screen_seed_core_passes: 0
+  alpha_1_screen_seed_matched_core_passes: 23
+  alpha_1_screen_seed_shuffled_core_passes: 0
+  alpha_0_all_seed_core_passes: 1
+  alpha_1_all_seed_matched_core_passes: 69
+  alpha_1_all_seed_shuffled_core_passes: 0
+
+generation:
+  max_new_tokens: 256
+  do_sample: true
+  temperature: 0.2
+  top_p: 0.95
+  repetition_penalty: 1.0
+  resume_granularity: "one_atomic_jsonl_row"
+
+evaluation:
+  exact_metric: "functional_pass"
+  core_metric: "core_functional_pass"
+  alias_backoff_metric: "alias_functional_pass"
+  binding_gap_metric: "binding_gap"
+  cluster_unit: "task_id"
+  oracle_core_capacity_minimum: 0.75
+  oracle_shuffled_core_maximum: 0.10
+  forced_prefix_realization_minimum: 1.0
+  confidence: 0.95
+  bootstrap_iterations: 10000
+  statistics_seed: 4709
+  require_hardened_namespace: true
+  claim_eligible: false
+
+selection:
+  phase: "screen_seed_only"
+  objective: "maximum_matched_core_rate"
+  requires_specificity_gate: true
+  tie_break: "smallest_alpha"
+  confirmation_excludes_screen_seed: true
+
+decision:
+  confirmation_requires_screen_lock: true
+  screen_candidate:
+    route: "oracle_blend_screen_candidate_selected"
+    action: "authorize_locked_confirmation_on_two_unseen_generation_seeds"
+  screen_no_candidate:
+    route: "oracle_blend_screen_no_candidate"
+    action: "stop_and_revisit_packet_sites_or_dynamic_trajectory"
+  confirmation_passed:
+    route: "oracle_blend_capacity_restored_candidate"
+    action: "freeze_blend_operator_before_any_learned_mechanism_screen"
+  confirmation_failed:
+    route: "oracle_blend_candidate_does_not_replicate"
+    action: "reject_static_convex_blend_as_capacity_fix"
+  learned_execution_authorized: false
+  can_upgrade_EVAL_033: false
+  can_upgrade_EVAL_034: false
+  can_upgrade_EVAL_035: false
+  can_upgrade_EVAL_036: false
+  fresh_holdout_spend_authorized: false
+  proto_015_execution_authorized: false
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  screen_maximum_new_generation_cells: 192
+  confirmation_maximum_new_generation_cells: 128
+  maximum_new_generation_cells: 320
+
+output:
+  generations_jsonl: "runs/LIP-EVAL-037/generations.jsonl"
+  screen_evaluation_dir: "runs/LIP-EVAL-037/screen-evaluation"
+  confirmation_evaluation_dir: "runs/LIP-EVAL-037/confirmation-evaluation"

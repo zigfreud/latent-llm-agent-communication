@@ -139,6 +139,23 @@ def test_trajectory_capture_can_anchor_entry_then_add_to_live_state():
     assert outputs.logits[0, -1, 0].item() == 2400.0
 
 
+def test_trajectory_capture_blends_each_packet_with_live_incoming_state():
+    packets = {0: torch.tensor([[20.0]]), 1: torch.tensor([[40.0]])}
+    outputs, captured = forward_with_packet_trajectory_capture(
+        ToyModel(),
+        toy_inputs(),
+        layer_indices=[0, 1],
+        positions=torch.tensor([2]),
+        layer_packets=packets,
+        replay_mode="blend",
+        replay_alpha=0.25,
+    )
+    assert captured["residual_input"][0].tolist() == [[7.25]]
+    assert captured["incoming_before_replay"][1].tolist() == [[72.5]]
+    assert captured["residual_input"][1].tolist() == [[64.375]]
+    assert outputs.logits[0, -1, 0].item() == 643.75
+
+
 def test_trajectory_capture_rejects_incomplete_mapped_replay_mode():
     with pytest.raises(ValueError, match="cover exactly"):
         forward_with_packet_trajectory_capture(
@@ -158,7 +175,7 @@ def test_trajectory_capture_rejects_unknown_replay_mode():
             toy_inputs(),
             layer_indices=[0, 1],
             positions=torch.tensor([2]),
-            replay_mode="blend",
+            replay_mode="interpolate",
         )
 
 

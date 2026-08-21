@@ -45,6 +45,9 @@ from src.scripts.evaluate_constant_entry_point_screen import (
 from src.scripts.evaluate_constrained_prefix_receiver_screen import (
     evaluate as evaluate_constrained_prefix_receiver_screen,
 )
+from src.scripts.evaluate_oracle_native_packet_blend_screen import (
+    evaluate as evaluate_oracle_native_packet_blend_screen,
+)
 
 
 NOBODY_UID = 65534
@@ -130,6 +133,8 @@ def evaluator_for_config(config: dict[str, Any]):
         return evaluate_constant_entry_point_screen
     if config.get("experiment_id") == "LIP-EVAL-036":
         return evaluate_constrained_prefix_receiver_screen
+    if config.get("experiment_id") == "LIP-EVAL-037":
+        return evaluate_oracle_native_packet_blend_screen
     return evaluate_oracle_packet_semantics
 
 

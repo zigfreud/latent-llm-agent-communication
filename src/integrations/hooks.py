@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 from typing import Any, Callable, Tuple
 import torch
 
@@ -68,11 +69,21 @@ def make_lip_packet_hook(
     positions: torch.Tensor,
     enable: bool = True,
     mode: str = "replace",
+    blend_alpha: float | None = None,
 ) -> Callable[[Any, Tuple[Any, ...], Any], Any]:
     """Inject a position-aligned packet once during the first forward pass."""
 
-    if mode not in {"add", "replace"}:
-        raise ValueError("injection mode must be add or replace")
+    if mode not in {"add", "replace", "blend"}:
+        raise ValueError("injection mode must be add, replace, or blend")
+    if mode == "blend":
+        if (
+            blend_alpha is None
+            or not math.isfinite(float(blend_alpha))
+            or not 0.0 <= float(blend_alpha) <= 1.0
+        ):
+            raise ValueError("blend mode requires blend_alpha in [0, 1]")
+    elif blend_alpha is not None:
+        raise ValueError("blend_alpha is valid only for blend mode")
     if not isinstance(vectors, torch.Tensor) or vectors.ndim != 2:
         raise ValueError("packet vectors must have shape (positions, hidden_width)")
     if not isinstance(positions, torch.Tensor) or positions.ndim != 1:
@@ -103,6 +114,11 @@ def make_lip_packet_hook(
             hidden = hidden.clone()
             if mode == "add":
                 hidden[0, selected, :] = hidden[0, selected, :] + injected
+            elif mode == "blend":
+                alpha = float(blend_alpha)
+                hidden[0, selected, :] = (
+                    (1.0 - alpha) * hidden[0, selected, :] + alpha * injected
+                )
             else:
                 hidden[0, selected, :] = injected
         did["flag"] = True
@@ -118,11 +134,21 @@ def make_lip_packet_pre_hook(
     positions: torch.Tensor,
     enable: bool = True,
     mode: str = "replace",
+    blend_alpha: float | None = None,
 ) -> Callable[[Any, Tuple[Any, ...]], Tuple[Any, ...] | None]:
     """Inject a position-aligned packet into one block input exactly once."""
 
-    if mode not in {"add", "replace"}:
-        raise ValueError("injection mode must be add or replace")
+    if mode not in {"add", "replace", "blend"}:
+        raise ValueError("injection mode must be add, replace, or blend")
+    if mode == "blend":
+        if (
+            blend_alpha is None
+            or not math.isfinite(float(blend_alpha))
+            or not 0.0 <= float(blend_alpha) <= 1.0
+        ):
+            raise ValueError("blend mode requires blend_alpha in [0, 1]")
+    elif blend_alpha is not None:
+        raise ValueError("blend_alpha is valid only for blend mode")
     if not isinstance(vectors, torch.Tensor) or vectors.ndim != 2:
         raise ValueError("packet vectors must have shape (positions, hidden_width)")
     if not isinstance(positions, torch.Tensor) or positions.ndim != 1:
@@ -156,6 +182,11 @@ def make_lip_packet_pre_hook(
         hidden = hidden.clone()
         if mode == "add":
             hidden[0, selected, :] = hidden[0, selected, :] + injected
+        elif mode == "blend":
+            alpha = float(blend_alpha)
+            hidden[0, selected, :] = (
+                (1.0 - alpha) * hidden[0, selected, :] + alpha * injected
+            )
         else:
             hidden[0, selected, :] = injected
         did["flag"] = True
