@@ -1,0 +1,180 @@
+experiment_id: "LIP-H0-017"
+protocol_version: "lip-closed-loop-trajectory-corrector-v1"
+claim_status: "development_only_operator_feasibility"
+
+predecessors:
+  learned_system:
+    experiment_id: "LIP-H0-016"
+    registry: "experiments/registry/LIP-H0-016_hard_negative_replication.json"
+    registry_sha256: "336ea451e6714903bd1f20db08fd6d18853774fa2ec6cd983e0eb4f92f90451a"
+    conclusion: "unrolled layer-0 initial-condition identity geometry replicated at the preregistered threshold but did not establish functional transport"
+  functional_mechanism:
+    experiment_id: "LIP-EVAL-037"
+    registry: "experiments/registry/LIP-EVAL-037_oracle_native_packet_blend_screen.json"
+    registry_sha256: "607cb6c13758e536cfc19103abe0698461d20c8edd96d34c921c51ff016d0953"
+    required_route: "oracle_blend_screen_no_candidate"
+    conclusion: "a static scalar native-to-packet blend did not restore the frozen receiver-capacity gate"
+  source_encoder_checkpoint:
+    experiment_id: "LIP-H0-015"
+    registry: "experiments/registry/LIP-H0-015_hard_negative_batches.json"
+    registry_sha256: "d84e46239bdc132c9e55302127e765b8002252585839d87ee2bfeb53bff43c7b"
+    seed: 4007
+    drive_path: "lip-artifacts/LIP-H0-015/screen-v1/best_checkpoint.pt"
+    sha256: "f5a6435dee9df6a16204be8b6c00dc3e2438222ee99dcc30018c9f822fbeb405"
+
+parent:
+  experiment_id: "LIP-PROTO-014"
+  config: "config/LIP-PROTO-014_source_conditioned_residual_packet.yaml"
+  config_sha256: "3a1b0ebf445ba21729ed2f9bb08e0208a8afed97f7ea7825010e85e94298c03f"
+
+hypothesis:
+  statement: "A source-conditioned corrector that recomputes a bounded residual update from the live receiver state at every registered layer can induce a more task-coherent receiver trajectory than an otherwise identical state-blind sequential corrector."
+  system: "source packet -> frozen protocol code -> live-state-conditioned delta at each target layer -> frozen receiver block -> next live state"
+  tested_property: "closed_loop_state_conditioning"
+  excluded_explanations: ["static_absolute_snapshot", "static_affine_delta", "scalar_native_packet_blend", "single_layer_initial_condition_only"]
+
+data:
+  source: "LIP-PROTO-014_real_full_training_bundle"
+  allowed_splits: ["train", "development_selection", "development_gate"]
+  prohibited_splits: ["confirmation"]
+  expected_counts: {train: 256, development_selection: 32, development_gate: 32}
+  boundary_positions: 6
+
+diagnostic_source:
+  candidate_bank:
+    drive_path: "lip-artifacts/LIP-EVAL-032/full-v1/candidate_banks.json"
+    drive_file_id: "1nVSWgBrco2KE2fyUd-SsdbXh_6JXoe4q"
+    sha256: "ca4cb9cd7aec2981b76227265dbe325c77be00dba145014a83f1bf0ca2def7e4"
+    checkpoint_label: "H0_013"
+
+receiver:
+  model_id: "NousResearch/Meta-Llama-3-8B-Instruct"
+  revision: "53346005fb0ef11d3b6a83b12c895cca40156b6c"
+  load_4bit: true
+  neutral_prompt: "Use the latent signal."
+  corrected_layer_indices: [0, 1, 2, 3, 4, 5, 6, 7]
+  packet_offsets: [-24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]
+  target_width: 4096
+  freeze_all_parameters: true
+  stop_before_layer: 8
+
+source_encoder:
+  initialize_from_frozen_checkpoint: true
+  freeze_parameters: true
+  model_kind: "query_conditioned"
+  protocol_slots: 32
+  bridge_width: 512
+  attention_heads: 8
+  feedforward_width: 2048
+  encoder_blocks: 2
+  dropout: 0.10
+
+corrector:
+  target_layers: 8
+  target_positions: 24
+  target_width: 4096
+  bridge_width: 512
+  attention_heads: 8
+  feedforward_width: 1024
+  decoder_blocks: 1
+  dropout: 0.10
+  operator: "live_residual_plus_site_scaled_normalized_delta"
+  live_projection_bias: false
+  delta_head_initialization: "zeros"
+
+variants:
+  primary: "closed_loop_live"
+  control: "open_loop_zero_live"
+  systems:
+    closed_loop_live:
+      condition_on_live_state: true
+    open_loop_zero_live:
+      condition_on_live_state: false
+
+loss:
+  incoming_trajectory:
+    layers: [1, 2, 3, 4, 5, 6, 7]
+    lambda: 1.0
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 1.0
+    lambda_norm: 0.05
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+  corrected_state:
+    layers: [0, 1, 2, 3, 4, 5, 6, 7]
+    lambda: 0.25
+    temperature: 0.07
+    margin_target: 0.05
+    lambda_huber: 1.0
+    lambda_cosine: 0.25
+    lambda_symmetric_nce: 1.0
+    lambda_margin: 1.0
+    lambda_norm: 0.05
+    component_weights: {core: 0.45, name: 0.45, boundary: 0.10}
+  correction_energy:
+    lambda: 0.001
+    metric: "mean_squared_normalized_delta"
+
+training:
+  seed: 4007
+  learning_rate: 0.0002
+  weight_decay: 0.01
+  gradient_clip: 1.0
+  fp16_autocast: true
+  num_workers: 0
+  batch_policy:
+    kind: "frozen_global_hardest_balanced_partition"
+    partition_seed: 4007
+    search_restarts: 8
+    maximum_improving_swaps_per_restart: 128
+    expected_global_hardest_covered_anchors: 224
+    expected_global_hardest_coverage: 0.875
+    one_exposure_per_task_per_epoch: true
+    freeze_partition_across_epochs: true
+  pilot:
+    variant: "closed_loop_live"
+    batch_size: 4
+    max_updates: 4
+    validation_interval: 2
+    output_dir: "runs/LIP-H0-017/pilot-v1"
+  paired_screen:
+    variants: ["open_loop_zero_live", "closed_loop_live"]
+    batch_size: 16
+    max_updates: 128
+    validation_interval: 8
+    use_frozen_H0_015_hard_negative_partition: true
+    output_dir: "runs/LIP-H0-017/screen-v1"
+
+pilot_gate:
+  required_updates: 4
+  require_finite_loss: true
+  require_nonzero_corrector_gradient_each_update: true
+  require_frozen_source_encoder: true
+  require_frozen_receiver: true
+  maximum_amp_overflow_events: 2
+  maximum_peak_allocated_vram_bytes: 22500000000
+  pass_action: "run_the_frozen_paired_state_blind_vs_state_conditioned_screen"
+  fail_action: "stop_and_revise_only_numeric_or_memory_settings"
+
+paired_screen_gate:
+  primary_metric: "development_gate_incoming_trajectory_normalized_residual_rmse"
+  minimum_relative_rmse_reduction_vs_state_blind: 0.10
+  require_core_retrieval_not_lower: true
+  require_mean_retrieval_not_lower: true
+  require_complete_joint_core_name_holm_family: true
+  pass_action: "design_LIP_EVAL_038_functional_closed_loop_screen_on_the_open_cohort"
+  fail_action: "reject_this_trained_closed_loop_operator_before_functional_generation"
+
+confirmation:
+  status: "prohibited_in_H0-017"
+  eval_038_execution_authorized: false
+  proto_015_status: "premature"
+
+compute:
+  preferred_accelerator: "L4"
+  allow_silent_fallback: false
+  receiver_forward_scope: "blocks_0_through_7_only"
+  source_encoder_and_receiver_frozen: true
