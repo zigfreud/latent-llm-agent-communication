@@ -1,0 +1,210 @@
+{
+  "experiment_id": "LIP-EVAL-037",
+  "protocol_version": "lip-oracle-native-packet-blend-screen-v1",
+  "claim_status": "development_only_oracle_blend_screen_failure_no_confirmation",
+  "run_commit": "76b81522edb53ce6d5659f5e1b74cf1cd65692eb",
+  "completed_date": "2026-08-21",
+  "artifacts": {
+    "drive_root": "lip-artifacts/LIP-EVAL-037/screen-v1",
+    "generations": {
+      "path": "generations.jsonl",
+      "sha256": "fb5fc6d0187b44c82948907a733f5b9a34b50a50a012b6598174234531d7675b",
+      "bytes": 668632
+    },
+    "generation_metadata": {
+      "path": "generations.metadata.json",
+      "sha256": "082ef590349caa77d5d9a90918f545a05ce6f68ff6abe5c57f73af2877389748",
+      "bytes": 5789
+    },
+    "screen_summary": {
+      "path": "screen-evaluation/summary.json",
+      "sha256": "a253c8cb8224377b360142dd8517435dc8c029d1578d992192f928a7710e42aa",
+      "bytes": 51800
+    },
+    "scored_generations": {
+      "path": "screen-evaluation/scored_generations.jsonl",
+      "sha256": "457f0d627929dc0b636cf22e642495df3fffb8665f45229a5b257e292c145d27",
+      "bytes": 840823
+    },
+    "sandbox_report": {
+      "path": "screen-evaluation/sandbox_report.json",
+      "sha256": "c481c955fefd72b9d53edea38b78c3bea7395df30f13d1615e21e35322782989",
+      "bytes": 1531
+    }
+  },
+  "provenance": {
+    "experiment_config_sha256": "b48f0238dcff434afe1349fed178fccffffb8362c36df0a6ee0272c9c9de610a",
+    "design_sha256": "0848ec3c6743a06b80c0405c7eef834a53a94aff83b678dc78197749bbe56a53",
+    "predecessor_registry_sha256": "e4923864b651233eeaeb500d11fa5839242617623bd2088a2d7fa3973565c95e",
+    "source_screen_config_sha256": "f417da2327e432b54a4beee78cc1ebf6a07d13602f0bf22baa0cd8548591ee54",
+    "source_screen_run_commit": "c9fd47dfb838d8e4ef7a07d26714a33cd9697de9",
+    "source_model_revision": "e5babb80b8539a4e85dd2418c0ee611522276987",
+    "target_model_revision": "53346005fb0ef11d3b6a83b12c895cca40156b6c",
+    "execution_commits": {
+      "initial_probe_generation_commit": "5817d17a028f2c2efe04fb2248b076df7d010b95",
+      "resumed_generation_and_evaluation_commit": "76b81522edb53ce6d5659f5e1b74cf1cd65692eb",
+      "rows_generated_before_evaluator_fix": 1,
+      "rows_generated_after_evaluator_fix": 191,
+      "generation_path_changed_between_commits": false,
+      "fix_scope": "partial-probe evaluator comparison layout and regression test only"
+    }
+  },
+  "execution": {
+    "accelerator": "NVIDIA L4",
+    "phase": "screen",
+    "record_count": 192,
+    "screen_expected_record_count": 192,
+    "full_expected_record_count": 320,
+    "missing_record_count": 128,
+    "task_count": 32,
+    "screen_generation_seed": 4127,
+    "screen_alphas": [0.25, 0.5, 0.75],
+    "canonical_entry_point": "f_0",
+    "forced_completion_prefix": "def f_0",
+    "forced_completion_prefix_token_ids": [755, 282, 62, 15],
+    "forced_completion_prefix_sha256": "cf63d4315c95b7acb636b2c402b90d9dcb52d0b4c8418dad4a51344c333e9397",
+    "forced_completion_prefix_token_ids_sha256": "23986f7c0cb621e3aec6b266eca7d75b3fab8f0e46376aab1c0c0c83a883bdbd",
+    "run_scope": "development_only_reused_open_P014_cohort",
+    "execution_mode": "functional_hardened_namespace",
+    "subprocess_is_security_sandbox": true,
+    "claim_eligible": false
+  },
+  "receiver_position_audit": {
+    "receiver_prompt_token_count": 96,
+    "entry_point_token_positions": [34, 35, 36],
+    "intervention_position_min": 72,
+    "intervention_position_max": 95,
+    "tokens_after_entry_point": 59,
+    "positionally_separated": true
+  },
+  "normalization": {
+    "already_exact": 191,
+    "syntax_invalid": 1
+  },
+  "outcomes": {
+    "alpha_0_25": {
+      "oracle_blend_matched": {
+        "records": 32,
+        "exact_functional_passes": 22,
+        "alias_functional_passes": 22,
+        "core_functional_passes": 22,
+        "binding_gap_passes": 0,
+        "forced_prefix_realized": 32
+      },
+      "oracle_blend_shuffled": {
+        "records": 32,
+        "exact_functional_passes": 0,
+        "alias_functional_passes": 0,
+        "core_functional_passes": 0,
+        "binding_gap_passes": 0,
+        "forced_prefix_realized": 32
+      }
+    },
+    "alpha_0_50": {
+      "oracle_blend_matched": {
+        "records": 32,
+        "exact_functional_passes": 23,
+        "alias_functional_passes": 23,
+        "core_functional_passes": 23,
+        "binding_gap_passes": 0,
+        "forced_prefix_realized": 32
+      },
+      "oracle_blend_shuffled": {
+        "records": 32,
+        "exact_functional_passes": 0,
+        "alias_functional_passes": 0,
+        "core_functional_passes": 0,
+        "binding_gap_passes": 0,
+        "forced_prefix_realized": 32
+      }
+    },
+    "alpha_0_75": {
+      "oracle_blend_matched": {
+        "records": 32,
+        "exact_functional_passes": 22,
+        "alias_functional_passes": 22,
+        "core_functional_passes": 22,
+        "binding_gap_passes": 0,
+        "forced_prefix_realized": 32
+      },
+      "oracle_blend_shuffled": {
+        "records": 32,
+        "exact_functional_passes": 0,
+        "alias_functional_passes": 0,
+        "core_functional_passes": 0,
+        "binding_gap_passes": 0,
+        "forced_prefix_realized": 32
+      }
+    }
+  },
+  "screen_gates": {
+    "alpha_0_25": {
+      "matched_core_rate": 0.6875,
+      "matched_core_minimum": 0.75,
+      "matched_core_passed": false,
+      "shortfall_passes": 2,
+      "shuffled_core_rate": 0.0,
+      "shuffled_core_maximum": 0.1,
+      "shuffled_core_passed": true,
+      "forced_prefix_realization_rate": 1.0,
+      "forced_prefix_passed": true,
+      "selection_eligible": false
+    },
+    "alpha_0_50": {
+      "matched_core_rate": 0.71875,
+      "matched_core_minimum": 0.75,
+      "matched_core_passed": false,
+      "shortfall_passes": 1,
+      "shuffled_core_rate": 0.0,
+      "shuffled_core_maximum": 0.1,
+      "shuffled_core_passed": true,
+      "forced_prefix_realization_rate": 1.0,
+      "forced_prefix_passed": true,
+      "selection_eligible": false
+    },
+    "alpha_0_75": {
+      "matched_core_rate": 0.6875,
+      "matched_core_minimum": 0.75,
+      "matched_core_passed": false,
+      "shortfall_passes": 2,
+      "shuffled_core_rate": 0.0,
+      "shuffled_core_maximum": 0.1,
+      "shuffled_core_passed": true,
+      "forced_prefix_realization_rate": 1.0,
+      "forced_prefix_passed": true,
+      "selection_eligible": false
+    }
+  },
+  "reused_screen_seed_anchors": {
+    "alpha_0_no_packet_core_passes": 0,
+    "alpha_1_matched_core_passes": 23,
+    "alpha_1_shuffled_core_passes": 0
+  },
+  "interpretation": {
+    "registered_result": "No interior alpha passed the frozen 75% matched-oracle capacity gate. The prespecified route is oracle_blend_screen_no_candidate.",
+    "specificity_preserved": "Every shuffled condition remained 0/32 while the matched conditions recovered 22/32, 23/32, and 22/32, so the signal remained task-specific under every tested blend.",
+    "blend_result": "The best interior point, alpha=0.50, tied the reused alpha=1 screen-seed anchor at 23/32 and remained one pass below the gate. Preserving a scalar fraction of native residual state did not restore capacity at the frozen sites.",
+    "timeline_boundary": "This rejects the tested static convex interpolation as the missing capacity fix. It does not reject a state-dependent trajectory bridge conditioned on the live receiver residual, layer, and position, nor does it identify packet-site mismatch versus update-law mismatch.",
+    "next_hypothesis": "Before learned-bridge training, freeze a development-only discriminator between packet-site mismatch and missing closed-loop trajectory evolution on the same open cohort.",
+    "causal_boundary": "Matched oracle strongly exceeds shuffled oracle, but the failed screen gate blocks confirmation and does not establish a learned bridge.",
+    "not_supported": "The result does not authorize confirmation, a learned phase, a fresh holdout, PROTO-015, or an upgrade of EVAL-033 through EVAL-036."
+  },
+  "decision": {
+    "diagnostic_route": "oracle_blend_screen_no_candidate",
+    "recommended_action": "revisit_packet_sites_or_design_dynamic_trajectory_discriminator",
+    "screen_passed": false,
+    "selected_alpha": null,
+    "confirmation_authorized_by_frozen_gate": false,
+    "confirmation_executed": false,
+    "learned_phase_authorized": false,
+    "learned_phase_executed": false,
+    "static_convex_blend_supported_as_capacity_fix": false,
+    "dynamic_trajectory_hypothesis_tested": false,
+    "proto_015_execution_authorized": false,
+    "fresh_holdout_spend_authorized": false,
+    "can_upgrade_EVAL_033": false,
+    "can_upgrade_EVAL_034": false,
+    "can_upgrade_EVAL_035": false,
+    "can_upgrade_EVAL_036": false
+  }
+}

@@ -7,6 +7,14 @@ on the already open P014 cohort. It follows the EVAL-036 oracle-capacity gate
 failure. It does not execute a learned bridge, spend a fresh holdout, authorize
 PROTO-015, or upgrade any previous result.
 
+Execution completed on 2026-08-21 and stopped after the 192-row screen. No
+tested alpha passed the frozen capacity gate: matched core was `22/32` at
+`alpha=0.25`, `23/32` at `alpha=0.50`, and `22/32` at `alpha=0.75`; all three
+shuffled conditions were `0/32`, and the constrained prefix realized in every
+row. The registered route is `oracle_blend_screen_no_candidate`. Confirmation
+was not authorized or executed. See
+`experiments/registry/LIP-EVAL-037_oracle_native_packet_blend_screen.md`.
+
 ## Question
 
 EVAL-036 forced the task-invariant prefix `def f_0` and eliminated the oracle
