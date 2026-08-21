@@ -76,6 +76,31 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _observed_layout(rows: Sequence[Mapping]) -> tuple[list[str], list[tuple[str, str]]]:
+    observed_conditions = [
+        condition
+        for condition in ORACLE_BLEND_CONDITIONS
+        if any(row.get("condition") == condition for row in rows)
+    ]
+    task_sets = {
+        condition: {
+            str(row.get("task_id"))
+            for row in rows
+            if row.get("condition") == condition
+        }
+        for condition in observed_conditions
+    }
+    matched, shuffled = ORACLE_BLEND_CONDITIONS
+    comparisons = (
+        [(matched, shuffled)]
+        if matched in task_sets
+        and shuffled in task_sets
+        and bool(task_sets[matched].intersection(task_sets[shuffled]))
+        else []
+    )
+    return observed_conditions, comparisons
+
+
 def validate_oracle_blend_grid(
     rows: Sequence[Mapping],
     metadata: Mapping,
@@ -387,12 +412,13 @@ def evaluate(
                 for row in scored
                 if row["phase"] == phase and float(row["blend_alpha"]) == alpha
             ]
+            observed_conditions, comparisons = _observed_layout(subset)
             metrics_by_alpha[f"{phase}:{alpha}"] = {
                 metric: summarize_metric(
                     subset,
                     metric,
-                    ORACLE_BLEND_CONDITIONS,
-                    [("oracle_blend_matched", "oracle_blend_shuffled")],
+                    observed_conditions,
+                    comparisons,
                     **statistics_kwargs,
                 )
                 for metric in (

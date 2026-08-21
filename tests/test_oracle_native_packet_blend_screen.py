@@ -20,6 +20,7 @@ from src.pipelines.oracle_native_packet_blend_screen import (
     validate_oracle_blend_runtime_contract,
 )
 from src.scripts.run_hardened_oracle_evaluation import evaluator_for_config
+from src.scripts.evaluate_oracle_native_packet_blend_screen import _observed_layout
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -213,3 +214,19 @@ def test_hardened_dispatch_selects_eval037_evaluator():
     assert evaluator.__module__ == (
         "src.scripts.evaluate_oracle_native_packet_blend_screen"
     )
+
+
+def test_partial_metric_layout_waits_for_a_paired_control():
+    matched_only = [{"task_id": "0", "condition": "oracle_blend_matched"}]
+    conditions, comparisons = _observed_layout(matched_only)
+    assert conditions == ["oracle_blend_matched"]
+    assert comparisons == []
+
+    paired = matched_only + [
+        {"task_id": "0", "condition": "oracle_blend_shuffled"}
+    ]
+    conditions, comparisons = _observed_layout(paired)
+    assert conditions == ["oracle_blend_matched", "oracle_blend_shuffled"]
+    assert comparisons == [
+        ("oracle_blend_matched", "oracle_blend_shuffled")
+    ]
