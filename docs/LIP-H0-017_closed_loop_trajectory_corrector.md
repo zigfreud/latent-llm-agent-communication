@@ -70,5 +70,12 @@ to the state-blind control, without lowering core or mean retrieval, and must
 pass the joint/core/name Holm family. A pass would authorize design—not
 execution—of EVAL-038 on the already open functional cohort.
 
+The paired decision is frozen separately in
+`config/LIP-H0-017_paired_screen_aggregation.yaml` before either 128-update
+cell is run. It uses task-level treatment-minus-control diagonal margins for
+joint, core, and name under one one-sided Holm family. This tests the causal
+value of observing the live receiver state, rather than merely asking whether
+the closed-loop cell has positive margins in isolation.
+
 H0-017 cannot upgrade EVAL-033 through EVAL-037, spend a fresh holdout, or
 authorize PROTO-015.

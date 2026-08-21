@@ -1,0 +1,66 @@
+experiment_id: "LIP-H0-017"
+aggregation_protocol_version: "lip-closed-loop-paired-screen-aggregation-v1"
+claim_status: "development_only_paired_state_conditioning_screen"
+
+source_experiment:
+  config: "config/LIP-H0-017_closed_loop_trajectory_corrector.yaml"
+  config_sha256: "c0df4a8db4c672a6bdd7437fe9fb0bc2c4a157a9d12914acb0d2b076872881ea"
+  protocol_version: "lip-closed-loop-trajectory-corrector-v1"
+
+pilot_authorization:
+  required_stage: "pilot"
+  required_variant: "closed_loop_live"
+  required_passed: true
+  run_commit: "5ccc26098ffa226a0969ed9efd82a6b6ecf890ac"
+  drive_file_id: "19pUee8c7zDYABmw8DepARvJuEIVLHsf9"
+
+paired_cells:
+  control: "open_loop_zero_live"
+  treatment: "closed_loop_live"
+  required_stage: "paired_screen_cell"
+  seed: 4007
+  batch_size: 16
+  updates: 128
+  require_identical_run_commit: true
+  require_identical_training_batch_plan: true
+  require_identical_shared_provenance: true
+  shared_provenance_fields:
+    - "experiment_config_sha256"
+    - "parent_config_sha256"
+    - "learned_registry_sha256"
+    - "functional_registry_sha256"
+    - "source_registry_sha256"
+    - "bundle_manifest_sha256"
+    - "source_encoder_checkpoint_sha256"
+    - "candidate_bank_sha256"
+
+inference:
+  split: "development_gate"
+  task_count: 32
+  trajectory: "incoming_trajectory"
+  paired_margin_metric: "diagonal_margin"
+  regions: ["joint", "core", "name"]
+  treatment_minus_control: true
+  alternative: "greater"
+  alpha: 0.05
+  statistics_seed: 4481
+  monte_carlo_samples: 100000
+  bootstrap_iterations: 10000
+  confidence: 0.95
+  multiplicity: "one_Holm_family_across_joint_core_name"
+
+gate:
+  primary_metric: "development_gate_incoming_trajectory_normalized_residual_rmse"
+  minimum_relative_rmse_reduction_vs_control: 0.10
+  require_core_retrieval_not_lower: true
+  require_mean_retrieval_not_lower: true
+  require_all_Holm_adjusted_margin_tests: true
+  numeric_tolerance: 1.0e-12
+  pass_action: "authorize_design_only_of_LIP_EVAL_038"
+  fail_action: "reject_H0_017_closed_loop_operator_before_functional_generation"
+
+decision_boundary:
+  eval_038_execution_authorized: false
+  functional_transport_supported: false
+  confirmation_used: false
+  proto_015_status: "premature"
