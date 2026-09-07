@@ -187,6 +187,22 @@ def _validate_cell(
     ):
         raise ValueError(f"paired cell identity differs for {variant}")
     training = summary.get("training", {})
+    initialization = training.get("initialization")
+    if not isinstance(initialization, Mapping) or (
+        initialization.get("policy") != "lip-h0-017-shared-seeded-initialization-v1"
+        or initialization.get("seed") != paired["seed"]
+        or initialization.get("experiment_config_sha256")
+        != aggregation["source_experiment"]["config_sha256"]
+        or initialization.get("source_encoder_checkpoint_sha256")
+        != summary.get("provenance", {}).get("source_encoder_checkpoint_sha256")
+    ):
+        raise ValueError(f"paired initialization provenance missing or invalid for {variant}")
+    for key in ("corrector_state_sha256", "checkpoint_sha256"):
+        value = initialization.get(key, "")
+        if not isinstance(value, str) or len(value) != 64 or any(
+            char not in "0123456789abcdef" for char in value
+        ):
+            raise ValueError(f"paired initialization checksum invalid for {variant}")
     stage = training.get("resolved_stage", {})
     if (
         int(training.get("updates_completed", -1)),
@@ -310,6 +326,8 @@ def aggregate_closed_loop_screen(
     paired = aggregation["paired_cells"]
     _validate_cell(aggregation, control, variant=paired["control"])
     _validate_cell(aggregation, treatment, variant=paired["treatment"])
+    if control["training"]["initialization"] != treatment["training"]["initialization"]:
+        raise ValueError("paired initial corrector weights or checkpoint differ")
     if control.get("run_commit") != treatment.get("run_commit"):
         raise ValueError("paired cells were not executed from one code commit")
     if control["training"].get("batch_policy") != treatment["training"].get(
@@ -377,6 +395,7 @@ def aggregate_closed_loop_screen(
             "experiment_config_sha256": _lf_sha256_file(experiment_path),
             "pilot_run_commit": pilot["run_commit"],
             "paired_run_commit": treatment["run_commit"],
+            "paired_initialization": treatment["training"]["initialization"],
             "shared_cell_provenance": {
                 field: treatment["provenance"][field]
                 for field in paired["shared_provenance_fields"]

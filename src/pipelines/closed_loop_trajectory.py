@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import hashlib
 import json
 import math
 import subprocess
@@ -224,6 +225,8 @@ def build_closed_loop_bridge(
     source_checkpoint_path: Path,
     variant_name: str,
 ) -> ClosedLoopTrajectoryBridge:
+    # Seed before ANY randomly initialized bridge parameters are constructed.
+    torch.manual_seed(int(experiment["training"]["seed"]))
     expected = experiment["predecessors"]["source_encoder_checkpoint"]["sha256"]
     if not source_checkpoint_path.is_file():
         raise FileNotFoundError(source_checkpoint_path)
@@ -263,6 +266,51 @@ def build_closed_loop_bridge(
     bridge = ClosedLoopTrajectoryBridge(encoder, corrector)
     bridge.freeze_encoder()
     return bridge
+
+
+def corrector_state_sha256(state: Mapping) -> str:
+    """Hash tensor contents, independent of torch.save container metadata."""
+    digest = hashlib.sha256()
+    for name, tensor in sorted(state.items()):
+        value = tensor.detach().cpu().contiguous()
+        header = json.dumps([name, str(value.dtype), list(value.shape)])
+        digest.update(header.encode("utf-8") + b"\0")
+        digest.update(value.reshape(-1).view(torch.uint8).numpy().tobytes())
+    return digest.hexdigest()
+
+
+def prepare_paired_initialization(
+    corrector: ReceiverStateCorrector,
+    path: Path,
+    *,
+    seed: int,
+    experiment_config_sha256: str,
+    source_encoder_checkpoint_sha256: str,
+) -> dict:
+    """Load the same verified initial weights in both arms; never overwrite."""
+    state = {name: value.detach().cpu().clone()
+             for name, value in corrector.state_dict().items()}
+    metadata = {
+        "policy": "lip-h0-017-shared-seeded-initialization-v1",
+        "seed": int(seed),
+        "experiment_config_sha256": experiment_config_sha256,
+        "source_encoder_checkpoint_sha256": source_encoder_checkpoint_sha256,
+        "corrector_state_sha256": corrector_state_sha256(state),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        # Exclusive creation also makes an interrupted write fail closed on reuse.
+        with path.open("xb") as handle:
+            torch.save({"metadata": metadata, "corrector_state": state}, handle)
+    saved = torch.load(path, map_location="cpu", weights_only=True)
+    if saved["metadata"] != metadata:
+        raise ValueError("shared initialization metadata or seeded weights differ")
+    if corrector_state_sha256(saved["corrector_state"]) != metadata["corrector_state_sha256"]:
+        raise ValueError("shared initialization tensor checksum differs")
+    corrector.load_state_dict(saved["corrector_state"], strict=True)
+    if corrector_state_sha256(corrector.state_dict()) != metadata["corrector_state_sha256"]:
+        raise ValueError("loaded initial corrector weights differ")
+    return {**metadata, "checkpoint_sha256": sha256_file(path)}
 
 
 def _hard_negative_loader(
@@ -432,6 +480,7 @@ def run_closed_loop_training(
         raise ValueError("pilot variant differs from the frozen contract")
     if not pilot and variant_name not in stage["variants"]:
         raise ValueError("screen variant differs from the frozen contract")
+    stage["variant"] = variant_name
     if target_device != "cuda":
         raise RuntimeError("H0-017 training requires target_device=cuda")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -483,6 +532,16 @@ def run_closed_loop_training(
         variant_name=variant_name,
     ).to(device)
     bridge.freeze_encoder()
+    initialization = None
+    if not pilot:
+        initialization = prepare_paired_initialization(
+            bridge.corrector,
+            output_dir.parent / "paired_initialization.pt",
+            seed=int(experiment["training"]["seed"]),
+            experiment_config_sha256=_lf_sha256_file(experiment_path),
+            source_encoder_checkpoint_sha256=sha256_file(source_checkpoint_path),
+        )
+        _atomic_json(output_dir / "initialization.json", initialization)
     optimizer = torch.optim.AdamW(
         bridge.corrector.parameters(),
         lr=float(experiment["training"]["learning_rate"]),
@@ -757,6 +816,7 @@ def run_closed_loop_training(
         },
         "bundle_validation": validation,
         "training": {
+            "initialization": initialization,
             "updates_completed": step,
             "best_step": best_step,
             "best_selection_key": list(best_key),

@@ -70,6 +70,14 @@ def _cell(variant: str, *, rmse: float, margin: float, core_retrieval: float = 0
         "pilot_gate": None,
         "provenance": provenance,
         "training": {
+            "initialization": {
+                "policy": "lip-h0-017-shared-seeded-initialization-v1",
+                "seed": 4007,
+                "experiment_config_sha256": provenance["experiment_config_sha256"],
+                "source_encoder_checkpoint_sha256": provenance["source_encoder_checkpoint_sha256"],
+                "corrector_state_sha256": "8" * 64,
+                "checkpoint_sha256": "9" * 64,
+            },
             "updates_completed": 128,
             "batch_size": 16,
             "best_step": 120,
@@ -158,3 +166,17 @@ def test_paired_screen_rejects_batch_plan_or_task_identity_drift():
     ]["tasks"][0]["task_id"] = "different"
     with pytest.raises(ValueError, match="task identities differ"):
         _aggregate(control, drifted_tasks)
+
+
+def test_paired_screen_rejects_unproven_or_different_initialization():
+    control = _cell("open_loop_zero_live", rmse=1.0, margin=0.0)
+    treatment = _cell("closed_loop_live", rmse=0.8, margin=0.2)
+    missing = deepcopy(treatment)
+    del missing["training"]["initialization"]
+    with pytest.raises(ValueError, match="initialization provenance"):
+        _aggregate(control, missing)
+    for key in ("corrector_state_sha256", "checkpoint_sha256"):
+        changed = deepcopy(treatment)
+        changed["training"]["initialization"][key] = "b" * 64
+        with pytest.raises(ValueError, match="initial corrector weights"):
+            _aggregate(control, changed)

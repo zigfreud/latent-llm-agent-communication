@@ -2,11 +2,19 @@ from pathlib import Path
 from copy import deepcopy
 
 import torch
+import pytest
 
 from src.core.closed_loop_trajectory import ReceiverStateCorrector
 from src.core.receiver_closed_loop import evolve_receiver_with_closed_loop_corrector
 from src.pipelines.oracle_experiment import load_yaml
 from src.pipelines.closed_loop_trajectory import validate_closed_loop_contract
+from src.pipelines.closed_loop_trajectory import (
+    _build_source_encoder,
+    build_closed_loop_bridge,
+    corrector_state_sha256,
+    prepare_paired_initialization,
+)
+from src.core.packet_bundle import sha256_file
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -144,3 +152,57 @@ def test_h0_017_contract_rejects_a_state_aware_control():
         assert "control system" in str(exc)
     else:
         raise AssertionError("state-aware control drift should be rejected")
+
+
+def test_real_bridge_builder_pairs_initial_weights_before_training(tmp_path):
+    experiment = deepcopy(load_yaml(EXPERIMENT))
+    experiment["source_encoder"].update(
+        protocol_slots=3, bridge_width=4, attention_heads=2,
+        feedforward_width=8, encoder_blocks=1,
+    )
+    experiment["corrector"].update(
+        target_layers=2, target_positions=3, target_width=4,
+        bridge_width=4, attention_heads=2, feedforward_width=8,
+    )
+    shape = (2, 3, 4)
+    encoder = _build_source_encoder(experiment, shape)
+    source_path = tmp_path / "source.pt"
+    torch.save({"source_shape": shape, "model_state": {
+        "encoder." + name: tensor for name, tensor in encoder.state_dict().items()
+    }}, source_path)
+    experiment["predecessors"]["source_encoder_checkpoint"]["sha256"] = sha256_file(source_path)
+
+    def build(variant, unrelated_seed):
+        torch.manual_seed(unrelated_seed)
+        torch.randn(137)
+        return build_closed_loop_bridge(
+            experiment, source_shape=shape,
+            source_checkpoint_path=source_path, variant_name=variant,
+        )
+
+    control = build("open_loop_zero_live", 19)
+    treatment = build("closed_loop_live", 97)
+    assert control.corrector.condition_on_live_state is False
+    assert treatment.corrector.condition_on_live_state is True
+    for name, tensor in control.corrector.state_dict().items():
+        assert torch.equal(tensor, treatment.corrector.state_dict()[name]), name
+    shared_path = tmp_path / "paired_initialization.pt"
+    kwargs = dict(seed=4007, experiment_config_sha256="a" * 64,
+                  source_encoder_checkpoint_sha256=sha256_file(source_path))
+    first = prepare_paired_initialization(control.corrector, shared_path, **kwargs)
+    original_bytes = shared_path.read_bytes()
+    second = prepare_paired_initialization(treatment.corrector, shared_path, **kwargs)
+    assert first == second
+    assert shared_path.read_bytes() == original_bytes
+    experiment["training"]["seed"] = 4008
+    different = build("closed_loop_live", 97)
+    assert corrector_state_sha256(different.corrector.state_dict()) != first["corrector_state_sha256"]
+    with pytest.raises(ValueError, match="seeded weights differ"):
+        prepare_paired_initialization(different.corrector, shared_path, **kwargs)
+    assert shared_path.read_bytes() == original_bytes
+
+    corrupt = torch.load(shared_path, weights_only=True)
+    corrupt["corrector_state"]["delta_head.bias"][0] = 1.0
+    torch.save(corrupt, shared_path)
+    with pytest.raises(ValueError, match="tensor checksum differs"):
+        prepare_paired_initialization(treatment.corrector, shared_path, **kwargs)
