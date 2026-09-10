@@ -8,6 +8,9 @@ import json
 import math
 import subprocess
 import time
+from src.pipelines.closed_loop_duration import (
+    validate_duration_policy, evaluation_splits, evaluate_gate, save_duration_budget,
+)
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -461,6 +464,7 @@ def run_closed_loop_training(
     candidate_bank_path: Path | None = None,
     target_device: str = "cuda",
     colab_compute_units_before: float | None = None,
+    duration_policy_path: Path | None = None,
 ) -> dict:
     experiment = load_yaml(experiment_path)
     parent = load_yaml(parent_path)
@@ -481,6 +485,15 @@ def run_closed_loop_training(
     if not pilot and variant_name not in stage["variants"]:
         raise ValueError("screen variant differs from the frozen contract")
     stage["variant"] = variant_name
+    duration = None
+    if duration_policy_path is not None:
+        duration = load_json_object(duration_policy_path)
+        validate_duration_policy(duration, base_sha256=_lf_sha256_file(experiment_path), pilot=pilot)
+        stage.update(max_updates=duration['primary_budget'], validation_interval=duration['validation_interval'])
+        stage['diagnostic_id'] = duration['diagnostic_id']
+        stage['output_dir'] = str(output_dir)
+        if output_dir.exists() and any(output_dir.iterdir()):
+            raise FileExistsError('duration diagnostic requires an empty arm directory')
     if target_device != "cuda":
         raise RuntimeError("H0-017 training requires target_device=cuda")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -499,7 +512,7 @@ def run_closed_loop_training(
     records = load_packet_records(bundle_dir)
     by_split = {
         split: [record for record in records if record["split"] == split]
-        for split in ("train", "development_selection", "development_gate")
+        for split in ('train', *evaluation_splits(duration))
     }
     scaffold, site_scale = compute_target_packet_statistics(by_split["train"])
     statistics_path = output_dir / "target_statistics.pt"
@@ -587,6 +600,7 @@ def run_closed_loop_training(
     boundary_positions = int(experiment["data"]["boundary_positions"])
     gradient_clip = float(experiment["training"]["gradient_clip"])
     history = []
+    duration_budgets = []
     amp_overflow_events = []
     best_key = None
     best_step = None
@@ -718,6 +732,12 @@ def run_closed_loop_training(
                         best_path,
                     )
                 _atomic_json(output_dir / "train_history.json", history)
+                if duration and step in duration['budgets']:
+                    duration_budgets.append(save_duration_budget(
+                        output_dir=output_dir, corrector=bridge.corrector, step=step,
+                        selection=selection, best_path=best_path, best_step=best_step,
+                    ))
+                    _atomic_json(output_dir / 'duration_budgets.json', duration_budgets)
                 print(
                     json.dumps(
                         {
@@ -738,10 +758,10 @@ def run_closed_loop_training(
 
     checkpoint = torch.load(best_path, map_location=device, weights_only=True)
     bridge.corrector.load_state_dict(checkpoint["corrector_state"])
-    gate_metrics = _evaluate(
-        bridge,
-        receiver,
-        datasets["development_gate"],
+    gate_metrics = evaluate_gate(
+        lambda dataset, **kwargs: _evaluate(bridge, receiver, dataset, **kwargs),
+        duration=duration,
+        datasets=datasets,
         receiver_inputs=receiver_inputs,
         positions=positions,
         scaffold=scaffold,
@@ -792,8 +812,15 @@ def run_closed_loop_training(
     result = {
         "experiment_id": "LIP-H0-017",
         "protocol_version": CLOSED_LOOP_PROTOCOL_VERSION,
-        "claim_status": experiment["claim_status"],
-        "stage": "pilot" if pilot else "paired_screen_cell",
+        "claim_status": duration['claim_status'] if duration else experiment["claim_status"],
+        "stage": 'duration_diagnostic_cell' if duration else ("pilot" if pilot else "paired_screen_cell"),
+        "duration_diagnostic": ({'policy': duration,
+            'policy_sha256': _lf_sha256_file(duration_policy_path),
+            'budgets': duration_budgets, 'development_gate_evaluated': False,
+            'confirmation_evaluated': False, 'functional_execution_authorized': False,
+            'source_encoder_frozen': all(not p.requires_grad for p in bridge.encoder.parameters()),
+            'receiver_frozen': all(not p.requires_grad for p in receiver.parameters()),
+        } if duration else None),
         "variant": variant_name,
         "seed": seed,
         "run_commit": _git_head(),

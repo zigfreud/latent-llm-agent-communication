@@ -53,6 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--target-device", default="cuda")
     parser.add_argument("--colab-compute-units-before", type=float)
     parser.add_argument("--dry-run-contract", action="store_true")
+    parser.add_argument('--duration-policy', type=Path)
     return parser
 
 
@@ -70,6 +71,11 @@ def main() -> None:
         source_registry_path=args.source_registry,
     )
     if args.dry_run_contract:
+        if args.duration_policy:
+            from src.pipelines.closed_loop_duration import validate_duration_policy
+            from src.pipelines.receiver_aware_replay import _lf_sha256_file
+            validate_duration_policy(json.loads(args.duration_policy.read_text()),
+                base_sha256=_lf_sha256_file(args.experiment_config), pilot=args.pilot)
         print("LIP-H0-017 contract validated")
         return
     required = {
@@ -94,6 +100,7 @@ def main() -> None:
         pilot=bool(args.pilot),
         target_device=str(args.target_device),
         colab_compute_units_before=args.colab_compute_units_before,
+        duration_policy_path=args.duration_policy,
     )
     print(
         json.dumps(
