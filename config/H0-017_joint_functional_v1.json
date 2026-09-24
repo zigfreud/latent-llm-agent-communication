@@ -1,0 +1,20 @@
+{
+  "experiment_id": "H0-017-joint-functional-v1",
+  "claim_status": "exploratory_development_functional_diagnostic",
+  "authorization": "User authorized testing responses on 2026-09-24 under joint-unit premise; separate from failed historical H0-017 gate.",
+  "split": "development_selection",
+  "task_ids": ["516", "517", "551", "576", "588", "546", "556", "592", "540", "580", "531", "584", "582", "599", "552", "513", "519", "585", "544", "591", "548", "563", "555", "586", "524", "528", "545", "558", "573", "534", "539", "600"],
+  "checkpoints": {"regional": 384, "joint_only": 304},
+  "checkpoint_sha256": {"regional": "9f56bf73fed742d0dc7fa132d008f4c7ce851bb1549919a7c9e4d4b466a9ea24", "joint_only": "86baca1b92cf6127605e62dd445c13726cde88f1723e04914dccbe442e82e311"},
+  "conditions": ["regional_matched", "regional_shuffled", "joint_only_matched", "joint_only_shuffled", "oracle_matched", "oracle_shuffled", "text", "no_message"],
+  "bundle_manifest_sha256": "ad501e9537283b26f3b889ed7f355f69b47dd2e7967e6a92554a70ca5a7a3744",
+  "generation": {"max_new_tokens": 256, "do_sample": false, "repetition_penalty": 1.0, "use_cache": true, "num_beams": 1},
+  "seed": 4513,
+  "shuffle": "seeded_single_cycle_derangement",
+  "primary_metric": "all_original_tests_pass_without_name_repair",
+  "secondary_metric": "single_function_alias_tests_pass",
+  "interface": "unchanged_training_neutral_prompt_no_forced_prefix_full_joint_packet",
+  "training_allowed": false,
+  "confirmation_allowed": false,
+  "timing_scope": "cached_source_packet_encode_plus_receiver_generation_excludes_source_model_and_model_loading"
+}
