@@ -150,6 +150,7 @@ class ComponentAwarePacketLoss(nn.Module):
         lambda_norm: float = 0.05,
         component_weights: Mapping[str, float] | None = None,
         margin_region_weights: Mapping[str, float] | None = None,
+        identity_regions: tuple[str, ...] | list[str] | None = None,
         eps: float = 1e-8,
     ) -> None:
         super().__init__()
@@ -161,6 +162,10 @@ class ComponentAwarePacketLoss(nn.Module):
         self.lambda_margin = float(lambda_margin)
         self.lambda_norm = float(lambda_norm)
         self.eps = float(eps)
+        self.identity_regions = tuple(CONTRASTIVE_REGIONS if identity_regions is None else identity_regions)
+        if (not self.identity_regions or len(set(self.identity_regions)) != len(self.identity_regions)
+                or not set(self.identity_regions).issubset(CONTRASTIVE_REGIONS)):
+            raise ValueError("identity_regions must be a non-empty unique subset of joint, core, name")
         if self.temperature <= 0.0:
             raise ValueError("temperature must be positive")
         if self.margin_target < 0.0:
@@ -197,12 +202,12 @@ class ComponentAwarePacketLoss(nn.Module):
             raise ValueError("margin_region_weights must define joint, core, and name")
         if any(float(value) < 0.0 for value in margin_weights.values()):
             raise ValueError("margin region weights must be non-negative")
-        margin_total = sum(float(value) for value in margin_weights.values())
+        margin_total = sum(float(margin_weights[name]) for name in self.identity_regions)
         if margin_total <= 0.0:
             raise ValueError("margin region weights must have positive total")
         self.margin_region_weights = {
             name: float(margin_weights[name]) / margin_total
-            for name in CONTRASTIVE_REGIONS
+            for name in self.identity_regions
         }
 
     def forward(
@@ -247,11 +252,11 @@ class ComponentAwarePacketLoss(nn.Module):
                 margin_target=self.margin_target,
             )
         symmetric_nce = sum(
-            region_metrics[name]["symmetric_nce"] for name in CONTRASTIVE_REGIONS
-        ) / len(CONTRASTIVE_REGIONS)
+            region_metrics[name]["symmetric_nce"] for name in self.identity_regions
+        ) / len(self.identity_regions)
         margin_loss = sum(
             self.margin_region_weights[name] * region_metrics[name]["margin_loss"]
-            for name in CONTRASTIVE_REGIONS
+            for name in self.identity_regions
         )
 
         norm_components = {}

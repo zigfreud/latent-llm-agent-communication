@@ -465,6 +465,8 @@ def run_closed_loop_training(
     target_device: str = "cuda",
     colab_compute_units_before: float | None = None,
     duration_policy_path: Path | None = None,
+    joint_policy_path: Path | None = None,
+    objective_arm: str | None = None,
 ) -> dict:
     experiment = load_yaml(experiment_path)
     parent = load_yaml(parent_path)
@@ -485,6 +487,13 @@ def run_closed_loop_training(
     if not pilot and variant_name not in stage["variants"]:
         raise ValueError("screen variant differs from the frozen contract")
     stage["variant"] = variant_name
+    from src.pipelines.joint_objective_ablation import (
+        validate_joint_policy, joint_loss_config, joint_checkpoint_selection_key,
+    )
+    if duration_policy_path and joint_policy_path:
+        raise ValueError('duration and joint policies are mutually exclusive')
+    if objective_arm is not None and joint_policy_path is None:
+        raise ValueError('objective arm requires the joint ablation policy')
     duration = None
     if duration_policy_path is not None:
         duration = load_json_object(duration_policy_path)
@@ -494,6 +503,16 @@ def run_closed_loop_training(
         stage['output_dir'] = str(output_dir)
         if output_dir.exists() and any(output_dir.iterdir()):
             raise FileExistsError('duration diagnostic requires an empty arm directory')
+    joint = None
+    if joint_policy_path is not None:
+        joint = load_json_object(joint_policy_path)
+        validate_joint_policy(joint, base_sha256=_lf_sha256_file(experiment_path),
+                              pilot=pilot, variant=variant_name, arm=objective_arm)
+        stage.update(max_updates=joint['primary_budget'], validation_interval=joint['validation_interval'],
+                     diagnostic_id=joint['diagnostic_id'], output_dir=str(output_dir), objective_arm=objective_arm)
+        if output_dir.exists() and any(output_dir.iterdir()):
+            raise FileExistsError('joint ablation requires an empty arm directory')
+    diagnostic = joint or duration
     if target_device != "cuda":
         raise RuntimeError("H0-017 training requires target_device=cuda")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -512,7 +531,7 @@ def run_closed_loop_training(
     records = load_packet_records(bundle_dir)
     by_split = {
         split: [record for record in records if record["split"] == split]
-        for split in ('train', *evaluation_splits(duration))
+        for split in ('train', *evaluation_splits(diagnostic))
     }
     scaffold, site_scale = compute_target_packet_statistics(by_split["train"])
     statistics_path = output_dir / "target_statistics.pt"
@@ -562,6 +581,9 @@ def run_closed_loop_training(
     )
     incoming_loss_config = experiment["loss"]["incoming_trajectory"]
     corrected_loss_config = experiment["loss"]["corrected_state"]
+    if joint:
+        incoming_loss_config = joint_loss_config(incoming_loss_config, objective_arm)
+        corrected_loss_config = joint_loss_config(corrected_loss_config, objective_arm)
     incoming_criterion = build_packet_loss(incoming_loss_config)
     corrected_criterion = build_packet_loss(corrected_loss_config)
     lambda_incoming = float(incoming_loss_config["lambda"])
@@ -710,7 +732,7 @@ def run_closed_loop_training(
                     boundary_positions=boundary_positions,
                 )
                 row["development_selection"] = selection
-                key = checkpoint_selection_key(
+                key = (joint_checkpoint_selection_key if joint else checkpoint_selection_key)(
                     selection["incoming_trajectory"], step=step
                 )
                 if best_key is None or key > best_key:
@@ -732,12 +754,12 @@ def run_closed_loop_training(
                         best_path,
                     )
                 _atomic_json(output_dir / "train_history.json", history)
-                if duration and step in duration['budgets']:
+                if diagnostic and step in diagnostic['budgets']:
                     duration_budgets.append(save_duration_budget(
                         output_dir=output_dir, corrector=bridge.corrector, step=step,
                         selection=selection, best_path=best_path, best_step=best_step,
                     ))
-                    _atomic_json(output_dir / 'duration_budgets.json', duration_budgets)
+                    _atomic_json(output_dir / ('joint_budgets.json' if joint else 'duration_budgets.json'), duration_budgets)
                 print(
                     json.dumps(
                         {
@@ -760,7 +782,7 @@ def run_closed_loop_training(
     bridge.corrector.load_state_dict(checkpoint["corrector_state"])
     gate_metrics = evaluate_gate(
         lambda dataset, **kwargs: _evaluate(bridge, receiver, dataset, **kwargs),
-        duration=duration,
+        duration=diagnostic,
         datasets=datasets,
         receiver_inputs=receiver_inputs,
         positions=positions,
@@ -812,8 +834,16 @@ def run_closed_loop_training(
     result = {
         "experiment_id": "LIP-H0-017",
         "protocol_version": CLOSED_LOOP_PROTOCOL_VERSION,
-        "claim_status": duration['claim_status'] if duration else experiment["claim_status"],
-        "stage": 'duration_diagnostic_cell' if duration else ("pilot" if pilot else "paired_screen_cell"),
+        "claim_status": diagnostic['claim_status'] if diagnostic else experiment["claim_status"],
+        "stage": 'joint_objective_ablation_cell' if joint else ('duration_diagnostic_cell' if duration else ("pilot" if pilot else "paired_screen_cell")),
+        "joint_objective_ablation": ({'policy': joint, 'arm': objective_arm,
+            'policy_sha256': _lf_sha256_file(joint_policy_path),
+            'resolved_loss': {'incoming_trajectory': incoming_loss_config, 'corrected_state': corrected_loss_config},
+            'budgets': duration_budgets, 'development_gate_evaluated': False,
+            'confirmation_evaluated': False, 'functional_execution_authorized': False,
+            'source_encoder_frozen': all(not p.requires_grad for p in bridge.encoder.parameters()),
+            'receiver_frozen': all(not p.requires_grad for p in receiver.parameters()),
+        } if joint else None),
         "duration_diagnostic": ({'policy': duration,
             'policy_sha256': _lf_sha256_file(duration_policy_path),
             'budgets': duration_budgets, 'development_gate_evaluated': False,

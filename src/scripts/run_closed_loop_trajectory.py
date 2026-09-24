@@ -54,11 +54,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--colab-compute-units-before", type=float)
     parser.add_argument("--dry-run-contract", action="store_true")
     parser.add_argument('--duration-policy', type=Path)
+    parser.add_argument('--joint-policy', type=Path)
+    parser.add_argument('--objective-arm', choices=['regional', 'joint_only'])
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
+    if args.duration_policy and args.joint_policy:
+        raise ValueError('duration and joint policies are mutually exclusive')
+    if args.objective_arm is not None and args.joint_policy is None:
+        raise ValueError('objective arm requires the joint ablation policy')
     experiment = load_yaml(args.experiment_config)
     parent = load_yaml(args.parent_config)
     validate_closed_loop_contract(
@@ -71,6 +77,12 @@ def main() -> None:
         source_registry_path=args.source_registry,
     )
     if args.dry_run_contract:
+        if args.joint_policy:
+            from src.pipelines.joint_objective_ablation import validate_joint_policy
+            from src.pipelines.receiver_aware_replay import _lf_sha256_file
+            validate_joint_policy(json.loads(args.joint_policy.read_text()),
+                base_sha256=_lf_sha256_file(args.experiment_config), pilot=args.pilot,
+                variant=args.variant, arm=args.objective_arm)
         if args.duration_policy:
             from src.pipelines.closed_loop_duration import validate_duration_policy
             from src.pipelines.receiver_aware_replay import _lf_sha256_file
@@ -101,6 +113,8 @@ def main() -> None:
         target_device=str(args.target_device),
         colab_compute_units_before=args.colab_compute_units_before,
         duration_policy_path=args.duration_policy,
+        joint_policy_path=args.joint_policy,
+        objective_arm=args.objective_arm,
     )
     print(
         json.dumps(

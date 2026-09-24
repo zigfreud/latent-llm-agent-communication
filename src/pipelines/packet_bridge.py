@@ -145,6 +145,7 @@ def build_packet_loss(loss_config) -> ComponentAwarePacketLoss:
         lambda_norm=float(loss_config.get("lambda_norm", 0.05)),
         component_weights=loss_config.get("component_weights"),
         margin_region_weights=loss_config.get("margin_region_weights"),
+        identity_regions=loss_config.get("identity_regions"),
     )
 
 
