@@ -117,6 +117,7 @@ def test_summary_satisfies_hardened_worker_contract_without_executing_candidates
     summary = evaluate(policy, generations, tmp_path / 'scores', functional=True,
                        candidate_process_policy=object(), security_context={'validated': True})
     assert summary['execution_mode'] == 'hardened_functional'
+    assert summary['diagnostic_route'] == 'exploratory_task_contract_calibration_completed'
     assert summary['subprocess_is_security_sandbox'] is True
     assert summary['reference_passes_original_tests'] is True
     assert summary['conditions']['text_explicit']['all_32']['tasks'] == 32

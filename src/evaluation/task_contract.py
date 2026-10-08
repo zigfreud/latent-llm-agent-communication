@@ -148,6 +148,7 @@ def evaluate(config, generations_path, output_dir, *, functional=False,
             'lost_task_ids': [t for t in config['task_ids'] if passes[t, baseline] and not passes[t, treatment]]}
     summary = {'experiment_id': config['experiment_id'], 'claim_eligible': False,
         'execution_mode': 'hardened_functional', 'subprocess_is_security_sandbox': True,
+        'diagnostic_route': 'exploratory_task_contract_calibration_completed',
         'scope': config['scope'], 'sandbox': security_context, 'conditions': totals, 'paired_comparisons': paired,
         'reference_passes_original_tests': totals['reference_source']['all_32']['functional_pass'] == 32,
         'no_candidate_repairs': True, 'tests_unchanged': True}
