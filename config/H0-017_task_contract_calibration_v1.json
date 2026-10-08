@@ -113,5 +113,10 @@
     "528",
     "558"
   ],
-  "scope": "Exploratory calibration of public task information; all 32 retained, flagged and unflagged strata reported separately. Not a latent communication result."
+  "scope": "Exploratory calibration of public task information; all 32 retained, flagged and unflagged strata reported separately. Not a latent communication result.",
+  "runtime_packages": {
+    "transformers": "5.16.1",
+    "accelerate": "1.14.0",
+    "bitsandbytes": "0.50.2"
+  }
 }

@@ -63,6 +63,13 @@ registrar também coincidência token a token com a resposta antiga. Medir ganho
 e perdas pareados entre condições, limites de tokens, erros e incompatibilidades
 estáticas de chamada. Um TypeError no corpo não equivale a erro de aridade.
 
+Fixar Transformers 5.16.1, Accelerate 1.14.0 e bitsandbytes 0.50.2 com
+`requirements-h0-017-contract-calibration.txt`. A primeira tentativa em
+08/10/2026 encontrou Transformers 5.18.0 sem `config._commit_hash` e parou
+antes de gerar respostas. Seu log foi preservado; não se removeu a verificação
+de revisão. Torch/CUDA são registrados por execução e a repetição textual
+controla também possíveis diferenças em relação ao ambiente de setembro.
+
 ## Contrato de correção
 
 A métrica primária permanece passar todos os testes originais sem reparo.

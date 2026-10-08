@@ -29,6 +29,9 @@ def run(args):
         print(json.dumps({'validated': True, 'tasks': 32, 'conditions': policy['conditions'],
                           'candidate_code_executed': False, 'registry_sha256': task_sha256(registry)}))
         return
+    packages = {p: importlib.metadata.version(p) for p in policy['runtime_packages']}
+    if packages != policy['runtime_packages']:
+        raise RuntimeError('install requirements-h0-017-contract-calibration.txt before generation: ' + repr(packages))
     import torch
     from src.pipelines.infer import load_target, model_input_device
     if not torch.cuda.is_available() or 'L4' not in torch.cuda.get_device_name(0):
@@ -36,7 +39,7 @@ def run(args):
     metadata = {'policy': policy, 'registry': registry,
         'code_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
         'python': platform.python_version(), 'torch': torch.__version__, 'gpu': torch.cuda.get_device_name(0),
-        'packages': {p: importlib.metadata.version(p) for p in ('transformers', 'bitsandbytes', 'accelerate')},
+        'packages': packages,
         'no_training': True, 'no_latent_packets': True}
     args.output.mkdir(parents=True, exist_ok=True)
     meta_path = args.output / 'generations.metadata.json'
