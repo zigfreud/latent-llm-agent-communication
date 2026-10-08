@@ -101,3 +101,24 @@ def test_grid_is_complete_and_bound_to_public_and_private_inputs(change):
 def test_scoring_requires_validated_sandbox_before_reading_or_executing():
     with pytest.raises(ValueError, match='sandbox'):
         evaluate({}, 'nonexistent.jsonl', 'never-created', functional=True)
+
+
+def test_summary_satisfies_hardened_worker_contract_without_executing_candidates(tmp_path, monkeypatch):
+    policy, registry, rows, metadata = make_grid()
+    for row in rows:
+        row['hit_token_limit'] = False
+    generations = tmp_path / 'generations.jsonl'
+    generations.write_text('\n'.join(json.dumps(r) for r in rows))
+    generations.with_suffix('.metadata.json').write_text(json.dumps(metadata))
+    def fake_evaluate(row, task, **kwargs):
+        return {**row, 'extracted_code': 'pass', 'syntax_pass': True,
+                'functional_pass': True, 'functional_error_type': None}
+    monkeypatch.setattr('src.evaluation.task_contract.evaluate_generation', fake_evaluate)
+    summary = evaluate(policy, generations, tmp_path / 'scores', functional=True,
+                       candidate_process_policy=object(), security_context={'validated': True})
+    assert summary['execution_mode'] == 'hardened_functional'
+    assert summary['subprocess_is_security_sandbox'] is True
+    assert summary['reference_passes_original_tests'] is True
+    assert summary['conditions']['text_explicit']['all_32']['tasks'] == 32
+    assert summary['conditions']['text_explicit']['remaining_25']['tasks'] == 25
+    assert summary['paired_comparisons']['text_original_to_text_explicit'] == {'gained_task_ids': [], 'lost_task_ids': []}
