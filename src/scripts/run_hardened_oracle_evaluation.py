@@ -123,6 +123,9 @@ def sha256_file(path: Path) -> str:
 
 
 def evaluator_for_config(config: dict[str, Any]):
+    if config.get("experiment_id") == "H0-017-task-contract-calibration-v1":
+        from src.evaluation.task_contract import evaluate
+        return evaluate
     if config.get("experiment_id") == "H0-017-joint-functional-v1":
         from src.evaluation.joint_functional import evaluate
         return evaluate
